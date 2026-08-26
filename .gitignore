@@ -1,0 +1,16 @@
+# Node & Angular/Nest JS Dependencies
+**/node_modules/
+**/dist/
+**/.angular/
+
+# Environment files
+**/.env
+**/.env.*
+
+# SQLite Database
+**/prisma/*.db
+**/prisma/*.db-journal
+
+# Logs e arquivos do SO
+*.log
+.DS_Store
