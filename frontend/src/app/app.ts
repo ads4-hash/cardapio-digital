@@ -1,13 +1,13 @@
-import { Component, inject, OnInit } from '@angular/core';
+﻿import { Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { FormsModule } from '@angular/forms'; // <--- Importante adicionar esta linha
+import { FormsModule } from '@angular/forms';
 
 import { ProdutoService, Produto } from './services/produto.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, FormsModule], // <--- Adicionado FormsModule aqui
+  imports: [RouterOutlet, FormsModule],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
@@ -15,6 +15,8 @@ export class App implements OnInit {
   private readonly produtoService = inject(ProdutoService);
   
   produtos: Produto[] = [];
+  carregandoLista = false;
+  carregandoCadastro = false;
 
   // Objeto para vincular aos campos do formulário
   novoProduto: Produto = {
@@ -28,11 +30,16 @@ export class App implements OnInit {
   }
 
   carregarProdutos(): void {
+    this.carregandoLista = true;
     this.produtoService.listar().subscribe({
       next: (dados: Produto[]) => {
         this.produtos = dados;
+        this.carregandoLista = false;
       },
-      error: (err: any) => console.error('Erro ao conectar com o NestJS:', err)
+      error: (err: any) => {
+        console.error('Erro ao conectar com o NestJS:', err);
+        this.carregandoLista = false;
+      }
     });
   }
 
@@ -43,6 +50,7 @@ export class App implements OnInit {
       return;
     }
 
+    this.carregandoCadastro = true;
     this.produtoService.criar(this.novoProduto).subscribe({
       next: (produtoCriado: Produto) => {
         console.log('Produto cadastrado com sucesso:', produtoCriado);
@@ -52,8 +60,13 @@ export class App implements OnInit {
         
         // Recarrega a lista para mostrar o novo produto imediatamente
         this.carregarProdutos();
+        this.carregandoCadastro = false;
       },
-      error: (err: any) => console.error('Erro ao cadastrar produto:', err)
+      error: (err: any) => {
+        console.error('Erro ao cadastrar produto:', err);
+        this.carregandoCadastro = false;
+        alert('Erro ao cadastrar produto. Tente novamente.');
+      }
     });
   }
 }
