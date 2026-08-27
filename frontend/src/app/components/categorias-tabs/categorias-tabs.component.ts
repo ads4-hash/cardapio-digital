@@ -18,6 +18,14 @@ import { ProdutoService } from '../../services/produto.service';
       />
 
       <div class="tabs">
+        <button
+          [class.active]="categoriaSelecionada() === 'todas'"
+          (click)="selecionarCategoria('todas')"
+          class="tab-btn"
+        >
+          Tudo
+        </button>
+
         @for (cat of produtoService.categorias(); track cat.id) {
           <button 
             [class.active]="categoriaSelecionada() === cat.id"
