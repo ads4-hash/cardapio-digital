@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface ItemPedidoDto {
@@ -45,9 +49,15 @@ export class PedidosService {
   }
 
   // Criar um novo pedido
-  async create(data: { cliente: string; mesa?: string; itens: ItemPedidoDto[] }) {
+  async create(data: {
+    cliente: string;
+    mesa?: string;
+    itens: ItemPedidoDto[];
+  }) {
     if (!data.itens || data.itens.length === 0) {
-      throw new BadRequestException('O pedido precisa conter pelo menos um item.');
+      throw new BadRequestException(
+        'O pedido precisa conter pelo menos um item.',
+      );
     }
 
     // Busca os preços atuais de cada produto
@@ -57,24 +67,25 @@ export class PedidosService {
     });
 
     if (produtos.length !== produtoIds.length) {
-      throw new BadRequestException('Um ou mais produtos informados não existem.');
+      throw new BadRequestException(
+        'Um ou mais produtos informados não existem.',
+      );
     }
 
     const produtosMap = new Map(produtos.map((p) => [p.id, p.preco]));
 
-
     let total = 0;
-const itensParaCriar = data.itens.map((item) => {
-  const precoUnitario = Number(produtosMap.get(item.produtoId) ?? 0);
+    const itensParaCriar = data.itens.map((item) => {
+      const precoUnitario = Number(produtosMap.get(item.produtoId) ?? 0);
 
-  total += precoUnitario * Number(item.quantidade);
+      total += precoUnitario * Number(item.quantidade);
 
-  return {
-    produtoId: item.produtoId,
-    quantidade: Number(item.quantidade),
-    preco: precoUnitario,
-  };
-});
+      return {
+        produtoId: item.produtoId,
+        quantidade: Number(item.quantidade),
+        preco: precoUnitario,
+      };
+    });
 
     // Cria o pedido junto com seus itens na mesma transação
     return this.prisma.pedido.create({

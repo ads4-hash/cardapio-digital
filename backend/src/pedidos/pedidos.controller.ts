@@ -36,10 +36,7 @@ export class PedidosController {
   }
 
   @Patch(':id/status')
-  updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: string,
-  ) {
+  updateStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.pedidosService.updateStatus(id, status);
   }
 
