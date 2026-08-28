@@ -1,12 +1,13 @@
-import { Component, inject, input, output } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Produto, resolverImagemUrl } from '../../services/produto.service';
 import { CartService } from '../../services/cart.service';
+import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';
 
 @Component({
   selector: 'app-produto-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PersonalizacaoProdutoComponent],
   template: `
     <div class="card">
       @if (produtoImagemUrl()) {
@@ -26,11 +27,18 @@ import { CartService } from '../../services/cart.service';
             </div>
           } @else {
             <span class="price">{{ produto().preco | currency:'BRL' }}</span>
-            <button class="btn-add" (click)="cartService.add(produto())">Adicionar</button>
+            <button class="btn-add" (click)="adicionar()">Adicionar</button>
           }
         </div>
       </div>
     </div>
+
+    @if (produtoSelecionado()) {
+      <app-personalizacao-produto
+        [produto]="produtoSelecionado()!"
+        (fecharEvento)="fecharPersonalizacao()"
+      ></app-personalizacao-produto>
+    }
   `,
   styles: [`
     .card { border: 1px solid #eee; border-radius: 10px; overflow: hidden; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
@@ -53,7 +61,22 @@ export class ProdutoCardComponent {
   remover = output<string | undefined>();
   cartService = inject(CartService);
 
+  produtoSelecionado = signal<Produto | null>(null);
+
   produtoImagemUrl(): string | undefined {
     return resolverImagemUrl(this.produto().imagemUrl);
+  }
+
+  adicionar(): void {
+    // Produtos com ingredientes abrem o modal de personalização
+    if (this.produto().ingredientes && this.produto().ingredientes!.length > 0) {
+      this.produtoSelecionado.set(this.produto());
+      return;
+    }
+    this.cartService.add(this.produto());
+  }
+
+  fecharPersonalizacao(): void {
+    this.produtoSelecionado.set(null);
   }
 }

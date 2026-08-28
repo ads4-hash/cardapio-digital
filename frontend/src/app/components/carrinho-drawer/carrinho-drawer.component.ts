@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CartService } from '../../services/cart.service';
+import { CartService, ItemIngrediente } from '../../services/cart.service';
 import { PedidoService } from '../../services/pedidos.service';
 
 type Etapa = 'carrinho' | 'checkout' | 'sucesso';
@@ -68,16 +68,26 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
             @if (cartService.items().length === 0) {
               <p>Seu carrinho está vazio.</p>
             } @else {
-              @for (item of cartService.items(); track item.produto.id) {
+              @for (item of cartService.items(); track item.uid) {
                 <div class="cart-item">
-                  <div>
+                  <div class="cart-item-info">
                     <strong>{{ item.produto.nome }}</strong>
-                    <p>{{ item.produto.preco | currency:'BRL' }}</p>
+                    <p class="item-preco">{{ item.precoUnitario | currency:'BRL' }}</p>
+                    @if (item.personalizacao.removidos.length > 0) {
+                      <p class="pers">
+                        Sem: {{ nomesIngredientes(item.personalizacao.removidos) }}
+                      </p>
+                    }
+                    @if (item.personalizacao.adicionados.length > 0) {
+                      <p class="pers extra">
+                        + {{ item.personalizacao.adicionados.map(a => a.nome).join(', ') }}
+                      </p>
+                    }
                   </div>
                   <div class="controls">
-                    <button (click)="cartService.updateQuantity(item.produto.id!, item.quantidade - 1)">-</button>
+                    <button (click)="cartService.updateQuantity(item.uid, item.quantidade - 1)">-</button>
                     <span>{{ item.quantidade }}</span>
-                    <button (click)="cartService.updateQuantity(item.produto.id!, item.quantidade + 1)">+</button>
+                    <button (click)="cartService.updateQuantity(item.uid, item.quantidade + 1)">+</button>
                   </div>
                 </div>
               }
@@ -130,6 +140,10 @@ export class CarrinhoDrawerComponent {
     this.etapa.set('checkout');
   }
 
+  nomesIngredientes(lista: ItemIngrediente[]): string {
+    return lista.map((i) => i.nome).join(', ');
+  }
+
   voltar(): void {
     this.erro.set(null);
     this.etapa.set('carrinho');
@@ -149,6 +163,8 @@ export class CarrinhoDrawerComponent {
     const itens = this.cartService.items().map((item) => ({
       produtoId: item.produto.id!,
       quantidade: item.quantidade,
+      removidos: item.personalizacao.removidos.map((r) => r.ingredienteId),
+      adicionados: item.personalizacao.adicionados.map((a) => a.ingredienteId),
     }));
 
     this.pedidoService

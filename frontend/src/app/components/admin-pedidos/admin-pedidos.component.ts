@@ -54,7 +54,15 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
               <ul class="itens">
                 @for (item of pedido.itens; track item.id) {
                   <li>
-                    <span>{{ item.quantidade }}x {{ item.produto.nome }}</span>
+                    <span class="item-nome">
+                      {{ item.quantidade }}x {{ item.produto.nome }}
+                      @if (listaRemovidos(item).length > 0) {
+                        <span class="pers-tag removido">sem {{ listaRemovidos(item).join(', ') }}</span>
+                      }
+                      @if (listaAdicionados(item).length > 0) {
+                        <span class="pers-tag adicionado">+ {{ listaAdicionados(item).join(', ') }}</span>
+                      }
+                    </span>
                     <span>{{ item.preco * item.quantidade | currency:'BRL' }}</span>
                   </li>
                 }
@@ -85,6 +93,10 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     .pedido-info { margin: 4px 0; color: #555; font-size: 0.9rem; }
     .itens { list-style: none; margin: 8px 0; padding: 0; border-top: 1px solid #f0f0f0; }
     .itens li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f7f7f7; font-size: 0.9rem; }
+    .item-nome { display: flex; flex-direction: column; }
+    .pers-tag { font-size: 0.75rem; font-weight: normal; }
+    .pers-tag.removido { color: #e74c3c; }
+    .pers-tag.adicionado { color: #27ae60; }
     .pedido-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .pedido-bottom select { padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; background: white; }
     .btn-remove { padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
@@ -104,6 +116,23 @@ export class AdminPedidosComponent implements OnInit {
 
   pedidos = signal<Pedido[]>([]);
   carregando = signal(false);
+
+  private parseLista(valor: string): string[] {
+    try {
+      const parsed = JSON.parse(valor);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  listaRemovidos(item: Pedido['itens'][number]): string[] {
+    return this.parseLista(item.removidos);
+  }
+
+  listaAdicionados(item: Pedido['itens'][number]): string[] {
+    return this.parseLista(item.adicionados);
+  }
 
   ngOnInit(): void {
     this.carregar();

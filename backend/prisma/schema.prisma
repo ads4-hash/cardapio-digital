@@ -24,8 +24,28 @@ model Produto {
   categoria   Categoria   @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   categoriaId String
   itensPedido ItemPedido[]
+  ingredientes ProdutoIngrediente[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+}
+
+model Ingrediente {
+  id            String      @id @default(uuid())
+  nome          String
+  produtos      ProdutoIngrediente[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model ProdutoIngrediente {
+  id              String      @id @default(uuid())
+  produtoId       String
+  ingredienteId   String
+  precoAdicional  Float       @default(0)
+  produto         Produto     @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  ingrediente     Ingrediente @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+
+  @@unique([produtoId, ingredienteId])
 }
 
 model Pedido {
@@ -43,6 +63,8 @@ model ItemPedido {
   id         String   @id @default(uuid())
   quantidade Int
   preco      Float
+  removidos  String   @default("[]") // nomes dos ingredientes removidos (JSON)
+  adicionados String  @default("[]") // nomes dos ingredientes adicionados (JSON)
   pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   pedidoId   String
   produto    Produto  @relation(fields: [produtoId], references: [id])

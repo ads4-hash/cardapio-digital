@@ -52,10 +52,15 @@ export class PedidosService {
       );
     }
 
-    // Busca os preços atuais de cada produto
+    // Busca os preços atuais de cada produto e seus ingredientes
     const produtoIds = data.itens.map((i) => i.produtoId);
     const produtos = await this.prisma.produto.findMany({
       where: { id: { in: produtoIds } },
+      include: {
+        ingredientes: {
+          include: { ingrediente: true },
+        },
+      },
     });
 
     if (produtos.length !== produtoIds.length) {
@@ -64,11 +69,36 @@ export class PedidosService {
       );
     }
 
-    const produtosMap = new Map(produtos.map((p) => [p.id, p.preco]));
+    const produtosMap = new Map(produtos.map((p) => [p.id, p]));
 
     let total = 0;
     const itensParaCriar = data.itens.map((item) => {
-      const precoUnitario = Number(produtosMap.get(item.produtoId) ?? 0);
+      const produto = produtosMap.get(item.produtoId)!;
+      const precoBase = Number(produto.preco);
+
+      // Soma o preço de cada ingrediente adicionado como extra
+      const adicionadosNomes: string[] = [];
+      let adicionalTotal = 0;
+
+      for (const id of item.adicionados ?? []) {
+        const vinculo = produto.ingredientes.find(
+          (c) => c.ingredienteId === id,
+        );
+        const nome = vinculo?.ingrediente.nome ?? id;
+        adicionadosNomes.push(nome);
+        adicionalTotal += Number(vinculo?.precoAdicional ?? 0);
+      }
+
+      // Guarda os nomes dos ingredientes removidos
+      const removidosNomes: string[] = [];
+      for (const id of item.removidos ?? []) {
+        const vinculo = produto.ingredientes.find(
+          (c) => c.ingredienteId === id,
+        );
+        removidosNomes.push(vinculo?.ingrediente.nome ?? id);
+      }
+
+      const precoUnitario = precoBase + adicionalTotal;
 
       total += precoUnitario * Number(item.quantidade);
 
@@ -76,6 +106,8 @@ export class PedidosService {
         produtoId: item.produtoId,
         quantidade: Number(item.quantidade),
         preco: precoUnitario,
+        removidos: JSON.stringify(removidosNomes),
+        adicionados: JSON.stringify(adicionadosNomes),
       };
     });
 

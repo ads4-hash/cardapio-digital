@@ -6,6 +6,7 @@ import { CategoriasModule } from './categorias/categorias.module';
 import { ProdutosModule } from './produtos/produtos.module';
 import { PedidosModule } from './pedidos/pedidos.module';
 import { UploadModule } from './upload/upload.module';
+import { IngredientesModule } from './ingredientes/ingredientes.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UploadModule } from './upload/upload.module';
     ProdutosModule,
     PedidosModule,
     UploadModule,
+    IngredientesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

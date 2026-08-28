@@ -5,13 +5,20 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProdutosService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly includeCompleto = {
+    categoria: true,
+    ingredientes: {
+      include: {
+        ingrediente: true,
+      },
+    },
+  };
+
   // Listar todos os produtos (com opção de filtrar por categoria)
   async findAll(categoriaId?: string) {
     return this.prisma.produto.findMany({
       where: categoriaId ? { categoriaId } : {},
-      include: {
-        categoria: true,
-      },
+      include: this.includeCompleto,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -20,7 +27,7 @@ export class ProdutosService {
   async findOne(id: string) {
     const produto = await this.prisma.produto.findUnique({
       where: { id },
-      include: { categoria: true },
+      include: this.includeCompleto,
     });
 
     if (!produto) {
@@ -37,6 +44,7 @@ export class ProdutosService {
     preco: number;
     imagemUrl?: string;
     categoriaId: string;
+    ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
   }) {
     return this.prisma.produto.create({
       data: {
@@ -45,7 +53,16 @@ export class ProdutosService {
         preco: Number(data.preco),
         imagemUrl: data.imagemUrl,
         categoriaId: data.categoriaId,
+        ingredientes: data.ingredientes
+          ? {
+              create: data.ingredientes.map((i) => ({
+                ingredienteId: i.ingredienteId,
+                precoAdicional: Number(i.precoAdicional ?? 0),
+              })),
+            }
+          : undefined,
       },
+      include: this.includeCompleto,
     });
   }
 
@@ -58,6 +75,7 @@ export class ProdutosService {
       preco?: number;
       imagemUrl?: string;
       categoriaId?: string;
+      ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
     },
   ) {
     await this.findOne(id);
@@ -65,9 +83,22 @@ export class ProdutosService {
     return this.prisma.produto.update({
       where: { id },
       data: {
-        ...data,
+        nome: data.nome,
+        descricao: data.descricao,
         preco: data.preco !== undefined ? Number(data.preco) : undefined,
+        imagemUrl: data.imagemUrl,
+        categoriaId: data.categoriaId,
+        ingredientes: data.ingredientes
+          ? {
+              deleteMany: {},
+              create: data.ingredientes.map((i) => ({
+                ingredienteId: i.ingredienteId,
+                precoAdicional: Number(i.precoAdicional ?? 0),
+              })),
+            }
+          : undefined,
       },
+      include: this.includeCompleto,
     });
   }
 

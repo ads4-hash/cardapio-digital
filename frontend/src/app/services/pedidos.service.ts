@@ -11,6 +11,8 @@ export interface ItemPedido {
   id: string;
   quantidade: number;
   preco: number;
+  removidos: string;
+  adicionados: string;
   produtoId: string;
   produto: Produto;
 }
@@ -29,7 +31,12 @@ export interface Pedido {
 export interface CreatePedido {
   cliente: string;
   mesa?: string;
-  itens: { produtoId: string; quantidade: number }[];
+  itens: {
+    produtoId: string;
+    quantidade: number;
+    removidos?: string[];
+    adicionados?: string[];
+  }[];
 }
 
 @Injectable({

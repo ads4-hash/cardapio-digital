@@ -19,6 +19,16 @@ export class ItemPedidoDto {
   @IsInt({ message: 'A quantidade deve ser um número inteiro.' })
   @Min(1, { message: 'A quantidade deve ser ao menos 1.' })
   quantidade: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  removidos?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  adicionados?: string[];
 }
 
 export class CreatePedidoDto {

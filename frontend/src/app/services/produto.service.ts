@@ -12,6 +12,21 @@ export interface Categoria {
   produtos?: Produto[];
 }
 
+// Interface representando o vínculo de um ingrediente a um produto
+export interface ProdutoIngrediente {
+  id?: string;
+  precoAdicional: number;
+  ingredienteId: string;
+  ingrediente?: Ingrediente;
+}
+
+// Interface representando a entidade do Ingrediente
+export interface Ingrediente {
+  id: string;
+  nome: string;
+  produtos?: ProdutoIngrediente[];
+}
+
 // Interface representando a entidade do Produto
 export interface Produto {
   id?: string;
@@ -22,6 +37,7 @@ export interface Produto {
   categoriaId: string;
   categoria?: Categoria;
   categoriaNome?: string;
+  ingredientes?: ProdutoIngrediente[];
 }
 
 // Retorna a URL completa de uma imagem (a API devolve caminhos relativos como /uploads/...)
@@ -56,6 +72,7 @@ export class ProdutoService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly API_URL = `${environment.apiUrl}/produtos`;
   private readonly CATEGORIAS_URL = `${environment.apiUrl}/categorias`;
+  private readonly INGREDIENTES_URL = `${environment.apiUrl}/ingredientes`;
   private readonly UPLOAD_URL = `${environment.apiUrl}/upload`;
 
   // Estado reativo consumido pelos componentes
@@ -129,6 +146,26 @@ export class ProdutoService {
   // Buscar todas as categorias (GET /categorias)
   listarCategorias(): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(this.CATEGORIAS_URL);
+  }
+
+  // Buscar todos os ingredientes (GET /ingredientes)
+  listarIngredientes(): Observable<Ingrediente[]> {
+    return this.http.get<Ingrediente[]>(this.INGREDIENTES_URL);
+  }
+
+  // Criar ingrediente (POST /ingredientes)
+  criarIngrediente(dados: { nome: string }): Observable<Ingrediente> {
+    return this.http.post<Ingrediente>(this.INGREDIENTES_URL, dados);
+  }
+
+  // Atualizar ingrediente (PATCH /ingredientes/:id)
+  atualizarIngrediente(id: string, dados: { nome?: string }): Observable<Ingrediente> {
+    return this.http.patch<Ingrediente>(`${this.INGREDIENTES_URL}/${id}`, dados);
+  }
+
+  // Deletar ingrediente (DELETE /ingredientes/:id)
+  excluirIngrediente(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.INGREDIENTES_URL}/${id}`);
   }
 
   // Buscar produto por ID (GET /produtos/:id)

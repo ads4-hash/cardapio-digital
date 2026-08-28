@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import {
   ProdutoService,
   Produto,
+  Ingrediente,
   filtrarProdutos,
   resolverImagemUrl,
 } from '../../services/produto.service';
@@ -12,7 +13,7 @@ import { CategoriasTabsComponent } from '../../components/categorias-tabs/catego
 import { ProdutoCardComponent } from '../../components/produto-card/produto-card.component';
 import { AdminPedidosComponent } from '../../components/admin-pedidos/admin-pedidos.component';
 
-type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
+type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
 
 @Component({
   selector: 'app-admin-screen',
@@ -35,6 +36,14 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
               <span class="rotulo">
                 <strong>Adicionar Produto</strong>
                 <small>Cadastrar um novo item no cardápio</small>
+              </span>
+            </button>
+
+            <button class="botao-grande ingredientes" (click)="navegar('ingredientes')">
+              <span class="icone">🧀</span>
+              <span class="rotulo">
+                <strong>Adicionar Ingrediente</strong>
+                <small>Cadastrar ou remover ingredientes</small>
               </span>
             </button>
 
@@ -138,6 +147,63 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
               }
             </div>
 
+            <div class="ingredientes-form">
+              <label>Ingredientes</label>
+              <p class="ingredientes-ajuda">
+                Clique nos ingredientes para incluir no produto. Defina um preço extra para os que o cliente pode adicionar.
+              </p>
+              @if (ingredientesDisponiveis().length === 0) {
+                <p class="img-status">Nenhum ingrediente cadastrado.</p>
+              } @else {
+                <input
+                  type="text"
+                  class="ing-busca"
+                  name="buscaIngrediente"
+                  [ngModel]="buscaIngrediente()"
+                  (ngModelChange)="buscaIngrediente.set($event)"
+                  placeholder="Buscar ingrediente..."
+                />
+                @if (ingredientesFiltrados().length === 0) {
+                  <p class="img-status">Nenhum ingrediente encontrado para "{{ buscaIngrediente() }}".</p>
+                } @else {
+                  <div class="ing-chips">
+                    @for (ing of ingredientesFiltrados(); track ing.id) {
+                      <button
+                        type="button"
+                        class="chip-select"
+                        [class.selecionado]="ingredienteIncluso(ing.id)"
+                        (click)="alternarIngrediente(ing.id)"
+                      >
+                        {{ ing.nome }}
+                      </button>
+                    }
+                  </div>
+                }
+                @if (ingredientesDoProduto().length > 0) {
+                  <div class="ing-adicionais">
+                    <p class="ing-adicionais-titulo">Adicionais do produto</p>
+                    @for (ing of ingredientesDoProduto(); track ing.id) {
+                      <div class="ing-adicional-linha">
+                        <span class="ing-adicional-nome">{{ ing.nome }}</span>
+                        <label class="ing-adicional-preco">
+                          Extra (R$)
+                          <input
+                            type="number"
+                            class="ing-preco"
+                            step="0.01"
+                            min="0"
+                            placeholder="0,00"
+                            [value]="ingredientePrecoExtra(ing.id)"
+                            (change)="definirPrecoIngrediente(ing.id, $event)"
+                          />
+                        </label>
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            </div>
+
             <button type="submit" class="btn-submit" [disabled]="carregandoCadastro || enviandoImagem()">
               {{ editando ? (carregandoCadastro ? 'Salvando...' : 'Salvar Alterações') : (carregandoCadastro ? 'Cadastrando...' : 'Cadastrar Produto') }}
             </button>
@@ -145,6 +211,35 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
               <button type="button" class="btn-cancel" (click)="cancelarEdicao()">Cancelar</button>
             }
           </form>
+        </section>
+      }
+
+      @if (secao() === 'ingredientes') {
+        <button class="btn-voltar" (click)="voltar()">← Voltar</button>
+        <section class="admin-form">
+          <h2>Gerenciar Ingredientes</h2>
+          <div class="gestor-novo">
+            <input
+              type="text"
+              [ngModel]="novoIngredienteNome()"
+              (ngModelChange)="novoIngredienteNome.set($event)"
+              placeholder="Novo ingrediente (ex: Bacon)"
+              (keyup.enter)="criarIngrediente()"
+            />
+            <button (click)="criarIngrediente()">Adicionar</button>
+          </div>
+          @if (ingredientesDisponiveis().length === 0) {
+            <p class="img-status">Nenhum ingrediente cadastrado.</p>
+          } @else {
+            <div class="ing-chips">
+              @for (ing of ingredientesDisponiveis(); track ing.id) {
+                <span class="chip">
+                  {{ ing.nome }}
+                  <button class="chip-remove" (click)="removerIngrediente(ing.id)">✕</button>
+                </span>
+              }
+            </div>
+          }
         </section>
       }
 
@@ -203,6 +298,7 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
     .botao-grande.adicionar { background: #28a745; }
     .botao-grande.produtos { background: #3498db; }
     .botao-grande.pedidos { background: #e67e22; }
+    .botao-grande.ingredientes { background: #8e44ad; }
     .botao-grande .icone { font-size: 2.2rem; flex-shrink: 0; }
     .botao-grande .rotulo { display: flex; flex-direction: column; gap: 4px; }
     .botao-grande .rotulo strong { font-size: 1.4rem; }
@@ -266,6 +362,58 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos';
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 16px;
     }
+
+    .ingredientes-form { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .ingredientes-form label { display: block; margin-bottom: 4px; font-weight: bold; }
+    .ingredientes-ajuda { font-size: 0.8rem; color: #666; margin: 0 0 8px; }
+    .ing-busca {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+    .chip-select {
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: #333;
+      transition: background 0.15s ease, color 0.15s ease, border 0.15s ease;
+    }
+    .chip-select:hover { border-color: #8e44ad; }
+    .chip-select.selecionado {
+      background: #8e44ad;
+      color: white;
+      border-color: #8e44ad;
+    }
+    .ing-adicionais {
+      margin-top: 14px;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .ing-adicionais-titulo { margin: 0 0 8px; font-size: 0.85rem; color: #555; font-weight: bold; }
+    .ing-adicional-linha {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+    }
+    .ing-adicional-nome { font-size: 0.9rem; }
+    .ing-adicional-preco { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #555; font-weight: normal; }
+    .ing-preco { width: 90px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+
+    .gestor-novo { display: flex; gap: 8px; margin-bottom: 14px; }
+    .gestor-novo input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+    .gestor-novo button { padding: 8px 14px; background: #8e44ad; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .gestor-novo button:hover { background: #732d91; }
+    .ing-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #ddd; border-radius: 20px; padding: 4px 10px; font-size: 0.85rem; }
+    .chip-remove { border: none; background: transparent; color: #e74c3c; cursor: pointer; font-weight: bold; }
   `,
   ],
 })
@@ -293,9 +441,51 @@ export class AdminScreenComponent implements OnInit {
     categoriaId: '',
   };
 
+  // Lista global de ingredientes cadastrados (para vínculo no produto)
+  ingredientesDisponiveis = signal<Ingrediente[]>([]);
+  // ingredientes selecionados para o produto (id -> precoAdicional)
+  ingredientesSelecionados = signal<Record<string, number>>({});
+  novoIngredienteNome = signal<string>('');
+  // termo de busca na seção de ingredientes do cadastro de produto
+  buscaIngrediente = signal<string>('');
+
   ngOnInit(): void {
     this.produtoService.loadCategorias();
     this.produtoService.loadProdutos();
+    this.carregarIngredientes();
+  }
+
+  carregarIngredientes(): void {
+    this.produtoService.listarIngredientes().subscribe({
+      next: (dados) => this.ingredientesDisponiveis.set(dados),
+      error: (err) => console.error('Erro ao carregar ingredientes:', err),
+    });
+  }
+
+  criarIngrediente(): void {
+    const nome = this.novoIngredienteNome().trim();
+    if (!nome) return;
+    this.produtoService.criarIngrediente({ nome }).subscribe({
+      next: () => {
+        this.novoIngredienteNome.set('');
+        this.carregarIngredientes();
+      },
+      error: (err) => {
+        console.error('Erro ao criar ingrediente:', err);
+        alert('Erro ao criar ingrediente. Tente novamente.');
+      },
+    });
+  }
+
+  removerIngrediente(id: string): void {
+    if (!confirm('Deseja remover este ingrediente?')) return;
+    this.produtoService.excluirIngrediente(id).subscribe({
+      next: () => this.carregarIngredientes(),
+      error: (err) => {
+        console.error('Erro ao remover ingrediente:', err);
+        alert('Erro ao remover ingrediente. Verifique se ele não está em uso.');
+      },
+    });
   }
 
   produtos(): Produto[] {
@@ -348,6 +538,63 @@ export class AdminScreenComponent implements OnInit {
     this.precoFormatado.set('');
   }
 
+  ingredienteIncluso(id: string): boolean {
+    return id in this.ingredientesSelecionados();
+  }
+
+  // Ingredientes filtrados pelo termo de busca (na tela de cadastro de produto)
+  ingredientesFiltrados(): Ingrediente[] {
+    const termo = this.buscaIngrediente().trim().toLowerCase();
+    if (!termo) return this.ingredientesDisponiveis();
+    return this.ingredientesDisponiveis().filter((ing) =>
+      ing.nome.toLowerCase().includes(termo),
+    );
+  }
+
+  // Ingredientes selecionados (objetos completos) na ordem cadastrada
+  ingredientesDoProduto(): Ingrediente[] {
+    return this.ingredientesDisponiveis().filter((ing) =>
+      this.ingredienteIncluso(ing.id),
+    );
+  }
+
+  ingredientePrecoExtra(id: string): number {
+    return this.ingredientesSelecionados()[id] ?? 0;
+  }
+
+  alternarIngrediente(id: string): void {
+    const atual = this.ingredientesSelecionados();
+    if (id in atual) {
+      const { [id]: _removido, ...resto } = atual;
+      this.ingredientesSelecionados.set(resto);
+    } else {
+      this.ingredientesSelecionados.set({ ...atual, [id]: 0 });
+    }
+  }
+
+  definirPrecoIngrediente(id: string, event: Event): void {
+    const valor = Number((event.target as HTMLInputElement).value);
+    const atual = this.ingredientesSelecionados();
+    this.ingredientesSelecionados.set({
+      ...atual,
+      [id]: isNaN(valor) ? 0 : valor,
+    });
+  }
+
+  // Monta a lista de ingredientes para enviar ao backend
+  ingredientesParaSalvar(): { ingredienteId: string; precoAdicional: number }[] {
+    return Object.entries(this.ingredientesSelecionados()).map(
+      ([ingredienteId, precoAdicional]) => ({
+        ingredienteId,
+        precoAdicional: Number(precoAdicional) || 0,
+      }),
+    );
+  }
+
+  limparIngredientesSelecionados(): void {
+    this.ingredientesSelecionados.set({});
+  }
+
   onImagemSelecionada(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -386,19 +633,22 @@ export class AdminScreenComponent implements OnInit {
     }
 
     this.carregandoCadastro = true;
-    this.produtoService.criar(this.novoProduto).subscribe({
-      next: () => {
-        this.novoProduto = { nome: '', descricao: '', preco: 0, categoriaId: '' };
-        this.limparPrecoFormatado();
-        this.produtoService.recarregarProdutos();
-        this.carregandoCadastro = false;
-      },
-      error: (err: any) => {
-        console.error('Erro ao cadastrar produto:', err);
-        this.carregandoCadastro = false;
-        alert('Erro ao cadastrar produto. Tente novamente.');
-      },
-    });
+    this.produtoService
+      .criar({ ...this.novoProduto, ingredientes: this.ingredientesParaSalvar() })
+      .subscribe({
+        next: () => {
+          this.novoProduto = { nome: '', descricao: '', preco: 0, categoriaId: '' };
+          this.limparPrecoFormatado();
+          this.limparIngredientesSelecionados();
+          this.produtoService.recarregarProdutos();
+          this.carregandoCadastro = false;
+        },
+        error: (err: any) => {
+          console.error('Erro ao cadastrar produto:', err);
+          this.carregandoCadastro = false;
+          alert('Erro ao cadastrar produto. Tente novamente.');
+        },
+      });
   }
 
   editarProduto(produto: Produto): void {
@@ -414,6 +664,14 @@ export class AdminScreenComponent implements OnInit {
     this.precoFormatado.set(
       produto.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     );
+
+    // Preenche a seleção de ingredientes a partir do produto
+    const selecao: Record<string, number> = {};
+    for (const vinculo of produto.ingredientes ?? []) {
+      selecao[vinculo.ingredienteId] = vinculo.precoAdicional ?? 0;
+    }
+    this.ingredientesSelecionados.set(selecao);
+
     this.navegar('cadastro');
   }
 
@@ -428,11 +686,13 @@ export class AdminScreenComponent implements OnInit {
       preco: this.novoProduto.preco,
       categoriaId: this.novoProduto.categoriaId,
       imagemUrl: this.novoProduto.imagemUrl,
+      ingredientes: this.ingredientesParaSalvar(),
     }).subscribe({
       next: () => {
         this.novoProduto = { nome: '', descricao: '', preco: 0, categoriaId: '' };
         this.editando = null;
         this.limparPrecoFormatado();
+        this.limparIngredientesSelecionados();
         this.produtoService.recarregarProdutos();
         this.carregandoCadastro = false;
       },
@@ -448,6 +708,7 @@ export class AdminScreenComponent implements OnInit {
     this.editando = null;
     this.novoProduto = { nome: '', descricao: '', preco: 0, categoriaId: '' };
     this.limparPrecoFormatado();
+    this.limparIngredientesSelecionados();
   }
 
   removerProduto(id?: string): void {
