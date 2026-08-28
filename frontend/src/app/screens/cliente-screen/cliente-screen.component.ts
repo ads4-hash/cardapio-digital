@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { ProdutoService, Produto } from '../../services/produto.service';
+import { ProdutoService, Produto, filtrarProdutos } from '../../services/produto.service';
 import { CategoriasTabsComponent } from '../../components/categorias-tabs/categorias-tabs.component';
 import { ProdutoCardComponent } from '../../components/produto-card/produto-card.component';
 import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrinho-drawer.component';
@@ -60,16 +60,11 @@ export class ClienteScreenComponent implements OnInit {
   }
 
   produtosFiltrados(): Produto[] {
-    const busca = this.buscaFiltro().toLowerCase();
-    return this.produtos().filter((p) => {
-      const combinaCategoria =
-        this.categoriaFiltro() === 'todas' || p.categoriaId === this.categoriaFiltro();
-      const combinaBusca =
-        busca === '' ||
-        p.nome.toLowerCase().includes(busca) ||
-        (p.descricao?.toLowerCase().includes(busca) ?? false);
-      return combinaCategoria && combinaBusca;
-    });
+    return filtrarProdutos(
+      this.produtos(),
+      this.categoriaFiltro(),
+      this.buscaFiltro(),
+    );
   }
 
   onFiltroChange(filtro: { categoria: string; busca: string }): void {

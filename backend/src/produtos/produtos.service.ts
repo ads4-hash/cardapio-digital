@@ -66,7 +66,7 @@ export class ProdutosService {
       where: { id },
       data: {
         ...data,
-        preco: data.preco ? Number(data.preco) : undefined,
+        preco: data.preco !== undefined ? Number(data.preco) : undefined,
       },
     });
   }

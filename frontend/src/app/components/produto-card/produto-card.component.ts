@@ -1,6 +1,6 @@
 import { Component, inject, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Produto } from '../../services/produto.service';
+import { Produto, resolverImagemUrl } from '../../services/produto.service';
 import { CartService } from '../../services/cart.service';
 
 @Component({
@@ -9,8 +9,8 @@ import { CartService } from '../../services/cart.service';
   imports: [CommonModule],
   template: `
     <div class="card">
-      @if (produto().imagemUrl) {
-        <img [src]="produto().imagemUrl" alt="{{ produto().nome }}" class="card-img" />
+      @if (produtoImagemUrl()) {
+        <img [src]="produtoImagemUrl()" alt="{{ produto().nome }}" class="card-img" />
       }
       <div class="card-body">
         <h3>{{ produto().nome }}</h3>
@@ -52,4 +52,8 @@ export class ProdutoCardComponent {
   editar = output<Produto>();
   remover = output<string | undefined>();
   cartService = inject(CartService);
+
+  produtoImagemUrl(): string | undefined {
+    return resolverImagemUrl(this.produto().imagemUrl);
+  }
 }

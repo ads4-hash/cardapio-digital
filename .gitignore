@@ -2,10 +2,14 @@
 **/node_modules/
 **/dist/
 **/.angular/
+**/*.tsbuildinfo
 
 # Environment files
 **/.env
 **/.env.*
+
+# Arquivos enviados pelo admin (imagens de produtos)
+**/uploads/
 
 # SQLite Database
 **/prisma/*.db

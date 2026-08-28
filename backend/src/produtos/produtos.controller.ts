@@ -9,6 +9,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ProdutosService } from './produtos.service';
+import { CreateProdutoDto } from './dto/create-produto.dto';
+import { UpdateProdutoDto } from './dto/update-produto.dto';
 
 @Controller('produtos')
 export class ProdutosController {
@@ -25,31 +27,12 @@ export class ProdutosController {
   }
 
   @Post()
-  create(
-    @Body()
-    dto: {
-      nome: string;
-      descricao?: string;
-      preco: number;
-      imagemUrl?: string;
-      categoriaId: string;
-    },
-  ) {
+  create(@Body() dto: CreateProdutoDto) {
     return this.produtosService.create(dto);
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body()
-    dto: {
-      nome?: string;
-      descricao?: string;
-      preco?: number;
-      imagemUrl?: string;
-      categoriaId?: string;
-    },
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateProdutoDto) {
     return this.produtosService.update(id, dto);
   }
 

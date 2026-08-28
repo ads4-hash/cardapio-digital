@@ -1,6 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, PLATFORM_ID } from '@angular/core';
+import { isPlatformServer } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Observable, shareReplay } from 'rxjs';
+
+import { environment } from '../environment';
 
 // Interface representando a entidade do Categoria
 export interface Categoria {
@@ -21,13 +24,39 @@ export interface Produto {
   categoriaNome?: string;
 }
 
+// Retorna a URL completa de uma imagem (a API devolve caminhos relativos como /uploads/...)
+export function resolverImagemUrl(imagemUrl?: string): string | undefined {
+  if (!imagemUrl) return undefined;
+  return imagemUrl.startsWith('/') ? `${environment.apiUrl}${imagemUrl}` : imagemUrl;
+}
+
+// Filtra produtos por categoria e termo de busca (lógica compartilhada entre as telas)
+export function filtrarProdutos(
+  produtos: Produto[],
+  categoriaFiltro: string,
+  buscaFiltro: string,
+): Produto[] {
+  const busca = buscaFiltro.trim().toLowerCase();
+  return produtos.filter((p) => {
+    const combinaCategoria =
+      categoriaFiltro === 'todas' || p.categoriaId === categoriaFiltro;
+    const combinaBusca =
+      busca === '' ||
+      p.nome.toLowerCase().includes(busca) ||
+      (p.descricao?.toLowerCase().includes(busca) ?? false);
+    return combinaCategoria && combinaBusca;
+  });
+}
+
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ProdutoService {
   private readonly http = inject(HttpClient);
-  private readonly API_URL = 'http://localhost:3000/produtos';
-  private readonly CATEGORIAS_URL = 'http://localhost:3000/categorias';
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly API_URL = `${environment.apiUrl}/produtos`;
+  private readonly CATEGORIAS_URL = `${environment.apiUrl}/categorias`;
+  private readonly UPLOAD_URL = `${environment.apiUrl}/upload`;
 
   // Estado reativo consumido pelos componentes
   produtos = signal<Produto[]>([]);
@@ -46,12 +75,15 @@ export class ProdutoService {
 
   // Carrega categorias uma única vez e reutiliza o resultado em cache
   loadCategorias(force = false): void {
+    // Evita chamadas HTTP durante o SSR/prerender (raio do cliente executa após a hidratação)
+    if (isPlatformServer(this.platformId)) return;
     if (this.categoriasEmVoo) return;
     if (!force && this.categorias().length > 0) return;
 
     this.categoriasEmVoo = true;
     this.carregandoCategorias.set(true);
 
+    if (force) this.categoriasCache$ = undefined;
     this.categoriasCache$ ??= this.listarCategorias().pipe(shareReplay(1));
     this.categoriasCache$.subscribe({
       next: (dados) => this.categorias.set(dados),
@@ -65,12 +97,14 @@ export class ProdutoService {
 
   // Carrega produtos; se já carregados, apenas retorna sem nova chamada
   loadProdutos(force = false): void {
+    if (isPlatformServer(this.platformId)) return;
     if (this.produtosEmVoo) return;
     if (!force && this.produtos().length > 0) return;
 
     this.produtosEmVoo = true;
     this.carregandoProdutos.set(true);
 
+    if (force) this.produtosCache$ = undefined;
     this.produtosCache$ ??= this.listar().pipe(shareReplay(1));
     this.produtosCache$.subscribe({
       next: (dados) => this.produtos.set(dados),
@@ -84,8 +118,6 @@ export class ProdutoService {
 
   // Recarrega ignorando o cache (usado após cadastrar/remover)
   recarregarProdutos(): void {
-    this.produtosCache$ = undefined;
-    this.produtosEmVoo = false;
     this.loadProdutos(true);
   }
 
@@ -94,7 +126,7 @@ export class ProdutoService {
     return this.http.get<Produto[]>(this.API_URL);
   }
 
-  // Buscar todos as categorias (GET /categorias)
+  // Buscar todas as categorias (GET /categorias)
   listarCategorias(): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(this.CATEGORIAS_URL);
   }
@@ -117,5 +149,12 @@ export class ProdutoService {
   // Deletar produto (DELETE /produtos/:id)
   excluir(id: string): Observable<void> {
     return this.http.delete<void>(`${this.API_URL}/${id}`);
+  }
+
+  // Envia uma imagem e retorna a URL relativa salva na API (POST /upload)
+  uploadImagem(file: File): Observable<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    return this.http.post<{ url: string }>(this.UPLOAD_URL, formData);
   }
 }

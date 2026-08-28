@@ -4,11 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-interface ItemPedidoDto {
-  produtoId: string;
-  quantidade: number;
-}
+import { CreatePedidoDto } from './dto/create-pedido.dto';
 
 @Injectable()
 export class PedidosService {
@@ -49,11 +45,7 @@ export class PedidosService {
   }
 
   // Criar um novo pedido
-  async create(data: {
-    cliente: string;
-    mesa?: string;
-    itens: ItemPedidoDto[];
-  }) {
+  async create(data: CreatePedidoDto) {
     if (!data.itens || data.itens.length === 0) {
       throw new BadRequestException(
         'O pedido precisa conter pelo menos um item.',

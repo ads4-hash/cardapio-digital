@@ -1,4 +1,18 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreatePedidoDto } from './create-pedido.dto';
+import { IsIn } from 'class-validator';
 
-export class UpdatePedidoDto extends PartialType(CreatePedidoDto) {}
+export const PEDIDO_STATUS = [
+  'PENDENTE',
+  'EM_PREPARO',
+  'CONCLUIDO',
+  'CANCELADO',
+] as const;
+
+export type PedidoStatus = (typeof PEDIDO_STATUS)[number];
+
+export class UpdatePedidoDto {
+  @IsIn(PEDIDO_STATUS, {
+    message:
+      'Status inválido. Use PENDENTE, EM_PREPARO, CONCLUIDO ou CANCELADO.',
+  })
+  status: string;
+}

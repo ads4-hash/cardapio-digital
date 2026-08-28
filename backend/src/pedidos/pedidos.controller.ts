@@ -8,6 +8,8 @@ import {
   Delete,
 } from '@nestjs/common';
 import { PedidosService } from './pedidos.service';
+import { CreatePedidoDto } from './dto/create-pedido.dto';
+import { UpdatePedidoDto } from './dto/update-pedido.dto';
 
 @Controller('pedidos')
 export class PedidosController {
@@ -24,20 +26,13 @@ export class PedidosController {
   }
 
   @Post()
-  create(
-    @Body()
-    dto: {
-      cliente: string;
-      mesa?: string;
-      itens: { produtoId: string; quantidade: number }[];
-    },
-  ) {
+  create(@Body() dto: CreatePedidoDto) {
     return this.pedidosService.create(dto);
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.pedidosService.updateStatus(id, status);
+  updateStatus(@Param('id') id: string, @Body() dto: UpdatePedidoDto) {
+    return this.pedidosService.updateStatus(id, dto.status);
   }
 
   @Delete(':id')
