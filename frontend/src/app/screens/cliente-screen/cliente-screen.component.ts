@@ -16,7 +16,7 @@ import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrin
     CarrinhoDrawerComponent,
   ],
   template: `
-    <app-categorias-tabs (onFiltroChange)="onFiltroChange($event)"></app-categorias-tabs>
+    <app-categorias-tabs [apenasVisiveis]="true" (onFiltroChange)="onFiltroChange($event)"></app-categorias-tabs>
 
     <section class="cardapio">
       @if (produtoService.carregandoProdutos()) {
@@ -51,7 +51,7 @@ export class ClienteScreenComponent implements OnInit {
   buscaFiltro = signal<string>('');
 
   ngOnInit(): void {
-    this.produtoService.loadCategorias();
+    this.produtoService.loadCategoriasVisiveis();
     this.produtoService.loadProdutos();
   }
 
@@ -60,8 +60,15 @@ export class ClienteScreenComponent implements OnInit {
   }
 
   produtosFiltrados(): Produto[] {
+    // Considera apenas produtos de categorias visíveis
+    const visiveis = new Set(
+      this.produtoService.categoriasVisiveisParaCliente().map((c) => c.id),
+    );
+    const produtosVisiveis = this.produtos().filter((p) =>
+      visiveis.has(p.categoriaId),
+    );
     return filtrarProdutos(
-      this.produtos(),
+      produtosVisiveis,
       this.categoriaFiltro(),
       this.buscaFiltro(),
     );

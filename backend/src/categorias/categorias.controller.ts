@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { CategoriasService } from './categorias.service';
 import { CreateCategoriaDto } from './dto/create-categoria.dto';
@@ -15,9 +16,11 @@ import { UpdateCategoriaDto } from './dto/update-categoria.dto';
 export class CategoriasController {
   constructor(private readonly categoriasService: CategoriasService) {}
 
+  // ?somenteVisiveis=true retorna apenas as categorias visíveis p/ o cliente
   @Get()
-  findAll() {
-    return this.categoriasService.findAll();
+  findAll(@Query('somenteVisiveis') somenteVisiveis?: string) {
+    const filtro = somenteVisiveis === 'true';
+    return this.categoriasService.findAll(filtro ? true : undefined);
   }
 
   @Get(':id')

@@ -6,6 +6,7 @@ import {
   ProdutoService,
   Produto,
   Ingrediente,
+  Categoria,
   filtrarProdutos,
   resolverImagemUrl,
 } from '../../services/produto.service';
@@ -13,7 +14,7 @@ import { CategoriasTabsComponent } from '../../components/categorias-tabs/catego
 import { ProdutoCardComponent } from '../../components/produto-card/produto-card.component';
 import { AdminPedidosComponent } from '../../components/admin-pedidos/admin-pedidos.component';
 
-type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
+type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes' | 'categorias';
 
 @Component({
   selector: 'app-admin-screen',
@@ -44,6 +45,14 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
               <span class="rotulo">
                 <strong>Adicionar Ingrediente</strong>
                 <small>Cadastrar ou remover ingredientes</small>
+              </span>
+            </button>
+
+            <button class="botao-grande categorias" (click)="navegar('categorias')">
+              <span class="icone">🏷️</span>
+              <span class="rotulo">
+                <strong>Categorias</strong>
+                <small>Adicionar e controlar a visibilidade</small>
               </span>
             </button>
 
@@ -243,6 +252,45 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
         </section>
       }
 
+      @if (secao() === 'categorias') {
+        <button class="btn-voltar" (click)="voltar()">← Voltar</button>
+        <section class="admin-form">
+          <h2>Gerenciar Categorias</h2>
+          <div class="gestor-novo">
+            <input
+              type="text"
+              [ngModel]="novaCategoriaNome()"
+              (ngModelChange)="novaCategoriaNome.set($event)"
+              placeholder="Nova categoria (ex: Porções)"
+              (keyup.enter)="criarCategoria()"
+            />
+            <button (click)="criarCategoria()">Adicionar</button>
+          </div>
+          @if (categoriasAdmin().length === 0) {
+            <p class="img-status">Nenhuma categoria cadastrada.</p>
+          } @else {
+            <div class="categoria-lista">
+              @for (cat of categoriasAdmin(); track cat.id) {
+                <div class="categoria-linha">
+                  <span class="categoria-nome">{{ cat.nome }}</span>
+                  <div class="categoria-acoes">
+                    <label class="visivel-toggle">
+                      <input
+                        type="checkbox"
+                        [checked]="cat.visivel !== false"
+                        (change)="alternarVisibilidade(cat.id, $event)"
+                      />
+                      Visível
+                    </label>
+                    <button class="chip-remove" (click)="removerCategoria(cat.id)">✕</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+
       @if (secao() === 'produtos') {
         <button class="btn-voltar" (click)="voltar()">← Voltar</button>
         <section class="secao-produtos">
@@ -299,6 +347,7 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
     .botao-grande.produtos { background: #3498db; }
     .botao-grande.pedidos { background: #e67e22; }
     .botao-grande.ingredientes { background: #8e44ad; }
+    .botao-grande.categorias { background: #16a085; }
     .botao-grande .icone { font-size: 2.2rem; flex-shrink: 0; }
     .botao-grande .rotulo { display: flex; flex-direction: column; gap: 4px; }
     .botao-grande .rotulo strong { font-size: 1.4rem; }
@@ -414,6 +463,22 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes';
     .ing-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #ddd; border-radius: 20px; padding: 4px 10px; font-size: 0.85rem; }
     .chip-remove { border: none; background: transparent; color: #e74c3c; cursor: pointer; font-weight: bold; }
+
+    .categoria-lista { display: flex; flex-direction: column; gap: 6px; }
+    .categoria-linha {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .categoria-nome { font-size: 0.95rem; font-weight: 500; }
+    .categoria-acoes { display: flex; align-items: center; gap: 12px; }
+    .visivel-toggle { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #555; cursor: pointer; font-weight: normal; }
+    .visivel-toggle input { width: auto; }
   `,
   ],
 })
@@ -448,6 +513,8 @@ export class AdminScreenComponent implements OnInit {
   novoIngredienteNome = signal<string>('');
   // termo de busca na seção de ingredientes do cadastro de produto
   buscaIngrediente = signal<string>('');
+  // nome da nova categoria digitada pelo admin
+  novaCategoriaNome = signal<string>('');
 
   ngOnInit(): void {
     this.produtoService.loadCategorias();
@@ -484,6 +551,51 @@ export class AdminScreenComponent implements OnInit {
       error: (err) => {
         console.error('Erro ao remover ingrediente:', err);
         alert('Erro ao remover ingrediente. Verifique se ele não está em uso.');
+      },
+    });
+  }
+
+  // Categorias exibidas na tela de gestão (todas, inclusive as ocultas)
+  categoriasAdmin(): Categoria[] {
+    return this.produtoService.categorias();
+  }
+
+  criarCategoria(): void {
+    const nome = this.novaCategoriaNome().trim();
+    if (!nome) return;
+    this.produtoService.criarCategoria({ nome }).subscribe({
+      next: () => {
+        this.novaCategoriaNome.set('');
+        this.produtoService.recarregarCategorias();
+      },
+      error: (err) => {
+        console.error('Erro ao criar categoria:', err);
+        alert('Erro ao criar categoria. Tente novamente.');
+      },
+    });
+  }
+
+  alternarVisibilidade(id: string, event: Event): void {
+    const visivel = (event.target as HTMLInputElement).checked;
+    this.produtoService.atualizarCategoria(id, { visivel }).subscribe({
+      next: () => this.produtoService.recarregarCategorias(),
+      error: (err) => {
+        console.error('Erro ao alterar visibilidade da categoria:', err);
+        alert('Erro ao alterar visibilidade. Tente novamente.');
+      },
+    });
+  }
+
+  removerCategoria(id: string): void {
+    if (!confirm('Deseja remover esta categoria? Os produtos dela também serão removidos.')) return;
+    this.produtoService.excluirCategoria(id).subscribe({
+      next: () => {
+        this.produtoService.recarregarCategorias();
+        this.produtoService.recarregarProdutos();
+      },
+      error: (err) => {
+        console.error('Erro ao remover categoria:', err);
+        alert('Erro ao remover categoria. Verifique se ela não está em uso.');
       },
     });
   }

@@ -9,6 +9,7 @@ import { environment } from '../environment';
 export interface Categoria {
   id: string;
   nome: string;
+  visivel?: boolean;
   produtos?: Produto[];
 }
 
@@ -138,6 +139,28 @@ export class ProdutoService {
     this.loadProdutos(true);
   }
 
+  // Recarrega as categorias ignorando o cache (usado após cadastrar/editar/remover)
+  recarregarCategorias(): void {
+    this.loadCategorias(true);
+  }
+
+  // Categorias visíveis ao cliente
+  private categoriasVisiveis = signal<Categoria[]>([]);
+
+  // Retorna as categorias visíveis ao cliente
+  categoriasVisiveisParaCliente(): Categoria[] {
+    return this.categoriasVisiveis();
+  }
+
+  // Carrega as categorias visíveis ao cliente (GET /categorias?somenteVisiveis=true)
+  loadCategoriasVisiveis(): void {
+    if (isPlatformServer(this.platformId)) return;
+    this.listarCategoriasVisiveis().subscribe({
+      next: (dados) => this.categoriasVisiveis.set(dados),
+      error: (err) => console.error('Erro ao carregar categorias visíveis:', err),
+    });
+  }
+
   // Buscar todos os produtos (GET /produtos)
   listar(): Observable<Produto[]> {
     return this.http.get<Produto[]>(this.API_URL);
@@ -146,6 +169,29 @@ export class ProdutoService {
   // Buscar todas as categorias (GET /categorias)
   listarCategorias(): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(this.CATEGORIAS_URL);
+  }
+
+  // Buscar apenas categorias visíveis para o cliente (GET /categorias?somenteVisiveis=true)
+  listarCategoriasVisiveis(): Observable<Categoria[]> {
+    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?somenteVisiveis=true`);
+  }
+
+  // Criar categoria (POST /categorias)
+  criarCategoria(dados: { nome: string; visivel?: boolean }): Observable<Categoria> {
+    return this.http.post<Categoria>(this.CATEGORIAS_URL, dados);
+  }
+
+  // Atualizar categoria (PATCH /categorias/:id)
+  atualizarCategoria(
+    id: string,
+    dados: { nome?: string; visivel?: boolean },
+  ): Observable<Categoria> {
+    return this.http.patch<Categoria>(`${this.CATEGORIAS_URL}/${id}`, dados);
+  }
+
+  // Deletar categoria (DELETE /categorias/:id)
+  excluirCategoria(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.CATEGORIAS_URL}/${id}`);
   }
 
   // Buscar todos os ingredientes (GET /ingredientes)

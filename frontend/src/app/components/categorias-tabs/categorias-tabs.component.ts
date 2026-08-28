@@ -1,7 +1,7 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ProdutoService } from '../../services/produto.service';
+import { ProdutoService, Categoria } from '../../services/produto.service';
 
 @Component({
   selector: 'app-categorias-tabs',
@@ -26,7 +26,7 @@ import { ProdutoService } from '../../services/produto.service';
           Tudo
         </button>
 
-        @for (cat of produtoService.categorias(); track cat.id) {
+        @for (cat of categorias(); track cat.id) {
           <button 
             [class.active]="categoriaSelecionada() === cat.id"
             (click)="selecionarCategoria(cat.id)"
@@ -49,8 +49,19 @@ import { ProdutoService } from '../../services/produto.service';
 export class CategoriasTabsComponent {
   produtoService = inject(ProdutoService);
 
+  // quando true, mostra apenas categorias visíveis (uso no cliente)
+  apenasVisiveis = input(false);
+
   categoriaSelecionada = signal<string>('todas');
   termoBusca = signal<string>('');
+
+  // Retorna as categorias conforme o modo (visíveis p/ cliente ou todas p/ admin)
+  categorias(): Categoria[] {
+    if (this.apenasVisiveis()) {
+      return this.produtoService.categoriasVisiveisParaCliente();
+    }
+    return this.produtoService.categorias();
+  }
 
   // Notifica o componente pai quando os filtros mudam
   onFiltroChange = output<{ categoria: string; busca: string }>();

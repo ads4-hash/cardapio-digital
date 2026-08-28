@@ -6,13 +6,19 @@ export class CategoriasService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Listar todas as categorias (incluindo a lista de produtos atrelados)
-  async findAll() {
+  async findAll(somenteVisiveis?: boolean) {
     return this.prisma.categoria.findMany({
+      where: somenteVisiveis ? { visivel: true } : {},
       include: {
         produtos: true,
       },
       orderBy: { nome: 'asc' },
     });
+  }
+
+  // Listar apenas as categorias visíveis para o cliente
+  async findVisible() {
+    return this.findAll(true);
   }
 
   // Buscar uma categoria específica por ID
@@ -30,16 +36,17 @@ export class CategoriasService {
   }
 
   // Criar uma nova categoria
-  async create(data: { nome: string }) {
+  async create(data: { nome: string; visivel?: boolean }) {
     return this.prisma.categoria.create({
       data: {
         nome: data.nome,
+        visivel: data.visivel ?? true,
       },
     });
   }
 
-  // Atualizar o nome da categoria
-  async update(id: string, data: { nome?: string }) {
+  // Atualizar o nome/visibilidade da categoria
+  async update(id: string, data: { nome?: string; visivel?: boolean }) {
     await this.findOne(id);
 
     return this.prisma.categoria.update({
