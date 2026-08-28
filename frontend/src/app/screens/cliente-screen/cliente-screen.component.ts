@@ -39,7 +39,15 @@ import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrin
     .cardapio .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
+      gap: 20px;
+    }
+    .cardapio p {
+      text-align: center;
+      color: var(--text-muted, #6b7280);
+      background: var(--card, #fff);
+      border-radius: var(--radius, 14px);
+      padding: 48px 20px;
+      box-shadow: var(--shadow-sm);
     }
   `,
   ],

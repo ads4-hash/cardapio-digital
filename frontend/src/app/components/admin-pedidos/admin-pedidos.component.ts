@@ -83,23 +83,22 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     </section>
   `,
   styles: [`
-    .pedidos-section { margin-top: 24px; }
-    .pedidos-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .btn-refresh { padding: 6px 12px; border: none; border-radius: 6px; background: #3498db; color: white; cursor: pointer; font-weight: bold; }
+    .pedidos-section p { text-align: center; color: var(--text-muted, #888); }
     .pedidos-list { display: flex; flex-direction: column; gap: 12px; }
-    .pedido-card { border: 1px solid #eee; border-radius: 10px; padding: 12px; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    .pedido-card { border: 1px solid var(--border, #eee); border-radius: var(--radius, 14px); padding: 14px; background: var(--card, white); box-shadow: var(--shadow-sm); }
     .pedido-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .badge { color: white; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px; }
-    .pedido-info { margin: 4px 0; color: #555; font-size: 0.9rem; }
-    .itens { list-style: none; margin: 8px 0; padding: 0; border-top: 1px solid #f0f0f0; }
-    .itens li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f7f7f7; font-size: 0.9rem; }
+    .badge { color: white; padding: 4px 11px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; margin-left: 8px; letter-spacing: 0.3px; }
+    .pedido-info { margin: 4px 0; color: var(--text-muted, #555); font-size: 0.9rem; }
+    .itens { list-style: none; margin: 8px 0; padding: 0; border-top: 1px solid var(--border, #f0f0f0); }
+    .itens li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f8f9fa; font-size: 0.9rem; }
     .item-nome { display: flex; flex-direction: column; }
-    .pers-tag { font-size: 0.75rem; font-weight: normal; }
+    .pers-tag { font-size: 0.75rem; font-weight: normal; align-self: flex-start; margin-top: 2px; }
     .pers-tag.removido { color: #e74c3c; }
-    .pers-tag.adicionado { color: #27ae60; }
+    .pers-tag.adicionado { color: var(--accent-dark, #16a34a); }
     .pedido-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .pedido-bottom select { padding: 6px 8px; border-radius: 6px; border: 1px solid #ccc; background: white; }
-    .btn-remove { padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .pedido-bottom select { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border, #e5e7eb); background: white; outline: none; cursor: pointer; }
+    .btn-remove { padding: 6px 11px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: filter 0.15s; }
+    .btn-remove:hover { filter: brightness(1.1); }
   `],
 })
 export class AdminPedidosComponent implements OnInit {

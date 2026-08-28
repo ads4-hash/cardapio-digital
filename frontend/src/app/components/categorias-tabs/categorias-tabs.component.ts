@@ -39,11 +39,14 @@ import { ProdutoService, Categoria } from '../../services/produto.service';
     </div>
   `,
   styles: [`
-    .filter-container { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-    .search-input { padding: 10px 14px; border-radius: 8px; border: 1px solid #ccc; font-size: 1rem; }
+    .filter-container { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+    .search-input { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border, #e5e7eb); background: var(--card, #fff); font-size: 0.95rem; box-shadow: var(--shadow-sm); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .search-input:focus { border-color: var(--primary, #ff4757); box-shadow: 0 0 0 3px rgba(255,71,87,0.15); }
+    .search-input::placeholder { color: var(--text-muted, #9ca3af); }
     .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-    .tab-btn { padding: 8px 16px; border: none; border-radius: 20px; background: #e0e0e0; cursor: pointer; white-space: nowrap; }
-    .tab-btn.active { background: #ff4757; color: white; font-weight: bold; }
+    .tab-btn { padding: 9px 16px; border: none; border-radius: 999px; background: var(--card, #fff); color: var(--text, #1f2937); box-shadow: var(--shadow-sm); cursor: pointer; white-space: nowrap; font-weight: 500; transition: background 0.15s, color 0.15s, transform 0.1s; }
+    .tab-btn:hover { background: #e8eaed; }
+    .tab-btn.active { background: var(--primary, #ff4757); color: white; font-weight: 600; box-shadow: 0 4px 10px rgba(255,71,87,0.35); }
   `]
 })
 export class CategoriasTabsComponent {

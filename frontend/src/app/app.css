@@ -1,6 +1,17 @@
 .container {
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 20px;
-  font-family: sans-serif;
+  padding: 24px 20px 120px;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px 14px 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 12px 12px 120px;
+  }
 }

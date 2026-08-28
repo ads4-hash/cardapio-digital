@@ -1,1 +1,66 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --primary: #ff4757;
+  --primary-dark: #e13444;
+  --primary-light: #ffedef;
+  --accent: #22c55e;
+  --accent-dark: #16a34a;
+  --accent-light: #e9f9ef;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --border: #ececf1;
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow-sm: 0 1px 3px rgba(17,24,39,0.06), 0 1px 2px rgba(17,24,39,0.04);
+  --shadow-md: 0 8px 24px rgba(17,24,39,0.08);
+  --shadow-lg: 0 16px 40px rgba(17,24,39,0.16);
+}
+
+[data-theme='dark'] {
+  --primary: #ff5a68;
+  --primary-dark: #ff4757;
+  --primary-light: #3a1f23;
+  --accent: #2fd06e;
+  --accent-dark: #22c55e;
+  --accent-light: #17301f;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --border: #2b2f38;
+  --bg: #14161a;
+  --card: #1d2027;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.6);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+button { font-family: inherit; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #cfd4da; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #b3bbc4; }
+::-webkit-scrollbar-track { background: transparent; }
+
+::selection { background: var(--primary); color: #fff; }
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+html {
+  scroll-behavior: smooth;
+}

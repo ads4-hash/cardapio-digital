@@ -30,7 +30,6 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes' | '
     <section class="admin-screen">
       @if (secao() === 'inicio') {
         <div class="admin-home">
-          <h2 class="titulo">Painel do Administrador</h2>
           <div class="botoes-grandes">
             <button class="botao-grande adicionar" (click)="navegar('cadastro')">
               <span class="icone">＋</span>
@@ -327,124 +326,139 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes' | '
   styles: [
     `
     .botao-grande { width: 100%; }
-    .admin-home .titulo { text-align: center; margin: 0 0 24px; }
+    .admin-home .titulo { text-align: center; margin: 0 0 24px; color: var(--text, #1f2937); }
     .botoes-grandes { display: flex; flex-direction: column; gap: 18px; max-width: 520px; margin: 0 auto; }
     .botao-grande {
       display: flex;
       align-items: center;
       gap: 18px;
       border: none;
-      border-radius: 14px;
-      padding: 22px 24px;
+      border-radius: 16px;
+      padding: 24px;
       cursor: pointer;
       text-align: left;
       color: white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: var(--shadow-md);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
     }
-    .botao-grande:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-    .botao-grande.adicionar { background: #28a745; }
-    .botao-grande.produtos { background: #3498db; }
-    .botao-grande.pedidos { background: #e67e22; }
-    .botao-grande.ingredientes { background: #8e44ad; }
-    .botao-grande.categorias { background: #16a085; }
+    .botao-grande:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); filter: brightness(1.06); }
+    .botao-grande:active { transform: scale(0.99); }
+    .botao-grande.adicionar { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .botao-grande.produtos { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .botao-grande.pedidos { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .botao-grande.ingredientes { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .botao-grande.categorias { background: linear-gradient(135deg, #14b8a6, #0d9488); }
     .botao-grande .icone { font-size: 2.2rem; flex-shrink: 0; }
     .botao-grande .rotulo { display: flex; flex-direction: column; gap: 4px; }
     .botao-grande .rotulo strong { font-size: 1.4rem; }
-    .botao-grande .rotulo small { font-size: 0.95rem; opacity: 0.9; }
+    .botao-grande .rotulo small { font-size: 0.95rem; opacity: 0.92; }
 
     .btn-voltar {
-      padding: 8px 16px;
+      padding: 9px 18px;
       margin-bottom: 16px;
       border: none;
-      border-radius: 8px;
-      background: #7f8c8d;
+      border-radius: 10px;
+      background: #6b7280;
       color: white;
       cursor: pointer;
-      font-weight: bold;
+      font-weight: 600;
+      transition: filter 0.15s;
     }
-    .btn-voltar:hover { background: #6c7a7a; }
+    .btn-voltar:hover { filter: brightness(1.1); }
 
-    .titulo-secao { margin: 0 0 16px; }
+    .titulo-secao { margin: 0 0 16px; color: var(--text, #1f2937); }
 
     .admin-form {
-      background: #f4f4f4;
-      padding: 15px;
-      border-radius: 8px;
+      background: var(--card, #fff);
+      padding: 18px;
+      border-radius: var(--radius, 14px);
       margin: 0 0 20px;
+      border: 1px solid var(--border, #ececf1);
+      box-shadow: var(--shadow-sm);
     }
     .admin-form h2 { margin-top: 0; }
-    .admin-form form { display: flex; flex-direction: column; gap: 12px; }
-    .admin-form label { display: block; margin-bottom: 4px; font-weight: bold; }
+    .admin-form form { display: flex; flex-direction: column; gap: 14px; }
+    .admin-form label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
     .admin-form input,
     .admin-form select,
     .admin-form textarea {
       width: 100%;
-      padding: 8px;
+      padding: 11px 12px;
       box-sizing: border-box;
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .img-status { font-size: 0.85rem; color: #555; }
+    .admin-form input:focus,
+    .admin-form select:focus,
+    .admin-form textarea:focus { border-color: var(--primary, #ff4757); box-shadow: 0 0 0 3px rgba(255,71,87,0.12); }
+    .img-status { font-size: 0.85rem; color: var(--text-muted, #555); }
     .img-preview { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-    .img-preview img { width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
-    .btn-submit {
-      padding: 10px 15px;
-      background: #28a745;
-      color: white;
+    .img-preview img { width: 90px; height: 90px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border, #ddd); }
+    .btn-submit, .btn-cancel {
+      padding: 11px 16px;
       border: none;
-      border-radius: 4px;
+      border-radius: 10px;
       cursor: pointer;
-      font-weight: bold;
+      font-weight: 600;
+      transition: filter 0.15s, transform 0.1s;
     }
-    .btn-submit:disabled { opacity: 0.6; }
-    .btn-cancel {
-      padding: 10px 15px;
-      background: #7f8c8d;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-    }
+    .btn-submit { background: var(--accent-dark, #16a34a); color: white; }
+    .btn-cancel { background: #6b7280; color: white; }
+    .btn-submit:hover, .btn-cancel:hover { filter: brightness(1.1); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .cardapio .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
+      gap: 20px;
     }
 
-    .ingredientes-form { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
-    .ingredientes-form label { display: block; margin-bottom: 4px; font-weight: bold; }
-    .ingredientes-ajuda { font-size: 0.8rem; color: #666; margin: 0 0 8px; }
+    .ingredientes-form {
+      background: var(--card, #fff);
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: var(--radius-sm, 12px);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .ingredientes-form label { display: block; margin-bottom: 4px; font-weight: 600; }
+    .ingredientes-ajuda { font-size: 0.8rem; color: var(--text-muted, #666); margin: 0 0 8px; }
     .ing-busca {
       width: 100%;
       box-sizing: border-box;
-      padding: 8px 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      padding: 10px 12px;
+      border: 1px solid var(--border, #e5e7eb);
+      border-radius: 9px;
       margin-bottom: 10px;
+      outline: none;
+      transition: border-color 0.15s;
+      font-size: 0.9rem;
     }
+    .ing-busca:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,0.12); }
     .chip-select {
-      border: 1px solid #ccc;
+      border: 1px solid var(--border, #e5e7eb);
       background: #fff;
-      border-radius: 20px;
+      border-radius: 999px;
       padding: 6px 14px;
       font-size: 0.85rem;
       cursor: pointer;
-      color: #333;
+      color: var(--text, #333);
       transition: background 0.15s ease, color 0.15s ease, border 0.15s ease;
     }
-    .chip-select:hover { border-color: #8e44ad; }
+    .chip-select:hover { border-color: #8b5cf6; }
     .chip-select.selecionado {
-      background: #8e44ad;
+      background: #8b5cf6;
       color: white;
-      border-color: #8e44ad;
+      border-color: #8b5cf6;
     }
     .ing-adicionais {
       margin-top: 14px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid var(--border, #eee);
       padding-top: 10px;
     }
-    .ing-adicionais-titulo { margin: 0 0 8px; font-size: 0.85rem; color: #555; font-weight: bold; }
+    .ing-adicionais-titulo { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-muted, #555); font-weight: 600; }
     .ing-adicional-linha {
       display: flex;
       align-items: center;
@@ -453,16 +467,17 @@ type Secao = 'inicio' | 'cadastro' | 'produtos' | 'pedidos' | 'ingredientes' | '
       padding: 6px 0;
     }
     .ing-adicional-nome { font-size: 0.9rem; }
-    .ing-adicional-preco { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #555; font-weight: normal; }
-    .ing-preco { width: 90px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    .ing-adicional-preco { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted, #555); font-weight: normal; }
+    .ing-preco { width: 90px; padding: 8px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; outline: none; }
 
     .gestor-novo { display: flex; gap: 8px; margin-bottom: 14px; }
-    .gestor-novo input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-    .gestor-novo button { padding: 8px 14px; background: #8e44ad; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .gestor-novo button:hover { background: #732d91; }
+    .gestor-novo input { flex: 1; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 9px; box-sizing: border-box; outline: none; }
+    .gestor-novo input:focus { border-color: #8b5cf6; }
+    .gestor-novo button { padding: 10px 16px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; border-radius: 9px; font-weight: 600; cursor: pointer; transition: filter 0.15s; }
+    .gestor-novo button:hover { filter: brightness(1.1); }
     .ing-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip { display: inline-flex; align-items: center; gap: 6px; background: white; border: 1px solid #ddd; border-radius: 20px; padding: 4px 10px; font-size: 0.85rem; }
-    .chip-remove { border: none; background: transparent; color: #e74c3c; cursor: pointer; font-weight: bold; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 999px; padding: 5px 11px; font-size: 0.85rem; box-shadow: var(--shadow-sm); }
+    .chip-remove { border: none; background: transparent; color: #ef4444; cursor: pointer; font-weight: 700; }
 
     .categoria-lista { display: flex; flex-direction: column; gap: 6px; }
     .categoria-linha {

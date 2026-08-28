@@ -41,17 +41,21 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
     }
   `,
   styles: [`
-    .card { border: 1px solid #eee; border-radius: 10px; overflow: hidden; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-    .card-img { width: 100%; height: 140px; object-fit: cover; }
-    .card-body { padding: 12px; }
-    .card-body h3 { margin: 0 0 6px; font-size: 1.05rem; }
-    .desc { margin: 0 0 10px; color: #777; font-size: 0.85rem; }
-    .card-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .price { font-weight: bold; color: #28a745; }
+    .card { display: flex; flex-direction: column; background: var(--card, #fff); border: 1px solid var(--border, #eee); border-radius: var(--radius, 14px); overflow: hidden; box-shadow: var(--shadow-sm); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .card-img { width: 100%; height: 150px; object-fit: cover; display: block; }
+    .card-body { display: flex; flex-direction: column; flex: 1; padding: 14px; }
+    .card-body h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--text, #1f2937); }
+    .desc { margin: 0 0 14px; color: var(--text-muted, #6b7280); font-size: 0.85rem; line-height: 1.4; }
+    .card-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .price { font-weight: 700; color: var(--accent-dark, #16a34a); font-size: 1.05rem; }
     .admin-actions { display: flex; gap: 6px; }
-    .btn-add { padding: 8px 14px; background: #ff4757; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .btn-edit { padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .btn-remove { padding: 8px 12px; background: #e74c3c; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .btn-add, .btn-edit, .btn-remove { padding: 8px 14px; border: none; border-radius: 9px; font-weight: 600; cursor: pointer; transition: filter 0.15s, transform 0.1s; }
+    .btn-add { background: var(--primary, #ff4757); color: white; }
+    .btn-edit { background: #3b82f6; color: white; }
+    .btn-remove { background: #ef4444; color: white; }
+    .btn-add:hover, .btn-edit:hover, .btn-remove:hover { filter: brightness(1.08); }
+    .btn-add:active, .btn-edit:active, .btn-remove:active { transform: scale(0.96); }
   `]
 })
 export class ProdutoCardComponent {
