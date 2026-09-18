@@ -15,8 +15,8 @@ import { AuthService } from '../../services/auth.service';
         </button>
         @if (authService.isAutenticado()) {
           <button class="nav-btn" (click)="sair()">Logout</button>
-        } @else {
-          <a routerLink="/login" class="nav-btn">Login</a>
+        } @else if (!naRotaLogin()) {
+          <a routerLink="/" class="nav-btn">Login</a>
         }
       </nav>
     </header>
@@ -127,6 +127,10 @@ export class NavbarComponent {
 
   sair() {
     this.authService.logout();
-    this.router.navigate(['/login']);
+    this.router.navigate(['/']);
+  }
+
+  naRotaLogin(): boolean {
+    return this.router.url === '/';
   }
 }

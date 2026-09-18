@@ -20,8 +20,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (erro.status === 401) {
         const estavaLogado = auth.isAutenticado();
         auth.logout();
-        if (estavaLogado && !router.url.startsWith('/login')) {
-          router.navigate(['/login']);
+        if (estavaLogado && router.url !== '/') {
+          router.navigate(['/']);
         }
       }
       return throwError(() => erro);

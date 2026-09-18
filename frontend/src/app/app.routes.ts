@@ -19,10 +19,5 @@ export const routes: Routes = [
     component: AdminScreenComponent,
     canActivate: [authGuard],
   },
-  {
-    path: 'login',
-    component: LoginScreenComponent,
-    canActivate: [convidadoGuard],
-  },
   { path: '**', redirectTo: '/' },
 ];

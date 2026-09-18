@@ -10,7 +10,7 @@ export const authGuard: CanActivateFn = async () => {
   const router = inject(Router);
 
   if (!auth.isAutenticado()) {
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/']);
   }
 
   try {
@@ -18,11 +18,11 @@ export const authGuard: CanActivateFn = async () => {
     return true;
   } catch {
     auth.logout();
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/']);
   }
 };
 
-// Se já estiver logado, /login redireciona para o painel admin
+// Se já estiver logado, a tela de login (/) redireciona para o painel admin
 export const convidadoGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
