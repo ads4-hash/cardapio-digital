@@ -4,12 +4,14 @@ import {
   Post,
   Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import type { Request } from 'express';
+import { AuthGuard } from '../auth/auth.guard';
 
 /** Tipos de imagem aceitos no upload */
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -18,6 +20,7 @@ const MAX_SIZE = 5 * 1024 * 1024;
 
 @Controller('upload')
 export class UploadController {
+  @UseGuards(AuthGuard)
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {

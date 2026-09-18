@@ -41,21 +41,72 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
     }
   `,
   styles: [`
-    .card { display: flex; flex-direction: column; background: var(--card, #fff); border: 1px solid var(--border, #eee); border-radius: var(--radius, 14px); overflow: hidden; box-shadow: var(--shadow-sm); transition: transform 0.18s ease, box-shadow 0.18s ease; }
-    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-    .card-img { width: 100%; height: 150px; object-fit: cover; display: block; }
-    .card-body { display: flex; flex-direction: column; flex: 1; padding: 14px; }
-    .card-body h3 { margin: 0 0 6px; font-size: 1.05rem; color: var(--text, #1f2937); }
-    .desc { margin: 0 0 14px; color: var(--text-muted, #6b7280); font-size: 0.85rem; line-height: 1.4; }
-    .card-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .price { font-weight: 700; color: var(--accent-dark, #16a34a); font-size: 1.05rem; }
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--transition-slow), box-shadow var(--transition-slow), border-color var(--transition);
+    }
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
+      border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+    }
+    .card-img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      display: block;
+      transition: transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .card:hover .card-img { transform: scale(1.06); }
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 8px;
+      padding: 16px 16px 18px;
+    }
+    .card-body h3 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+    .desc {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .price { font-weight: 800; font-size: 1.05rem; color: var(--accent-dark); }
     .admin-actions { display: flex; gap: 6px; }
-    .btn-add, .btn-edit, .btn-remove { padding: 8px 14px; border: none; border-radius: 9px; font-weight: 600; cursor: pointer; transition: filter 0.15s, transform 0.1s; }
-    .btn-add { background: var(--primary, #ff4757); color: white; }
-    .btn-edit { background: #3b82f6; color: white; }
-    .btn-remove { background: #ef4444; color: white; }
-    .btn-add:hover, .btn-edit:hover, .btn-remove:hover { filter: brightness(1.08); }
-    .btn-add:active, .btn-edit:active, .btn-remove:active { transform: scale(0.96); }
+    .btn-add, .btn-edit, .btn-remove {
+      border: none;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
+    }
+    .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
+    .btn-edit { background: var(--info); color: #fff; }
+    .btn-remove { background: var(--danger); color: #fff; }
+    .btn-add:hover { filter: brightness(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent); }
+    .btn-edit:hover, .btn-remove:hover { filter: brightness(1.08); }
+    .btn-add:active, .btn-edit:active, .btn-remove:active { transform: scale(0.95); }
   `]
 })
 export class ProdutoCardComponent {

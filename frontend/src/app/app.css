@@ -1,17 +1,29 @@
 .container {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 24px 20px 120px;
+  padding: 28px 24px 140px;
+  animation: fade-up var(--transition-slow);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
   .container {
-    padding: 16px 14px 120px;
+    padding: 20px 16px 140px;
   }
 }
 
 @media (max-width: 480px) {
   .container {
-    padding: 12px 12px 120px;
+    padding: 16px 14px 140px;
   }
 }

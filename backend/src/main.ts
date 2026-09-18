@@ -1,3 +1,5 @@
+// Carrega as variáveis de ambiente do .env antes de qualquer módulo do Nest
+import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';

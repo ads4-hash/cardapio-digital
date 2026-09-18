@@ -1,37 +1,112 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink],
   template: `
     <header class="navbar">
-      <a class="brand" routerLink="/">Cardápio Digital</a>
+      <span class="brand">Cardápio Digital</span>
       <nav class="nav-links">
         <button class="theme-btn" (click)="toggleTheme()" [attr.aria-label]="isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'">
           {{ isDark ? '☀️' : '🌙' }}
         </button>
-        <a routerLink="/admin" routerLinkActive="active" class="nav-btn">
-          Login
-        </a>
+        @if (authService.isAutenticado()) {
+          <button class="nav-btn" (click)="sair()">Logout</button>
+        } @else {
+          <a routerLink="/login" class="nav-btn">Login</a>
+        }
       </nav>
     </header>
   `,
   styles: [`
-    .navbar { position: sticky; top: 0; display: flex; justify-content: flex-end; align-items: center; padding: 12px 24px; background: linear-gradient(135deg, #ff4757, #e13444); box-shadow: 0 2px 12px rgba(225,52,68,0.35); z-index: 50; }
-    .brand { position: absolute; left: 50%; transform: translateX(-50%); color: white; text-decoration: none; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
-    .nav-links { display: flex; gap: 10px; align-items: center; }
-    .theme-btn { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.35); width: 38px; height: 38px; border-radius: 999px; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s, transform 0.1s; }
-    .theme-btn:hover { background: rgba(255,255,255,0.3); }
-    .theme-btn:active { transform: scale(0.92); }
-    .nav-btn { background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.35); padding: 8px 18px; border-radius: 999px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.2s, transform 0.1s; }
-    .nav-btn:hover { background: rgba(255,255,255,0.3); }
-    .nav-btn:active { transform: scale(0.97); }
-    .nav-btn.active { background: white; color: #e13444; border-color: white; }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 26px;
+      background: var(--nav-bg);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--nav-border);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      transition: color var(--transition);
+    }
+    .brand::before {
+      content: '';
+      width: 11px;
+      height: 11px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 50%, transparent);
+    }
+    .brand:hover { color: var(--primary); }
+    .nav-links { display: flex; align-items: center; gap: 10px; }
+    .theme-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+    .theme-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: var(--shadow-sm); }
+    .theme-btn:active { transform: scale(0.94); }
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 18px;
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .nav-btn:hover { color: var(--primary); border-color: var(--primary); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 18%, transparent); }
+    .nav-btn:active { transform: scale(0.98); }
+    .nav-btn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+    @media (max-width: 560px) {
+      .navbar { padding: 12px 16px; }
+      .brand { font-size: 1rem; }
+      .nav-btn { padding: 8px 14px; }
+    }
   `]
 })
 export class NavbarComponent {
+  readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
   isDark = false;
 
   constructor() {
@@ -48,5 +123,10 @@ export class NavbarComponent {
       document.documentElement.setAttribute('data-theme', this.isDark ? 'dark' : 'light');
       localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
     }
+  }
+
+  sair() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

@@ -39,14 +39,45 @@ import { ProdutoService, Categoria } from '../../services/produto.service';
     </div>
   `,
   styles: [`
-    .filter-container { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
-    .search-input { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border, #e5e7eb); background: var(--card, #fff); font-size: 0.95rem; box-shadow: var(--shadow-sm); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
-    .search-input:focus { border-color: var(--primary, #ff4757); box-shadow: 0 0 0 3px rgba(255,71,87,0.15); }
-    .search-input::placeholder { color: var(--text-muted, #9ca3af); }
-    .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-    .tab-btn { padding: 9px 16px; border: none; border-radius: 999px; background: var(--card, #fff); color: var(--text, #1f2937); box-shadow: var(--shadow-sm); cursor: pointer; white-space: nowrap; font-weight: 500; transition: background 0.15s, color 0.15s, transform 0.1s; }
-    .tab-btn:hover { background: #e8eaed; }
-    .tab-btn.active { background: var(--primary, #ff4757); color: white; font-weight: 600; box-shadow: 0 4px 10px rgba(255,71,87,0.35); }
+    .filter-container { display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px; }
+    .search-input {
+      width: 100%;
+      padding: 13px 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--text);
+      font-size: 0.95rem;
+      box-shadow: var(--shadow-sm);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .search-input::placeholder { color: var(--text-muted); opacity: 0.75; }
+    .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+    .tabs { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex-shrink: 0;
+      padding: 9px 18px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-pill);
+      background: var(--card);
+      color: var(--text-muted);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .tab-btn:hover { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+    .tab-btn:active { transform: scale(0.97); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 6px 14px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
   `]
 })
 export class CategoriasTabsComponent {

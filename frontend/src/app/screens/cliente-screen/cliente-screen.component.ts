@@ -16,6 +16,11 @@ import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrin
     CarrinhoDrawerComponent,
   ],
   template: `
+    <header class="page-header">
+      <h1>Nosso cardápio</h1>
+      <p>Escolha seus itens favoritos, personalize e envie seu pedido.</p>
+    </header>
+
     <app-categorias-tabs [apenasVisiveis]="true" (onFiltroChange)="onFiltroChange($event)"></app-categorias-tabs>
 
     <section class="cardapio">
@@ -36,18 +41,41 @@ import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrin
   `,
   styles: [
     `
+    .page-header {
+      text-align: center;
+      padding: 8px 0 26px;
+    }
+    .page-header h1 {
+      margin: 0 0 6px;
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .page-header p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    @media (max-width: 560px) {
+      .page-header h1 { font-size: 1.35rem; }
+    }
     .cardapio .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
       gap: 20px;
     }
-    .cardapio p {
+    @media (max-width: 560px) {
+      .cardapio .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+    }
+    .cardapio > p {
       text-align: center;
-      color: var(--text-muted, #6b7280);
-      background: var(--card, #fff);
-      border-radius: var(--radius, 14px);
-      padding: 48px 20px;
+      color: var(--text-muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 56px 20px;
       box-shadow: var(--shadow-sm);
+      line-height: 1.6;
     }
   `,
   ],

@@ -71,3 +71,21 @@ model ItemPedido {
   produto    Produto  @relation(fields: [produtoId], references: [id])
   produtoId  String
 }
+
+model Usuario {
+  id           String    @id @default(uuid())
+  nome         String
+  email        String    @unique // usado no login; sempre armazenado em minúsculas
+  senhaHash    String
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+}
+
+model TentativaLogin {
+  id       String   @id @default(uuid())
+  ipHash   String // hash (HMAC) do IP, sem armazenar o IP em texto puro
+  sucesso  Boolean  @default(false)
+  criadoEm DateTime @default(now())
+
+  @@index([ipHash, criadoEm])
+}
