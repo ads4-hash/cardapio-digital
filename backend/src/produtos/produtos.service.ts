@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { unlinkSync } from 'fs';
+import { join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -14,10 +16,13 @@ export class ProdutosService {
     },
   };
 
-  // Listar todos os produtos (com opção de filtrar por categoria)
-  async findAll(categoriaId?: string) {
+  // Listar produtos (opcional filtrar por categoria e por visibilidade)
+  async findAll(categoriaId?: string, somenteVisiveis?: boolean) {
     return this.prisma.produto.findMany({
-      where: categoriaId ? { categoriaId } : {},
+      where: {
+        ...(categoriaId ? { categoriaId } : {}),
+        ...(somenteVisiveis ? { categoria: { visivel: true } } : {}),
+      },
       include: this.includeCompleto,
       orderBy: { createdAt: 'desc' },
     });
@@ -78,7 +83,12 @@ export class ProdutosService {
       ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
     },
   ) {
-    await this.findOne(id);
+    const atual = await this.findOne(id);
+
+    // Se a imagem foi trocada, remove o arquivo antigo do disco
+    if (data.imagemUrl !== undefined && data.imagemUrl !== atual.imagemUrl) {
+      this.removerImagemDoDisco(atual.imagemUrl);
+    }
 
     return this.prisma.produto.update({
       where: { id },
@@ -104,10 +114,21 @@ export class ProdutosService {
 
   // Remover um produto
   async remove(id: string) {
-    await this.findOne(id);
+    const produto = await this.findOne(id);
+    this.removerImagemDoDisco(produto.imagemUrl);
 
     return this.prisma.produto.delete({
       where: { id },
     });
+  }
+
+  // Apaga do disco imagens locais (/uploads/...) que ficaram órfãs
+  private removerImagemDoDisco(imagemUrl?: string | null): void {
+    if (!imagemUrl || !imagemUrl.startsWith('/uploads/')) return;
+    try {
+      unlinkSync(join(process.cwd(), imagemUrl));
+    } catch {
+      // arquivo já pode ter sido removido pelo próprio usuário
+    }
   }
 }

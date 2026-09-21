@@ -29,6 +29,12 @@ export class PedidosController {
     return this.pedidosService.findOne(id);
   }
 
+  // Acompanhamento público: retorna dados mínimos do pedido (ID é UUID não adivinhável)
+  @Get(':id/rastrear')
+  rastrear(@Param('id') id: string) {
+    return this.pedidosService.rastrear(id);
+  }
+
   // Criação de pedido é pública (o cliente faz o pedido sem login)
   @Post()
   create(@Body() dto: CreatePedidoDto) {

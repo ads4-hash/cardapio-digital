@@ -1,0 +1,2 @@
+Iniciar Backend -> npm run start:dev
+Iniciar Frontend -> npm start 

@@ -25,6 +25,12 @@ export interface CartItem {
 })
 export class CartService {
   private readonly _items = signal<CartItem[]>([]);
+  private readonly CHAVE_STORAGE = 'cart_items';
+
+  constructor() {
+    // Recupera o carrinho salvo no navegador (persistência entre recarregamentos)
+    this._items.set(this.carregarDoStorage());
+  }
 
   // Lista de itens no carrinho
   readonly items = computed(() => this._items());
@@ -77,6 +83,7 @@ export class CartService {
         },
       ];
     });
+    this.persistir();
   }
 
   private gerarId(): string {
@@ -116,6 +123,7 @@ export class CartService {
         item.uid === uid ? { ...item, quantidade } : item,
       ),
     );
+    this.persistir();
   }
 
   // Remove um item do carrinho
@@ -123,10 +131,34 @@ export class CartService {
     this._items.update((items) =>
       items.filter((item) => item.uid !== uid),
     );
+    this.persistir();
   }
 
   // Limpa o carrinho
   clear(): void {
     this._items.set([]);
+    this.persistir();
+  }
+
+  private carregarDoStorage(): CartItem[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const bruto = window.localStorage.getItem(this.CHAVE_STORAGE);
+      if (!bruto) return [];
+      const dados = JSON.parse(bruto);
+      return Array.isArray(dados) ? dados : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private persistir(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        this.CHAVE_STORAGE,
+        JSON.stringify(this._items()),
+      );
+    } catch {}
   }
 }

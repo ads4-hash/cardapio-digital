@@ -1,6 +1,8 @@
-import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { Router, RouterLink, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { ConfiguracoesService } from '../../services/configuracoes.service';
 
 @Component({
   selector: 'app-navbar',
@@ -10,12 +12,24 @@ import { AuthService } from '../../services/auth.service';
     <header class="navbar">
       <span class="brand">Cardápio Digital</span>
       <nav class="nav-links">
+        @if (authService.isAutenticado() && naRotaAdmin()) {
+          <button
+            class="status-btn"
+            [class.online]="configuracoes.aceitandoPedidos()"
+            [class.offline]="!configuracoes.aceitandoPedidos()"
+            (click)="configuracoes.alternar()"
+            [attr.aria-label]="configuracoes.aceitandoPedidos() ? 'Suspender pedidos' : 'Liberar pedidos'"
+          >
+            <span class="status-dot"></span>
+            {{ configuracoes.aceitandoPedidos() ? 'online' : 'offline' }}
+          </button>
+        }
         <button class="theme-btn" (click)="toggleTheme()" [attr.aria-label]="isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'">
           {{ isDark ? '☀️' : '🌙' }}
         </button>
-        @if (authService.isAutenticado()) {
+        @if (authService.isAutenticado() && naRotaAdmin()) {
           <button class="nav-btn" (click)="sair()">Logout</button>
-        } @else if (!naRotaLogin()) {
+        } @else if (!authService.isAutenticado() && !naRotaLogin()) {
           <a routerLink="/" class="nav-btn">Login</a>
         }
       </nav>
@@ -74,6 +88,31 @@ import { AuthService } from '../../services/auth.service';
     }
     .theme-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: var(--shadow-sm); }
     .theme-btn:active { transform: scale(0.94); }
+    .status-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      background: var(--card);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .status-btn .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-btn.online { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, var(--border)); }
+    .status-btn.online:hover { background: color-mix(in srgb, var(--success) 8%, var(--card)); box-shadow: var(--shadow-sm); }
+    .status-btn.offline { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+    .status-btn.offline:hover { background: color-mix(in srgb, var(--danger) 8%, var(--card)); box-shadow: var(--shadow-sm); }
+    .status-btn:active { transform: scale(0.96); }
     .nav-btn {
       display: inline-flex;
       align-items: center;
@@ -104,16 +143,33 @@ import { AuthService } from '../../services/auth.service';
     }
   `]
 })
-export class NavbarComponent {
+export class NavbarComponent implements OnInit {
   readonly authService = inject(AuthService);
+  readonly configuracoes = inject(ConfiguracoesService);
   private readonly router = inject(Router);
   isDark = false;
+  private readonly rotaAdmin = signal(false);
 
   constructor() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
       this.isDark = saved === 'dark';
       document.documentElement.setAttribute('data-theme', this.isDark ? 'dark' : 'light');
+    }
+  }
+
+  ngOnInit(): void {
+    // Estado online/offline só existe nas telas de admin
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((event) => {
+        this.rotaAdmin.set(event.urlAfterRedirects.startsWith('/admin'));
+        if (this.rotaAdmin() && this.authService.isAutenticado()) {
+          this.configuracoes.carregar();
+        }
+      });
+    if (this.rotaAdmin() && this.authService.isAutenticado()) {
+      this.configuracoes.carregar();
     }
   }
 
@@ -132,5 +188,9 @@ export class NavbarComponent {
 
   naRotaLogin(): boolean {
     return this.router.url === '/';
+  }
+
+  naRotaAdmin(): boolean {
+    return this.rotaAdmin() || this.router.url.startsWith('/admin');
   }
 }

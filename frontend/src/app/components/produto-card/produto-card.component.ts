@@ -2,6 +2,7 @@ import { Component, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Produto, resolverImagemUrl } from '../../services/produto.service';
 import { CartService } from '../../services/cart.service';
+import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';
 
 @Component({
@@ -27,7 +28,18 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
             </div>
           } @else {
             <span class="price">{{ produto().preco | currency:'BRL' }}</span>
-            <button class="btn-add" (click)="adicionar()">Adicionar</button>
+            <button
+              class="btn-add"
+              [class.disabled]="!configuracoes.aceitandoPedidos()"
+              [disabled]="!configuracoes.aceitandoPedidos()"
+              (click)="adicionar()"
+            > 
+              @if (!configuracoes.aceitandoPedidos()) {
+                Sem pedidos
+              } @else {
+                {{ temIngredientes() ? 'Personalizar' : 'Adicionar' }}
+              }
+            </button>
           }
         </div>
       </div>
@@ -102,9 +114,10 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
     }
     .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
+    .btn-add.disabled { background: var(--surface-hover); color: var(--text-muted); box-shadow: none; cursor: not-allowed; }
     .btn-edit { background: var(--info); color: #fff; }
     .btn-remove { background: var(--danger); color: #fff; }
-    .btn-add:hover { filter: brightness(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent); }
+    .btn-add:hover:not(:disabled) { filter: brightness(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent); }
     .btn-edit:hover, .btn-remove:hover { filter: brightness(1.08); }
     .btn-add:active, .btn-edit:active, .btn-remove:active { transform: scale(0.95); }
   `]
@@ -115,6 +128,7 @@ export class ProdutoCardComponent {
   editar = output<Produto>();
   remover = output<string | undefined>();
   cartService = inject(CartService);
+  configuracoes = inject(ConfiguracoesService);
 
   produtoSelecionado = signal<Produto | null>(null);
 
@@ -122,7 +136,16 @@ export class ProdutoCardComponent {
     return resolverImagemUrl(this.produto().imagemUrl);
   }
 
+  // Indica se o produto possui ingredientes vinculados (usuário pode
+  // remover/adicionar com valor extra vindo do vínculo no cadastro)
+  temIngredientes(): boolean {
+    const vinculos = this.produto().ingredientes;
+    return !!vinculos && vinculos.length > 0;
+  }
+
   adicionar(): void {
+    if (!this.configuracoes.aceitandoPedidos()) return;
+
     // Produtos com ingredientes abrem o modal de personalização
     if (this.produto().ingredientes && this.produto().ingredientes!.length > 0) {
       this.produtoSelecionado.set(this.produto());

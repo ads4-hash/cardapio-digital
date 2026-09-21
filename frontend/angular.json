@@ -30,6 +30,15 @@
             ],
             "server": "src/main.server.ts",
             "outputMode": "server",
+            "allowedCommonJsDependencies": [
+              "socket.io-client",
+              "engine.io-client",
+              "ws",
+              "xmlhttprequest-ssl",
+              "debug",
+              "component-emitter",
+              "base64-arraybuffer"
+            ],
             "security": {
               "allowedHosts": []
             },

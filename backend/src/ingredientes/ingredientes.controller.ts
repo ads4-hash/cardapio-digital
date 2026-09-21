@@ -9,7 +9,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { IngredientesService } from './ingredientes.service';
-import { CreateIngredienteDto, UpdateIngredienteDto } from './dto/create-ingrediente.dto';
+import {
+  CreateIngredienteDto,
+  UpdateIngredienteDto,
+} from './dto/create-ingrediente.dto';
 import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('ingredientes')

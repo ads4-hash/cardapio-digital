@@ -16,11 +16,6 @@ export class CategoriasService {
     });
   }
 
-  // Listar apenas as categorias visíveis para o cliente
-  async findVisible() {
-    return this.findAll(true);
-  }
-
   // Buscar uma categoria específica por ID
   async findOne(id: string) {
     const categoria = await this.prisma.categoria.findUnique({

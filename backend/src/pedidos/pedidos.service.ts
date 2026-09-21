@@ -4,11 +4,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePedidoDto } from './dto/create-pedido.dto';
+import { CreatePedidoDto, TipoEntrega } from './dto/create-pedido.dto';
+import { PedidosGateway } from './pedidos.gateway';
+import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
 
 @Injectable()
 export class PedidosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gateway: PedidosGateway,
+    private readonly configuracoes: ConfiguracoesService,
+  ) {}
 
   // Listar todos os pedidos com os itens e dados do produto
   async findAll() {
@@ -49,6 +55,14 @@ export class PedidosService {
     if (!data.itens || data.itens.length === 0) {
       throw new BadRequestException(
         'O pedido precisa conter pelo menos um item.',
+      );
+    }
+
+    // Nome do cliente obrigatório; endereço exigido apenas para entrega
+    const tipoEntrega = data.tipoEntrega ?? TipoEntrega.RETIRADA;
+    if (tipoEntrega === TipoEntrega.ENTREGA && !data.endereco?.trim()) {
+      throw new BadRequestException(
+        'Informe o endereço de entrega para pedidos com entrega.',
       );
     }
 
@@ -111,11 +125,22 @@ export class PedidosService {
       };
     });
 
+    // Pedidos de entrega somam a taxa definida pelo admin no Faturamento
+    let taxaEntrega = 0;
+    if (tipoEntrega === TipoEntrega.ENTREGA) {
+      const config = await this.configuracoes.obterTaxaEntrega();
+      taxaEntrega = config.taxaEntrega;
+      total += taxaEntrega;
+    }
+
     // Cria o pedido junto com seus itens na mesma transação
-    return this.prisma.pedido.create({
+    const pedido = await this.prisma.pedido.create({
       data: {
         cliente: data.cliente,
-        mesa: data.mesa,
+        tipoEntrega,
+        endereco: data.endereco,
+        telefone: data.telefone,
+        taxaEntrega,
         total,
         itens: {
           create: itensParaCriar,
@@ -129,13 +154,16 @@ export class PedidosService {
         },
       },
     });
+
+    this.gateway.emitirPedidoCriado(pedido);
+    return pedido;
   }
 
-  // Atualizar o status do pedido (PENDENTE, EM_PREPARO, CONCLUIDO, CANCELADO)
+  // Atualizar o status do pedido (PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO)
   async updateStatus(id: string, status: string) {
     await this.findOne(id);
 
-    return this.prisma.pedido.update({
+    const pedido = await this.prisma.pedido.update({
       where: { id },
       data: { status },
       include: {
@@ -146,14 +174,61 @@ export class PedidosService {
         },
       },
     });
+
+    this.gateway.emitirPedidoAtualizado(pedido);
+    return pedido;
   }
 
   // Deletar pedido
   async remove(id: string) {
     await this.findOne(id);
-
-    return this.prisma.pedido.delete({
+    await this.prisma.pedido.delete({
       where: { id },
     });
+    this.gateway.emitirPedidoRemovido(id);
+  }
+
+  // Consulta pública de acompanhamento: retorna apenas dados minimalistas do
+  // pedido (o ID em UUID já funciona como "senha" de acesso não adivinhável)
+  async rastrear(id: string) {
+    const pedido = await this.prisma.pedido.findUnique({
+      where: { id },
+      include: {
+        itens: {
+          include: { produto: { select: { nome: true } } },
+        },
+      },
+    });
+
+    if (!pedido) {
+      throw new NotFoundException(`Pedido com ID ${id} não encontrado.`);
+    }
+
+    return {
+      id: pedido.id,
+      status: pedido.status,
+      cliente: pedido.cliente,
+      tipoEntrega: pedido.tipoEntrega,
+      endereco: pedido.endereco,
+      telefone: pedido.telefone,
+      taxaEntrega: pedido.taxaEntrega,
+      total: pedido.total,
+      criadoEm: pedido.createdAt,
+      itens: pedido.itens.map((item) => ({
+        nome: item.produto.nome,
+        quantidade: item.quantidade,
+        preco: item.preco,
+        removidos: this.parseLista(item.removidos),
+        adicionados: this.parseLista(item.adicionados),
+      })),
+    };
+  }
+
+  // Converte os nomes de ingredientes salvos (JSON) de volta para lista
+  private parseLista(valor: string): string[] {
+    const parsed: unknown = JSON.parse(valor);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
   }
 }

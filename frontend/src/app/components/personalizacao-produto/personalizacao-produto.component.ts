@@ -74,11 +74,23 @@ interface EstadoIngrediente {
         </div>
 
         <div class="modal-footer">
-          <p class="preco">
-            Total:
-            <strong>{{ precoTotal() | currency:'BRL' }}</strong>
-          </p>
-          <button class="btn-adicionar" (click)="adicionar()">Adicionar ao Carrinho</button>
+          <div class="rodape-linha">
+            <div class="quantidade">
+              <span class="qtd-label">Quantidade</span>
+              <div class="qtd-controles">
+                <button class="qtd-btn" (click)="diminuirQuantidade()" [disabled]="quantidade() <= 1">−</button>
+                <span class="qtd-valor">{{ quantidade() }}</span>
+                <button class="qtd-btn" (click)="aumentarQuantidade()">+</button>
+              </div>
+            </div>
+            <p class="preco">
+              Total:
+              <strong>{{ precoTotal() * quantidade() | currency:'BRL' }}</strong>
+            </p>
+          </div>
+          <button class="btn-adicionar" (click)="adicionar()">
+            Adicionar {{ quantidade() > 1 ? quantidade() + 'x' : '' }} ao Carrinho
+          </button>
         </div>
       </div>
     }
@@ -152,7 +164,30 @@ interface EstadoIngrediente {
       border-top: 1px solid var(--border);
       background: var(--surface-hover);
     }
-    .preco { margin: 0 0 12px; font-weight: 500; }
+    .rodape-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .quantidade { display: flex; flex-direction: column; gap: 5px; }
+    .qtd-label { font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
+    .qtd-controles { display: flex; align-items: center; gap: 10px; }
+    .qtd-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      border-radius: 9px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color var(--transition), border-color var(--transition), transform var(--transition), opacity var(--transition);
+    }
+    .qtd-btn:hover:not(:disabled) { color: var(--primary); border-color: var(--primary); transform: translateY(-1px); }
+    .qtd-btn:active:not(:disabled) { transform: scale(0.92); }
+    .qtd-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .qtd-valor { min-width: 22px; text-align: center; font-weight: 800; font-size: 1.05rem; }
+    .preco { margin: 0; font-weight: 500; }
     .preco strong { color: var(--accent-dark); font-size: 1.05rem; }
     .btn-adicionar {
       width: 100%;
@@ -177,6 +212,7 @@ export class PersonalizacaoProdutoComponent {
   private readonly cartService = inject(CartService);
 
   ingredientes = signal<EstadoIngrediente[]>([]);
+  quantidade = signal(1);
 
   constructor() {
     effect(() => {
@@ -184,7 +220,16 @@ export class PersonalizacaoProdutoComponent {
       this.ingredientes.set(
         vinculos.map((vinculo) => ({ vinculo, removido: false, adicionado: false })),
       );
+      this.quantidade.set(1);
     });
+  }
+
+  aumentarQuantidade(): void {
+    this.quantidade.update((q) => q + 1);
+  }
+
+  diminuirQuantidade(): void {
+    this.quantidade.update((q) => Math.max(1, q - 1));
   }
 
   precoTotal(): number {
@@ -237,12 +282,18 @@ export class PersonalizacaoProdutoComponent {
         preco: i.vinculo.precoAdicional ?? 0,
       }));
 
-    this.cartService.addPersonalizado(produto, 1, removidos, adicionados);
+    this.cartService.addPersonalizado(
+      produto,
+      this.quantidade(),
+      removidos,
+      adicionados,
+    );
     this.fechar();
   }
 
   fechar(): void {
     this.ingredientes.set([]);
+    this.quantidade.set(1);
     this.fecharEvento.emit();
   }
 }

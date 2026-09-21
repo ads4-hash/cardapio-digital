@@ -52,8 +52,11 @@ model ProdutoIngrediente {
 model Pedido {
   id          String       @id @default(uuid())
   cliente     String
-  mesa        String?
-  status      String       @default("PENDENTE") // PENDENTE, EM_PREPARO, CONCLUIDO, CANCELADO
+  tipoEntrega String       @default("RETIRADA") // RETIRADA ou ENTREGA
+  endereco    String?
+  telefone    String?
+  taxaEntrega Float        @default(0)
+  status      String       @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
   total       Float
   itens       ItemPedido[]
   createdAt   DateTime     @default(now())
@@ -79,6 +82,12 @@ model Usuario {
   senhaHash    String
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
+}
+
+// Configurações gerais do estabelecimento (chave -> valor)
+model Configuracao {
+  chave String @id
+  valor String
 }
 
 model TentativaLogin {

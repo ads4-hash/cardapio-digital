@@ -3,15 +3,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
-
-const SEGREDO = process.env.JWT_SECRET ?? 'dev-change-this-secret';
+import { obterSegredo } from './segredo';
 
 @Global()
 @Module({
   imports: [
     JwtModule.register({
       global: true,
-      secret: SEGREDO,
+      secret: obterSegredo(),
       signOptions: { expiresIn: '7d' },
     }),
   ],

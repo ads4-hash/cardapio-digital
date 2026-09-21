@@ -5,7 +5,13 @@ import { Observable } from 'rxjs';
 import { environment } from '../environment';
 import { Produto } from './produto.service';
 
-export type PedidoStatus = 'PENDENTE' | 'EM_PREPARO' | 'CONCLUIDO' | 'CANCELADO';
+export type PedidoStatus =
+  | 'PENDENTE'
+  | 'EM_PREPARO'
+  | 'EM_ROTA'
+  | 'PRONTO'
+  | 'CONCLUIDO'
+  | 'CANCELADO';
 
 export interface ItemPedido {
   id: string;
@@ -17,10 +23,15 @@ export interface ItemPedido {
   produto: Produto;
 }
 
+export type TipoEntrega = 'RETIRADA' | 'ENTREGA';
+
 export interface Pedido {
   id: string;
   cliente: string;
-  mesa?: string | null;
+  tipoEntrega: TipoEntrega;
+  endereco?: string | null;
+  telefone?: string | null;
+  taxaEntrega: number;
   status: PedidoStatus;
   total: number;
   createdAt: string;
@@ -30,12 +41,34 @@ export interface Pedido {
 
 export interface CreatePedido {
   cliente: string;
-  mesa?: string;
+  tipoEntrega: TipoEntrega;
+  telefone: string;
+  endereco?: string;
   itens: {
     produtoId: string;
     quantidade: number;
     removidos?: string[];
     adicionados?: string[];
+  }[];
+}
+
+// Retorno do rastreio público (dados mínimos, sem produtos completos)
+export interface PedidoRastreio {
+  id: string;
+  status: PedidoStatus;
+  cliente: string;
+  tipoEntrega: TipoEntrega;
+  endereco?: string | null;
+  telefone?: string | null;
+  taxaEntrega: number;
+  total: number;
+  criadoEm: string;
+  itens: {
+    nome: string;
+    quantidade: number;
+    preco: number;
+    removidos: string[];
+    adicionados: string[];
   }[];
 }
 
@@ -60,5 +93,12 @@ export class PedidoService {
 
   excluir(id: string): Observable<void> {
     return this.http.delete<void>(`${this.API_URL}/${id}`);
+  }
+
+  // Acompanhamento público: GET /pedidos/:id/rastrear
+  rastrear(id: string): Observable<PedidoRastreio> {
+    return this.http.get<PedidoRastreio>(
+      `${this.API_URL}/${id}/rastrear`,
+    );
   }
 }

@@ -1,10 +1,14 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { PedidoService, Pedido, PedidoStatus } from '../../services/pedidos.service';
+import { RealtimeService } from '../../services/realtime.service';
 
 const STATUS_CORES: Record<PedidoStatus, string> = {
   PENDENTE: '#f39c12',
   EM_PREPARO: '#3498db',
+  EM_ROTA: '#8b5cf6',
+  PRONTO: '#14b8a6',
   CONCLUIDO: '#27ae60',
   CANCELADO: '#e74c3c',
 };
@@ -12,6 +16,8 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
 const STATUS_LABELS: Record<PedidoStatus, string> = {
   PENDENTE: 'Pendente',
   EM_PREPARO: 'Em preparo',
+  EM_ROTA: 'Em rota',
+  PRONTO: 'Pronto',
   CONCLUIDO: 'Concluído',
   CANCELADO: 'Cancelado',
 };
@@ -27,13 +33,35 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
         <button class="btn-refresh" (click)="carregar()">Atualizar</button>
       </div>
 
+      <div class="filtros">
+        <button
+          class="filtro-chip"
+          [class.ativo]="filtroStatus() === null"
+          (click)="filtrarPorStatus(null)"
+        >
+          Todos
+        </button>
+        @for (status of filtroOptions; track status) {
+          <button
+            class="filtro-chip"
+            [class.ativo]="filtroStatus() === status"
+            (click)="filtrarPorStatus(status)"
+          >
+            <span class="dot" [style.background]="STATUS_CORES[status]"></span>
+            {{ STATUS_LABELS[status] }}
+          </button>
+        }
+      </div>
+
       @if (carregando()) {
         <p>Carregando pedidos...</p>
-      } @else if (pedidos().length === 0) {
-        <p>Nenhum pedido por enquanto.</p>
+      } @else if (pedidosFiltrados().length === 0) {
+        <p>
+          {{ pedidos().length === 0 ? 'Nenhum pedido por enquanto.' : 'Nenhum pedido com esse status.' }}
+        </p>
       } @else {
         <div class="pedidos-list">
-          @for (pedido of pedidos(); track pedido.id) {
+          @for (pedido of pedidosFiltrados(); track pedido.id) {
             <div class="pedido-card">
               <div class="pedido-top">
                 <div>
@@ -47,9 +75,19 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
 
               <p class="pedido-info">
                 <strong>{{ pedido.cliente }}</strong>
-                <span *ngIf="pedido.mesa"> · Mesa {{ pedido.mesa }}</span>
+                <span class="tipo-tag">{{ pedido.tipoEntrega === 'ENTREGA' ? '🚚 Entrega' : '🏪 Retirada' }}</span>
                 · {{ pedido.createdAt | date:'dd/MM/yyyy HH:mm' }}
               </p>
+
+              @if (pedido.tipoEntrega === 'ENTREGA' && pedido.endereco) {
+                <p class="dados-entrega">📍 {{ pedido.endereco }}</p>
+              }
+              @if (pedido.telefone) {
+                <p class="dados-entrega">📞 {{ pedido.telefone }}</p>
+              }
+              @if (pedido.taxaEntrega > 0) {
+                <p class="dados-entrega taxa">Taxa de entrega: {{ pedido.taxaEntrega | currency:'BRL' }}</p>
+              }
 
               <ul class="itens">
                 @for (item of pedido.itens; track item.id) {
@@ -71,7 +109,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
               <div class="pedido-bottom">
                 <strong>Total: {{ pedido.total | currency:'BRL' }}</strong>
                 <select [value]="pedido.status" (change)="mudarStatus(pedido.id, $event)">
-                  @for (status of statusOptions; track status) {
+                  @for (status of statusPara(pedido); track status) {
                     <option [value]="status">{{ STATUS_LABELS[status] }}</option>
                   }
                 </select>
@@ -98,6 +136,30 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     }
     .btn-refresh:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
     .btn-refresh:active { transform: scale(0.97); }
+    .filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .filtro-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 14px;
+      background: var(--card);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: color var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .filtro-chip:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
+    .filtro-chip:active { transform: scale(0.97); }
+    .filtro-chip.ativo {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
+    }
+    .filtro-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
     .pedidos-section > p,
     .pedidos-list > p {
       text-align: center;
@@ -122,7 +184,18 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     .pedido-top > div { display: flex; align-items: center; }
     .pedido-top strong { font-size: 0.95rem; }
     .badge { color: #fff; padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; margin-left: 8px; letter-spacing: 0.4px; }
-    .pedido-info { margin: 6px 0; color: var(--text-muted); font-size: 0.9rem; }
+    .pedido-info { margin: 6px 0 0; color: var(--text-muted); font-size: 0.9rem; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .tipo-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+    .dados-entrega { margin: 2px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+    .dados-entrega.taxa { color: var(--accent-dark); font-weight: 600; }
     .itens { list-style: none; margin: 10px 0; padding: 0; border-top: 1px solid var(--border); }
     .itens li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
     .itens li:last-child { border-bottom: none; }
@@ -160,18 +233,72 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
 })
 export class AdminPedidosComponent implements OnInit {
   private readonly pedidoService = inject(PedidoService);
+  private readonly realtimeService = inject(RealtimeService);
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_CORES = STATUS_CORES;
-  readonly statusOptions: PedidoStatus[] = [
+  // Filtros globais: cobrem pedidos de entrega (Em rota) e de retirada (Pronto)
+  readonly filtroOptions: PedidoStatus[] = [
     'PENDENTE',
     'EM_PREPARO',
+    'EM_ROTA',
+    'PRONTO',
     'CONCLUIDO',
     'CANCELADO',
   ];
 
   pedidos = signal<Pedido[]>([]);
   carregando = signal(false);
+  filtroStatus = signal<PedidoStatus | null>(null);
+
+  // Lista já filtrada pelo status selecionado (aplica automaticamente
+  // também nas atualizações em tempo real)
+  pedidosFiltrados = computed(() => {
+    const status = this.filtroStatus();
+    if (!status) return this.pedidos();
+    return this.pedidos().filter((pedido) => pedido.status === status);
+  });
+
+  private readonly destruicoes = new Subscription();
+
+  ngOnInit(): void {
+    this.carregar();
+    // Recebe pedidos novos, atualizações de status e remoções em tempo real
+    this.realtimeService.conectar();
+    this.destruicoes.add(
+      this.realtimeService.pedidoCriado$.subscribe((pedido) =>
+        this.pedidos.update((lista) => [pedido, ...lista]),
+      ),
+    );
+    this.destruicoes.add(
+      this.realtimeService.pedidoAtualizado$.subscribe((pedido) =>
+        this.pedidos.update((lista) =>
+          lista.map((p) => (p.id === pedido.id ? pedido : p)),
+        ),
+      ),
+    );
+    this.destruicoes.add(
+      this.realtimeService.pedidoRemovido$.subscribe((id) =>
+        this.pedidos.update((lista) => lista.filter((p) => p.id !== id)),
+      ),
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.destruicoes.unsubscribe();
+  }
+
+  filtrarPorStatus(status: PedidoStatus | null): void {
+    this.filtroStatus.set(status);
+  }
+
+  // Opções do status por pedido: retirada não tem "Em rota" (usa "Pronto");
+  // entrega não usa "Pronto".
+  statusPara(pedido: Pedido): PedidoStatus[] {
+    return pedido.tipoEntrega === 'RETIRADA'
+      ? ['PENDENTE', 'EM_PREPARO', 'PRONTO', 'CONCLUIDO', 'CANCELADO']
+      : ['PENDENTE', 'EM_PREPARO', 'EM_ROTA', 'CONCLUIDO', 'CANCELADO'];
+  }
 
   private parseLista(valor: string): string[] {
     try {
@@ -188,10 +315,6 @@ export class AdminPedidosComponent implements OnInit {
 
   listaAdicionados(item: Pedido['itens'][number]): string[] {
     return this.parseLista(item.adicionados);
-  }
-
-  ngOnInit(): void {
-    this.carregar();
   }
 
   carregar(): void {

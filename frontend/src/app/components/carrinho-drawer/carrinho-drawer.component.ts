@@ -1,15 +1,17 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { CartService, ItemIngrediente } from '../../services/cart.service';
-import { PedidoService } from '../../services/pedidos.service';
+import { PedidoService, TipoEntrega } from '../../services/pedidos.service';
+import { ConfiguracoesService } from '../../services/configuracoes.service';
 
-type Etapa = 'carrinho' | 'checkout' | 'sucesso';
+type Etapa = 'carrinho' | 'entrega' | 'checkout' | 'sucesso';
 
 @Component({
   selector: 'app-carrinho-drawer',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <!-- Botão Flutuante -->
     <button class="cart-float-btn" (click)="isOpen.set(true)">
@@ -30,9 +32,62 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
             <p class="success-icon">✅</p>
             <p><strong>Pedido recebido com sucesso!</strong></p>
             <p>Muito obrigado! O número do seu pedido é <strong>#{{ pedidoSucesso() }}</strong>.</p>
+            <a class="btn-acompanhar" [routerLink]="['/pedido', pedidoId()]">Acompanhar pedido</a>
           </div>
           <div class="drawer-footer">
             <button class="btn-checkout" (click)="fechar()">Fechar</button>
+          </div>
+        } @else if (etapa() === 'entrega') {
+          <div class="drawer-body">
+            @if (erro()) {
+              <p class="erro">{{ erro() }}</p>
+            }
+            <div class="entrega">
+              <p class="entrega-titulo">Como deseja receber? <span class="req">*</span></p>
+              <label class="opcao" [class.selecionada]="tipoEntrega() === 'RETIRADA'">
+                <input
+                  type="radio"
+                  name="tipoEntrega"
+                  [checked]="tipoEntrega() === 'RETIRADA'"
+                  (change)="tipoEntrega.set('RETIRADA')"
+                />
+                <span class="opcao-info">
+                  <strong>🏪 Retirada</strong>
+                  <small>Buscar no balcão</small>
+                </span>
+              </label>
+              <label class="opcao" [class.selecionada]="tipoEntrega() === 'ENTREGA'">
+                <input
+                  type="radio"
+                  name="tipoEntrega"
+                  [checked]="tipoEntrega() === 'ENTREGA'"
+                  (change)="tipoEntrega.set('ENTREGA')"
+                />
+                <span class="opcao-info">
+                  <strong>🚚 Entrega</strong>
+                  <small>
+                    Taxa:
+                    {{ configuracoes.taxaEntrega() > 0 ? (taxa() | currency:'BRL') : 'Grátis' }}
+                  </small>
+                </span>
+              </label>
+            </div>
+            @if (tipoEntrega() === 'ENTREGA') {
+              <p class="dica-entrega">Você informará o endereço na próxima etapa.</p>
+            } @else {
+              <p class="dica-entrega">Você retirará o pedido no balcão.</p>
+            }
+          </div>
+          <div class="drawer-footer">
+            <p class="linha-total">Subtotal: {{ cartService.totalPrice() | currency:'BRL' }}</p>
+            @if (taxa() > 0) {
+              <p class="linha-total taxa">Taxa de entrega: {{ taxa() | currency:'BRL' }}</p>
+            }
+            <h3>Total: {{ totalComTaxa() | currency:'BRL' }}</h3>
+            <button class="btn-cancel" (click)="voltar()">Voltar ao carrinho</button>
+            <button class="btn-checkout" (click)="irParaCheckout()">
+              Continuar para Checkout
+            </button>
           </div>
         } @else if (etapa() === 'checkout') {
           <div class="drawer-body">
@@ -47,21 +102,42 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
               (ngModelChange)="cliente.set($event)"
               placeholder="Ex: João"
             />
-            <label for="mesa">Mesa (opcional)</label>
+            <label for="telefone">Telefone de contato <span class="req">*</span></label>
             <input
-              id="mesa"
-              type="text"
-              [ngModel]="mesa()"
-              (ngModelChange)="mesa.set($event)"
-              placeholder="Ex: 12"
+              id="telefone"
+              type="tel"
+              [ngModel]="telefone()"
+              (ngModelChange)="telefone.set($event)"
+              placeholder="Ex: (11) 99999-9999"
             />
+            @if (tipoEntrega() === 'ENTREGA') {
+              <label for="endereco">Endereço de entrega <span class="req">*</span></label>
+              <input
+                id="endereco"
+                type="text"
+                [ngModel]="endereco()"
+                (ngModelChange)="endereco.set($event)"
+                placeholder="Rua, número, bairro"
+              />
+            }
           </div>
           <div class="drawer-footer">
-            <h3>Total: {{ cartService.totalPrice() | currency:'BRL' }}</h3>
-            <button class="btn-checkout" [disabled]="enviando()" (click)="confirmarPedido()">
+            <p class="linha-total">Subtotal: {{ cartService.totalPrice() | currency:'BRL' }}</p>
+            @if (taxa() > 0) {
+              <p class="linha-total taxa">Taxa de entrega: {{ taxa() | currency:'BRL' }}</p>
+            }
+            <h3>Total: {{ totalComTaxa() | currency:'BRL' }}</h3>
+            @if (!configuracoes.aceitandoPedidos()) {
+              <p class="erro">A casa está offline no momento e não está recebendo pedidos.</p>
+            }
+            <button
+              class="btn-checkout"
+              [disabled]="enviando() || !configuracoes.aceitandoPedidos()"
+              (click)="confirmarPedido()"
+            >
               {{ enviando() ? 'Enviando...' : 'Confirmar Pedido' }}
             </button>
-            <button class="btn-cancel" (click)="voltar()">Voltar ao carrinho</button>
+            <button class="btn-cancel" (click)="voltarCheckout()">Voltar</button>
           </div>
         } @else {
           <div class="drawer-body">
@@ -96,8 +172,8 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
 
           <div class="drawer-footer">
             <h3>Total: {{ cartService.totalPrice() | currency:'BRL' }}</h3>
-            <button [disabled]="cartService.items().length === 0" class="btn-checkout" (click)="irParaCheckout()">
-              Avançar para Checkout
+            <button [disabled]="cartService.items().length === 0" class="btn-checkout" (click)="irParaEntrega()">
+              Continuar
             </button>
           </div>
         }
@@ -199,6 +275,27 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     .controls span { min-width: 20px; text-align: center; font-weight: 700; }
     .pers { font-size: 0.8rem; color: var(--text-muted); margin: 3px 0; line-height: 1.4; }
     .pers.extra { color: var(--accent-dark); font-weight: 600; }
+    .entrega { margin-top: 14px; }
+    .entrega-titulo { font-weight: 700; margin: 0 0 6px; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .opcao {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+    .opcao.selecionada { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+    .opcao input { accent-color: var(--primary); width: 15px; height: 15px; margin: 0; }
+    .opcao-info { display: flex; flex-direction: column; }
+    .opcao-info strong { font-size: 0.83rem; line-height: 1.2; }
+    .opcao-info small { color: var(--text-muted); font-size: 0.72rem; margin-top: 1px; line-height: 1.2; }
+    .linha-total { margin: 2px 0; color: var(--text-muted); font-size: 0.9rem; }
+    .linha-total.taxa { color: var(--accent-dark); font-weight: 600; }
+    .dica-entrega { margin: 12px 0 0; font-size: 0.82rem; color: var(--text-muted); }
     .drawer-body label { display: block; font-weight: 600; margin: 16px 0 6px; font-size: 0.88rem; color: var(--text); }
     .drawer-body input {
       width: 100%;
@@ -243,6 +340,17 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     }
     .btn-cancel:hover { background: var(--surface-hover); color: var(--text); }
     .btn-cancel:active { transform: scale(0.99); }
+    .btn-acompanhar {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      border-radius: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
     .erro { background: var(--danger-light); color: var(--danger); padding: 12px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; }
     .req { color: var(--danger); }
     .success { text-align: center; padding: 16px 0; }
@@ -253,14 +361,29 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
 export class CarrinhoDrawerComponent {
   cartService = inject(CartService);
   private readonly pedidoService = inject(PedidoService);
+  readonly configuracoes = inject(ConfiguracoesService);
 
   isOpen = signal<boolean>(false);
   erro = signal<string | null>(null);
   etapa = signal<Etapa>('carrinho');
   cliente = signal<string>('');
-  mesa = signal<string>('');
+  telefone = signal<string>('');
+  endereco = signal<string>('');
+  tipoEntrega = signal<TipoEntrega>('RETIRADA');
   enviando = signal(false);
   pedidoSucesso = signal<string>('');
+  pedidoId = signal<string>('');
+
+  // Taxa aplicada apenas quando a forma de receber escolhida é 'ENTREGA'
+  taxa = computed(() =>
+    this.tipoEntrega() === 'ENTREGA' ? this.configuracoes.taxaEntrega() : 0,
+  );
+  totalComTaxa = computed(() => this.cartService.totalPrice() + this.taxa());
+
+  irParaEntrega(): void {
+    this.erro.set(null);
+    this.etapa.set('entrega');
+  }
 
   irParaCheckout(): void {
     this.erro.set(null);
@@ -276,9 +399,29 @@ export class CarrinhoDrawerComponent {
     this.etapa.set('carrinho');
   }
 
+  voltarCheckout(): void {
+    this.erro.set(null);
+    this.etapa.set('entrega');
+  }
+
   confirmarPedido(): void {
+    if (!this.configuracoes.aceitandoPedidos()) {
+      this.erro.set('A casa está offline e não está recebendo pedidos.');
+      return;
+    }
+
     if (!this.cliente().trim()) {
       this.erro.set('Informe seu nome para continuar.');
+      return;
+    }
+
+    if (!this.telefone().trim()) {
+      this.erro.set('Informe um telefone de contato.');
+      return;
+    }
+
+    if (this.tipoEntrega() === 'ENTREGA' && !this.endereco().trim()) {
+      this.erro.set('Informe o endereço de entrega.');
       return;
     }
 
@@ -297,11 +440,15 @@ export class CarrinhoDrawerComponent {
     this.pedidoService
       .criar({
         cliente: this.cliente().trim(),
-        mesa: this.mesa().trim() || undefined,
+        tipoEntrega: this.tipoEntrega(),
+        telefone: this.telefone().trim(),
+        endereco:
+          this.tipoEntrega() === 'ENTREGA' ? this.endereco().trim() : undefined,
         itens,
       })
       .subscribe({
         next: (pedido) => {
+          this.pedidoId.set(pedido.id);
           this.pedidoSucesso.set(pedido.id.slice(0, 8).toUpperCase());
           this.cartService.clear();
           this.enviando.set(false);
@@ -319,8 +466,11 @@ export class CarrinhoDrawerComponent {
     this.isOpen.set(false);
     this.etapa.set('carrinho');
     this.cliente.set('');
-    this.mesa.set('');
+    this.telefone.set('');
+    this.endereco.set('');
+    this.tipoEntrega.set('RETIRADA');
     this.erro.set(null);
     this.pedidoSucesso.set('');
+    this.pedidoId.set('');
   }
 }

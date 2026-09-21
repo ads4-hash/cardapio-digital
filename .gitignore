@@ -7,6 +7,8 @@
 # Environment files
 **/.env
 **/.env.*
+# Mantém os exemplos de variáveis versionados
+!**/.env.example
 
 # Arquivos enviados pelo admin (imagens de produtos)
 **/uploads/

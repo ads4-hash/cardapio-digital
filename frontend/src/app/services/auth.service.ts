@@ -64,6 +64,21 @@ export class AuthService {
     return this.http.get<UsuarioLogado>(`${this.AUTH_URL}/me`);
   }
 
+  // Edita os dados do usuário logado (mesmos campos do cadastro)
+  atualizarPerfil(dados: {
+    nome: string;
+    email: string;
+    senha: string;
+    confirmarSenha: string;
+  }): Observable<UsuarioLogado> {
+    return this.http.patch<UsuarioLogado>(`${this.AUTH_URL}/me`, dados);
+  }
+
+  // Mantém os dados locais em sincronia após a edição do perfil
+  aplicarPerfil(usuario: UsuarioLogado): void {
+    this.usuario.set(usuario);
+  }
+
   salvarSessao(resposta: AuthResponse): void {
     this.token.set(resposta.token);
     this.usuario.set(resposta.usuario);
