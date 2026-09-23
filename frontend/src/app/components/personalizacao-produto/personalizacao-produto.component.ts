@@ -12,8 +12,7 @@ import { CartService } from '../../services/cart.service';
 
 interface EstadoIngrediente {
   vinculo: ProdutoIngrediente;
-  removido: boolean;
-  adicionado: boolean;
+  quantidade: number;
 }
 
 @Component({
@@ -40,31 +39,40 @@ interface EstadoIngrediente {
             <h4>Personalize seus ingredientes</h4>
             <ul class="ingredientes">
               @for (ing of ingredientes(); track ing.vinculo.ingredienteId) {
-                <li class="linha">
+                <li class="linha" [class.fora]="removido(ing)">
                   <div class="info">
                     <span class="nome">{{ ing.vinculo.ingrediente!.nome }}</span>
                     @if (ing.vinculo.precoAdicional > 0) {
-                      <span class="extra">+{{ ing.vinculo.precoAdicional | currency:'BRL' }}</span>
+                      <span class="extra">
+                        +{{ ing.vinculo.precoAdicional | currency:'BRL' }}
+                        @if (ing.quantidade > 0) {
+                          <span class="extra-total">
+                            × {{ ing.quantidade }} = {{ ing.vinculo.precoAdicional * ing.quantidade | currency:'BRL' }}
+                          </span>
+                        }
+                      </span>
+                    } @else if (removido(ing)) {
+                      <span class="extra sem">Sem este ingrediente</span>
                     }
                   </div>
-                  <div class="acoes">
-                    @if (ing.vinculo.precoAdicional > 0) {
-                      <button
-                        class="toggle adicionar"
-                        [class.ativo]="ing.adicionado"
-                        [disabled]="ing.removido"
-                        (click)="alternarAdicionado(ing)"
-                      >
-                        {{ ing.adicionado ? '✔ Adicionado' : '+ Adicionar' }}
-                      </button>
-                    }
+                  <div class="stepper" [class.bloqueado]="removido(ing)">
                     <button
-                      class="toggle remover"
-                      [class.ativo]="ing.removido"
-                      [disabled]="ing.adicionado"
-                      (click)="alternarRemovido(ing)"
+                      class="toggle"
+                      [disabled]="ing.quantidade === 0"
+                      (click)="diminuir(ing)"
+                      [attr.aria-label]="'Diminuir ' + ing.vinculo.ingrediente!.nome"
                     >
-                      {{ ing.removido ? '✔ Remover' : '– Remover' }}
+                      −
+                    </button>
+                    <span class="qtd-extra">{{ ing.quantidade }}</span>
+                    <button
+                      class="toggle"
+                      [class.ativo]="adicional(ing)"
+                      [disabled]="ing.quantidade === 99 || ing.vinculo.precoAdicional <= 0"
+                      (click)="aumentar(ing)"
+                      [attr.aria-label]="'Aumentar ' + ing.vinculo.ingrediente!.nome"
+                    >
+                      +
                     </button>
                   </div>
                 </li>
@@ -143,22 +151,40 @@ interface EstadoIngrediente {
     .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .nome { font-weight: 600; font-size: 0.92rem; }
     .extra { color: var(--accent-dark); font-size: 0.82rem; font-weight: 700; }
-    .acoes { display: flex; gap: 6px; flex-shrink: 0; }
-    .toggle {
+    .extra-total { color: var(--text-muted); font-weight: 600; }
+    .extra.sem { color: var(--danger); font-size: 0.78rem; font-weight: 600; }
+    .linha.fora { opacity: 0.55; }
+    .linha.fora .nome { text-decoration: line-through; }
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 2px;
       border: 1px solid var(--border);
-      background: var(--card);
-      border-radius: 9px;
-      padding: 7px 11px;
-      font-size: 0.78rem;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background var(--transition), color var(--transition), border-color var(--transition), transform var(--transition);
+      border-radius: 10px;
+      padding: 3px;
+      flex-shrink: 0;
     }
-    .toggle:hover:not(:disabled) { transform: translateY(-1px); }
-    .toggle:active:not(:disabled) { transform: scale(0.96); }
-    .toggle.adicionar.ativo { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .toggle.remover.ativo { background: var(--danger); color: #fff; border-color: var(--danger); }
-    .toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+    .stepper .toggle {
+      border: none;
+      background: transparent;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background var(--transition), color var(--transition), transform var(--transition);
+    }
+    .stepper .toggle:hover:not(:disabled) { background: var(--surface-hover); }
+    .stepper .toggle:active:not(:disabled) { transform: scale(0.9); }
+    .stepper .toggle.ativo { background: var(--accent); color: #fff; }
+    .stepper.bloqueado { opacity: 0.5; }
+    .qtd-extra { min-width: 22px; text-align: center; font-weight: 800; font-size: 0.9rem; }
+    .toggle:disabled { opacity: 0.4; cursor: not-allowed; }
     .modal-footer {
       padding: 16px 20px 18px;
       border-top: 1px solid var(--border);
@@ -218,7 +244,12 @@ export class PersonalizacaoProdutoComponent {
     effect(() => {
       const vinculos = this.produto()?.ingredientes ?? [];
       this.ingredientes.set(
-        vinculos.map((vinculo) => ({ vinculo, removido: false, adicionado: false })),
+        vinculos.map((vinculo) => ({
+          vinculo,
+          // Ingrediente base (sem custo) já vem no produto por padrão → 1;
+          // adicional pago começa em 0 (não incluído).
+          quantidade: vinculo.precoAdicional > 0 ? 0 : 1,
+        })),
       );
       this.quantidade.set(1);
     });
@@ -232,31 +263,48 @@ export class PersonalizacaoProdutoComponent {
     this.quantidade.update((q) => Math.max(1, q - 1));
   }
 
+  // Ingrediente "base": já incluso no produto por padrão, sem custo extra
+  base(ing: EstadoIngrediente): boolean {
+    return ing.vinculo.precoAdicional <= 0;
+  }
+
+  // Base removida pelo cliente (quantidade zerada com o botão −)
+  removido(ing: EstadoIngrediente): boolean {
+    return this.base(ing) && ing.quantidade === 0;
+  }
+
+  // Há cópias extras além do padrão (base começa em 1, adicional em 0)
+  adicional(ing: EstadoIngrediente): boolean {
+    return ing.quantidade > (this.base(ing) ? 1 : 0);
+  }
+
   precoTotal(): number {
     const base = this.produto()?.preco ?? 0;
-    const extras = this.ingredientes()
-      .filter((i) => i.adicionado)
-      .reduce((acc, i) => acc + (i.vinculo.precoAdicional ?? 0), 0);
+    const extras = this.ingredientes().reduce(
+      (acc, i) => acc + (i.vinculo.precoAdicional ?? 0) * i.quantidade,
+      0,
+    );
     return base + extras;
   }
 
-  alternarRemovido(ing: EstadoIngrediente): void {
-    if (ing.adicionado) return;
+  aumentar(ing: EstadoIngrediente): void {
+    // Ingrediente sem valor agregado (precoAdicional zerado) não pode ser
+    // adicionado como extra — apenas removido do produto.
+    if ((ing.vinculo.precoAdicional ?? 0) <= 0) return;
     this.ingredientes.update((lista) =>
       lista.map((i) =>
         i.vinculo.ingredienteId === ing.vinculo.ingredienteId
-          ? { ...i, removido: !i.removido }
+          ? { ...i, quantidade: Math.min(i.quantidade + 1, 99) }
           : i,
       ),
     );
   }
 
-  alternarAdicionado(ing: EstadoIngrediente): void {
-    if (ing.removido) return;
+  diminuir(ing: EstadoIngrediente): void {
     this.ingredientes.update((lista) =>
       lista.map((i) =>
         i.vinculo.ingredienteId === ing.vinculo.ingredienteId
-          ? { ...i, adicionado: !i.adicionado }
+          ? { ...i, quantidade: Math.max(0, i.quantidade - 1) }
           : i,
       ),
     );
@@ -266,21 +314,28 @@ export class PersonalizacaoProdutoComponent {
     const produto = this.produto();
     if (!produto) return;
 
+    // "Sem": ingredientes base removidos (quantidade zerada)
     const removidos = this.ingredientes()
-      .filter((i) => i.removido)
+      .filter((i) => this.removido(i))
       .map((i) => ({
         ingredienteId: i.vinculo.ingredienteId,
         nome: i.vinculo.ingrediente!.nome,
         preco: 0,
       }));
 
+    // "Adicionados": cópias extras além do padrão de cada ingrediente
     const adicionados = this.ingredientes()
-      .filter((i) => i.adicionado)
-      .map((i) => ({
-        ingredienteId: i.vinculo.ingredienteId,
-        nome: i.vinculo.ingrediente!.nome,
-        preco: i.vinculo.precoAdicional ?? 0,
-      }));
+      .filter((i) => this.adicional(i))
+      .flatMap((i) =>
+        Array.from(
+          { length: i.quantidade - (this.base(i) ? 1 : 0) },
+          () => ({
+            ingredienteId: i.vinculo.ingredienteId,
+            nome: i.vinculo.ingrediente!.nome,
+            preco: i.vinculo.precoAdicional ?? 0,
+          }),
+        ),
+      );
 
     this.cartService.addPersonalizado(
       produto,

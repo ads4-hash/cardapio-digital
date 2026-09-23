@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UsuarioLogado } from '../../services/auth.service';
 
@@ -28,7 +28,7 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
               id="nome"
               type="text"
               [ngModel]="nome()"
-              (ngModelChange)="nome.set($event)"
+              (ngModelChange)="alterar('nome', $event)"
               name="nome"
               placeholder="Ex: cozinha01"
             />
@@ -40,40 +40,79 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
               id="email"
               type="email"
               [ngModel]="email()"
-              (ngModelChange)="email.set($event)"
+              (ngModelChange)="alterar('email', $event)"
               name="email"
               placeholder="Ex: contato@casa.com"
             />
           </div>
 
           <div>
-            <label for="senha">Nova senha <span class="req">*</span></label>
+            <label for="telefone">Telefone de contato <span class="opcional">(exibido no pedido)</span></label>
             <input
-              id="senha"
-              type="password"
-              [ngModel]="senha()"
-              (ngModelChange)="senha.set($event)"
-              name="senha"
-              placeholder="Mínimo de 6 caracteres"
+              id="telefone"
+              type="tel"
+              [ngModel]="telefone()"
+              (ngModelChange)="alterar('telefone', $event)"
+              name="telefone"
+              placeholder="Ex: (11) 99999-9999"
+              maxlength="20"
             />
           </div>
 
           <div>
-            <label for="confirmarSenha">Confirmar senha <span class="req">*</span></label>
-            <input
-              id="confirmarSenha"
-              type="password"
-              [ngModel]="confirmarSenha()"
-              (ngModelChange)="confirmarSenha.set($event)"
-              name="confirmarSenha"
-              placeholder="Repita a nova senha"
-            />
+            <label for="senha">Nova senha <span class="opcional">(opcional)</span></label>
+            <div class="senha-wrap">
+              <input
+                id="senha"
+                [type]="mostrarSenha() ? 'text' : 'password'"
+                [ngModel]="senha()"
+                (ngModelChange)="alterar('senha', $event)"
+                name="senha"
+                autocomplete="new-password"
+                placeholder="Deixe em branco para manter a atual"
+                minlength="6"
+              />
+              <button
+                type="button"
+                class="toggle-senha"
+                (click)="mostrarSenha.set(!mostrarSenha())"
+                [attr.aria-label]="mostrarSenha() ? 'Ocultar senha' : 'Mostrar senha'"
+              >
+                {{ mostrarSenha() ? '🙈' : '👁️' }}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label for="confirmarSenha">Confirmar nova senha <span class="opcional">(opcional)</span></label>
+            <div class="senha-wrap">
+              <input
+                id="confirmarSenha"
+                [type]="mostrarConfirmar() ? 'text' : 'password'"
+                [ngModel]="confirmarSenha()"
+                (ngModelChange)="alterar('confirmarSenha', $event)"
+                name="confirmarSenha"
+                autocomplete="new-password"
+                placeholder="Repita a nova senha"
+                minlength="6"
+              />
+              <button
+                type="button"
+                class="toggle-senha"
+                (click)="mostrarConfirmar.set(!mostrarConfirmar())"
+                [attr.aria-label]="mostrarConfirmar() ? 'Ocultar senha' : 'Mostrar senha'"
+              >
+                {{ mostrarConfirmar() ? '🙈' : '👁️' }}
+              </button>
+            </div>
           </div>
 
           <div class="acoes">
-            <button type="submit" class="btn-submit" [disabled]="salvando()">
-              {{ salvando() ? 'Salvando...' : 'Salvar alterações' }}
-            </button>
+            @if (alterado()) {
+              <button type="submit" class="btn-submit" [disabled]="salvando()">
+                {{ salvando() ? 'Salvando...' : 'Salvar alterações' }}
+              </button>
+            }
           </div>
         </form>
       </div>
@@ -83,6 +122,27 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
     `
     .perfil-titulo { margin: 0 0 16px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.015em; }
     .req { color: var(--danger); }
+    .opcional { color: var(--text-muted); font-weight: 500; }
+    .senha-wrap { position: relative; }
+    .senha-wrap input { padding-right: 46px; }
+    .toggle-senha {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      transition: background var(--transition);
+    }
+    .toggle-senha:hover { background: var(--surface-hover); }
     .msg-ok { background: var(--accent-light); color: var(--accent-dark); padding: 12px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; }
     .msg-erro { background: var(--danger-light); color: var(--danger); padding: 12px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; }
     .acoes { display: flex; gap: 10px; }
@@ -94,38 +154,79 @@ export class AdminPerfilComponent {
 
   nome = signal('');
   email = signal('');
+  telefone = signal('');
   senha = signal('');
   confirmarSenha = signal('');
+  mostrarSenha = signal(false);
+  mostrarConfirmar = signal(false);
   salvando = signal(false);
   sucesso = signal('');
   erro = signal('');
 
+  // Botão "Salvar alterações" só aparece quando algo foi alterado pelo usuário
+  alterado = signal(false);
+
+  // Registra qualquer digitação nos campos e marca o formulário como alterado
+  alterar(
+    campo: 'nome' | 'email' | 'telefone' | 'senha' | 'confirmarSenha',
+    valor: string,
+  ): void {
+    this[campo].set(valor);
+    this.alterado.set(true);
+  }
+
   constructor() {
-    // Pré-preenche com os dados atuais do usuário logado
-    const usuario = this.authService.usuarioLogado();
-    if (usuario) {
-      this.nome.set(usuario.nome);
-      this.email.set(usuario.email);
-    }
+    // Sempre reflete os dados atuais do usuário logado nos campos (funciona
+    // mesmo após recarregar a página, quando a sessão é revalidada no guard)
+    effect(() => {
+      const usuario = this.authService.usuarioLogado();
+      if (usuario) {
+        this.nome.set(usuario.nome);
+        this.email.set(usuario.email);
+        this.telefone.set(usuario.telefone ?? '');
+      }
+    });
   }
 
   salvar(): void {
     this.erro.set('');
     this.sucesso.set('');
 
-    if (this.senha() !== this.confirmarSenha()) {
-      this.erro.set('As senhas não conferem.');
-      return;
+    const senha = this.senha();
+    const confirmarSenha = this.confirmarSenha();
+
+    // A senha é opcional: só é validada quando o usuário quer alterá-la
+    if (senha) {
+      if (senha.length < 6) {
+        this.erro.set('A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      if (senha !== confirmarSenha) {
+        this.erro.set('As senhas não conferem.');
+        return;
+      }
+    }
+
+    const dados: {
+      nome: string;
+      email: string;
+      telefone?: string;
+      senha?: string;
+      confirmarSenha?: string;
+    } = {
+      nome: this.nome().trim(),
+      email: this.email().trim(),
+      telefone: this.telefone().trim() || undefined,
+    };
+
+    if (senha) {
+      dados.senha = senha;
+      dados.confirmarSenha = confirmarSenha;
     }
 
     this.salvando.set(true);
     this.authService
-      .atualizarPerfil({
-        nome: this.nome().trim(),
-        email: this.email().trim(),
-        senha: this.senha(),
-        confirmarSenha: this.confirmarSenha(),
-      })
+      .atualizarPerfil(dados)
       .subscribe({
         next: (usuario: UsuarioLogado) => {
           this.authService.aplicarPerfil(usuario);
@@ -133,6 +234,9 @@ export class AdminPerfilComponent {
           this.sucesso.set('Perfil atualizado com sucesso!');
           this.senha.set('');
           this.confirmarSenha.set('');
+          this.mostrarSenha.set(false);
+          this.mostrarConfirmar.set(false);
+          this.alterado.set(false);
         },
         error: (err) => {
           this.salvando.set(false);

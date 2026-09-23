@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, switchMap, timer } from 'rxjs';
@@ -6,7 +6,11 @@ import {
   PedidoService,
   PedidoRastreio,
   PedidoStatus,
+  FormaPagamento,
+  FORMA_PAGAMENTO_LABEL,
+  formatarTelefone as formatarTelefoneBr,
 } from '../../services/pedidos.service';
+import { ConfiguracoesService } from '../../services/configuracoes.service';
 
 const STATUS_LABELS: Record<PedidoStatus, string> = {
   PENDENTE: 'Pendente',
@@ -74,7 +78,16 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
             }
             @if (pedido()!.telefone) {
               <p class="detalhe">
-                Contato: <strong>{{ pedido()!.telefone }}</strong>
+                Contato: <strong>{{ formatarTelefone(pedido()!.telefone) }}</strong>
+              </p>
+            }
+            <p class="detalhe">
+              Pagamento: <strong>{{ rotuloPagamento(pedido()!.formaPagamento) }}</strong>
+            </p>
+            @if (pedido()!.formaPagamento === 'DINHEIRO' && trocoDevolver() > 0) {
+              <p class="detalhe">
+                Troco: <strong>{{ trocoDevolver() | currency:'BRL' }}</strong>
+                (pagando com {{ pedido()!.trocoPara | currency:'BRL' }})
               </p>
             }
           </div>
@@ -88,7 +101,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
                     <span class="pers removido">Sem: {{ item.removidos.join(', ') }}</span>
                   }
                   @if (item.adicionados.length > 0) {
-                    <span class="pers adicionado">+ {{ item.adicionados.join(', ') }}</span>
+                    <span class="pers adicionado">+ {{ agrupar(item.adicionados) }}</span>
                   }
                 </div>
                 <span>{{ item.preco * item.quantidade | currency:'BRL' }}</span>
@@ -96,16 +109,35 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
             }
           </ul>
 
+          <div class="resumo">
+            <p class="linha-resumo">Subtotal dos itens: {{ subtotal() | currency:'BRL' }}</p>
+            @if (pedido()!.tipoEntrega === 'ENTREGA' && pedido()!.taxaEntrega > 0) {
+              <p class="linha-resumo taxa">Taxa de entrega: {{ pedido()!.taxaEntrega | currency:'BRL' }}</p>
+            }
+          </div>
+
           <p class="total">
             Total: <strong>{{ pedido()!.total | currency:'BRL' }}</strong>
           </p>
+
+          @if (whatsappLink()) {
+            <a
+              class="btn-whatsapp"
+              [href]="whatsappLink()"
+              target="_blank"
+              rel="noopener"
+              aria-label="Conversar com a casa no WhatsApp"
+            >
+              💬 WhatsApp
+            </a>
+          }
 
           @if (pedido()!.status === 'CANCELADO') {
             <p class="obs">Este pedido foi cancelado. Fale com a casa para mais informações.</p>
           } @else if (pedido()!.status === 'PRONTO') {
             <p class="obs">Pedido pronto para retirada!</p>
           } @else if (pedido()!.status === 'CONCLUIDO') {
-            <p class="obs">Pedido pronto! Bom apetite.</p>
+            <p class="obs">Pedido finalizado!</p>
           }
         </div>
       }
@@ -127,6 +159,9 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
     .passo.ativo { color: var(--text); }
     .passo.ativo .ponto { background: var(--accent); color: #fff; }
     .info { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 12px; }
+    .resumo { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
+    .linha-resumo { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; font-size: 0.9rem; color: var(--text-muted); }
+    .linha-resumo.taxa { color: var(--accent-dark); font-weight: 600; }
     .itens { list-style: none; margin: 0 0 12px; padding: 0; border-top: 1px solid var(--border); }
     .itens li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
     .item-info { display: flex; flex-direction: column; min-width: 0; }
@@ -137,6 +172,19 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
     .tipo-entrega { margin: 0 0 4px; font-weight: 800; font-size: 0.95rem; }
     .detalhe { margin: 2px 0; font-size: 0.85rem; color: var(--text-muted); }
     .total { margin: 0; font-weight: 600; }
+    .btn-whatsapp {
+      display: block;
+      margin-top: 14px;
+      text-align: center;
+      background: #25D366;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      padding: 11px 16px;
+      border-radius: 12px;
+      transition: filter var(--transition);
+    }
+    .btn-whatsapp:hover { filter: brightness(1.06); }
     .obs { margin-top: 12px; font-size: 0.85rem; color: var(--text-muted); }
     `,
   ],
@@ -144,6 +192,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
 export class PedidoStatusComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly pedidoService = inject(PedidoService);
+  private readonly configuracoes = inject(ConfiguracoesService);
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_CORES = STATUS_CORES;
@@ -151,6 +200,12 @@ export class PedidoStatusComponent implements OnInit {
   pedido = signal<PedidoRastreio | null>(null);
   carregando = signal(true);
   erro = signal<string | null>(null);
+
+  readonly subtotal = computed(() => {
+    const p = this.pedido();
+    if (!p) return 0;
+    return p.itens.reduce((soma, item) => soma + item.preco * item.quantidade, 0);
+  });
 
   private readonly assinaturas = new Subscription();
 
@@ -178,10 +233,58 @@ export class PedidoStatusComponent implements OnInit {
         },
       }),
     );
+
+    // Busca o telefone do estabelecimento para montar o link do WhatsApp
+    this.configuracoes.carregarNome();
   }
 
   ngOnDestroy(): void {
     this.assinaturas.unsubscribe();
+  }
+
+  agrupar(lista: string[]): string {
+    const contagem = new Map<string, number>();
+    for (const nome of lista) {
+      contagem.set(nome, (contagem.get(nome) ?? 0) + 1);
+    }
+    return [...contagem.entries()]
+      .map(([nome, qtd]) => (qtd > 1 ? `${qtd}x ${nome}` : nome))
+      .join(', ');
+  }
+
+  formatarTelefone(valor: string | null | undefined): string {
+    return formatarTelefoneBr(valor);
+  }
+
+  rotuloPagamento(valor: FormaPagamento): string {
+    return FORMA_PAGAMENTO_LABEL[valor];
+  }
+
+  // Quanto de troco o estabelecimento deve devolver (trocoPara - total), ou 0
+  trocoDevolver(): number {
+    const p = this.pedido();
+    if (!p || p.formaPagamento !== 'DINHEIRO' || p.trocoPara == null) return 0;
+    const troco = p.trocoPara - p.total;
+    return troco > 0 ? troco : 0;
+  }
+
+  // Link do WhatsApp para falar com o estabelecimento. Só aparece quando o
+  // admin cadastrou um telefone no perfil. Se o número for brasileiro sem o
+  // DDI (10 ou 11 dígitos), adiciona o prefixo 55 automaticamente.
+  whatsappLink(): string | null {
+    const telefone = this.configuracoes.telefone();
+    if (!telefone) return null;
+
+    const digitos = telefone.replace(/\D/g, '');
+    const numero =
+      digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
+    if (numero.length < 10 || numero.length > 13) return null;
+
+    const p = this.pedido();
+    const mensagem = p
+      ? `Olá! Gostaria de saber como está o meu pedido #${p.id.slice(0, 8).toUpperCase()} (${p.cliente}).`
+      : 'Olá! Gostaria de saber como está o meu pedido.';
+    return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
   }
 
   posicaoStatus(): number {

@@ -1,29 +1,35 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
-  Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
-// Mesmos campos do cadastro: nome, e-mail e novas senha/confirmação
+// Edição do perfil: nome, e-mail e (opcionalmente) nova senha. A senha só é
+// alterada quando informada; deixar em branco mantém a senha atual.
 export class AtualizarPerfilDto {
   @IsString()
-  @IsNotEmpty({ message: 'Informe um nome de usuário.' })
-  @Matches(/^[a-zA-Z0-9_.-]+$/, {
-    message:
-      'O nome de usuário só pode conter letras, números, ponto, hífen ou sublinhado.',
-  })
+  @IsNotEmpty({ message: 'Informe um nome.' })
+  @MaxLength(80, { message: 'O nome deve ter no máximo 80 caracteres.' })
   nome: string;
 
   @IsEmail({}, { message: 'Informe um e-mail válido.' })
   email: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(20, { message: 'O telefone deve ter no máximo 20 caracteres.' })
+  telefone?: string;
+
+  @IsOptional()
   @IsString()
   @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres.' })
-  senha: string;
+  senha?: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: 'Confirme a senha.' })
-  confirmarSenha: string;
+  confirmarSenha?: string;
 }

@@ -13,12 +13,14 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
     <div class="card">
       @if (produtoImagemUrl()) {
         <img [src]="produtoImagemUrl()" alt="{{ produto().nome }}" class="card-img" />
+      } @else {
+        <div class="card-img card-placeholder" aria-label="Produto sem imagem">
+          <span class="placeholder-icone">?</span>
+        </div>
       }
       <div class="card-body">
         <h3>{{ produto().nome }}</h3>
-        @if (produto().descricao) {
-          <p class="desc">{{ produto().descricao }}</p>
-        }
+        <p class="desc">{{ produto().descricao || ' ' }}</p>
         <div class="card-footer">
           @if (modo() === 'admin') {
             <span class="price">{{ produto().preco | currency:'BRL' }}</span>
@@ -37,7 +39,7 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
               @if (!configuracoes.aceitandoPedidos()) {
                 Sem pedidos
               } @else {
-                {{ temIngredientes() ? 'Personalizar' : 'Adicionar' }}
+                {{ temIngredientes() ? 'Adicionar' : 'Adicionar' }}
               }
             </button>
           }
@@ -53,10 +55,12 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
     }
   `,
   styles: [`
+    :host { display: block; height: 100%; }
     .card {
       position: relative;
       display: flex;
       flex-direction: column;
+      height: 100%;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -76,6 +80,19 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       display: block;
       transition: transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
     }
+    .card-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--surface-hover), var(--border));
+    }
+    .placeholder-icone {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      opacity: 0.55;
+      user-select: none;
+    }
     .card:hover .card-img { transform: scale(1.06); }
     .card-body {
       display: flex;
@@ -84,7 +101,18 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       gap: 8px;
       padding: 16px 16px 18px;
     }
-    .card-body h3 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+    .card-body h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.3;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: calc(2 * 1.3 * 1.05rem);
+    }
     .desc {
       margin: 0;
       color: var(--text-muted);
@@ -94,6 +122,7 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+      min-height: calc(2 * 1.45 * 0.85rem);
     }
     .card-footer {
       margin-top: auto;

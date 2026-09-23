@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -28,13 +29,13 @@ export class ItemPedidoDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ArrayMaxSize(50)
+  @ArrayMaxSize(200)
   removidos?: string[];
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ArrayMaxSize(50)
+  @ArrayMaxSize(200)
   adicionados?: string[];
 }
 
@@ -42,6 +43,13 @@ export class ItemPedidoDto {
 export enum TipoEntrega {
   RETIRADA = 'RETIRADA',
   ENTREGA = 'ENTREGA',
+}
+
+// Métodos de pagamento aceitos pelo estabelecimento
+export enum FormaPagamento {
+  DINHEIRO = 'DINHEIRO',
+  PIX = 'PIX',
+  CARTAO = 'CARTAO',
 }
 
 export class CreatePedidoDto {
@@ -73,6 +81,21 @@ export class CreatePedidoDto {
     message: 'O endereço deve ter no máximo 200 caracteres.',
   })
   endereco?: string;
+
+  // Forma de pagamento escolhida no checkout (padrão: dinheiro)
+  @IsOptional()
+  @IsIn([FormaPagamento.DINHEIRO, FormaPagamento.PIX, FormaPagamento.CARTAO], {
+    message: 'Informe uma forma de pagamento válida.',
+  })
+  formaPagamento?: FormaPagamento;
+
+  // Valor em dinheiro entregue para receber troco (apenas quando DINHEIRO).
+  // O troco em si é calculado pelo servidor: trocoPara - total.
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Informe um valor de troco válido.' })
+  @Min(0.01, { message: 'O valor do troco deve ser maior que zero.' })
+  trocoPara?: number;
 
   @IsArray()
   @ArrayMinSize(1, { message: 'O pedido precisa conter pelo menos um item.' })

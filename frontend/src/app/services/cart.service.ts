@@ -97,19 +97,29 @@ export class CartService {
     return produto.preco + adicionados.reduce((acc, a) => acc + a.preco, 0);
   }
 
+  private mesmoConjunto(
+    a: ItemIngrediente[],
+    b: ItemIngrediente[],
+  ): boolean {
+    if (a.length !== b.length) return false;
+    const contar = (lista: ItemIngrediente[]) =>
+      lista.reduce<Record<string, number>>((acc, item) => {
+        acc[item.ingredienteId] = (acc[item.ingredienteId] ?? 0) + 1;
+        return acc;
+      }, {});
+    const ca = contar(a);
+    const cb = contar(b);
+    return Object.keys(ca).every((id) => ca[id] === (cb[id] ?? 0));
+  }
+
   private mesmaPersonalizacao(
     a: CartItemPersonalizacao,
     b: CartItemPersonalizacao,
   ): boolean {
-    const mesmoRemovidos =
-      a.removidos.length === b.removidos.length &&
-      a.removidos.every((r) => b.removidos.some((br) => br.ingredienteId === r.ingredienteId));
-    const mesmoAdicionados =
-      a.adicionados.length === b.adicionados.length &&
-      a.adicionados.every((ad) =>
-        b.adicionados.some((bad) => bad.ingredienteId === ad.ingredienteId),
-      );
-    return mesmoRemovidos && mesmoAdicionados;
+    return (
+      this.mesmoConjunto(a.removidos, b.removidos) &&
+      this.mesmoConjunto(a.adicionados, b.adicionados)
+    );
   }
 
   // Atualiza a quantidade de um item; remove se a quantidade for <= 0
@@ -131,6 +141,12 @@ export class CartService {
     this._items.update((items) =>
       items.filter((item) => item.uid !== uid),
     );
+    this.persistir();
+  }
+
+  // Substitui o carrinho pela lista informada (usada ao remover itens indisponíveis)
+  atualizarItens(itens: CartItem[]): void {
+    this._items.set(itens);
     this.persistir();
   }
 

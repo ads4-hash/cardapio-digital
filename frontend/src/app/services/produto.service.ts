@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, PLATFORM_ID } from '@angular/core';
 import { isPlatformServer } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Observable, shareReplay } from 'rxjs';
+import { Observable, firstValueFrom, shareReplay } from 'rxjs';
 
 import { environment } from '../environment';
 
@@ -34,7 +34,7 @@ export interface Produto {
   nome: string;
   descricao?: string;
   preco: number;
-  imagemUrl?: string;
+  imagemUrl?: string | null;
   categoriaId: string;
   categoria?: Categoria;
   categoriaNome?: string;
@@ -42,7 +42,7 @@ export interface Produto {
 }
 
 // Retorna a URL completa de uma imagem (a API devolve caminhos relativos como /uploads/...)
-export function resolverImagemUrl(imagemUrl?: string): string | undefined {
+export function resolverImagemUrl(imagemUrl?: string | null): string | undefined {
   if (!imagemUrl) return undefined;
   return imagemUrl.startsWith('/') ? `${environment.apiUrl}${imagemUrl}` : imagemUrl;
 }
@@ -137,6 +137,22 @@ export class ProdutoService {
   // Recarrega ignorando o cache (usado após cadastrar/remover)
   recarregarProdutos(): void {
     this.loadProdutos(true);
+  }
+
+  // Busca fresca do catálogo direto da API (ignorando o cache usado pela
+  // tela) e já resolve com a lista atual. Usado para validar o carrinho antes
+  // de enviar o pedido; em caso de erro mantém a lista em memória.
+  async carregarProdutosAtualizados(): Promise<Produto[]> {
+    if (isPlatformServer(this.platformId)) return this.produtos();
+    try {
+      const dados = await firstValueFrom(this.listar());
+      this.produtos.set(dados);
+      this.produtosCache$ = undefined;
+      return dados;
+    } catch (err) {
+      console.error('Erro ao atualizar produtos:', err);
+      return this.produtos();
+    }
   }
 
   // Recarrega as categorias ignorando o cache (usado após cadastrar/editar/remover)

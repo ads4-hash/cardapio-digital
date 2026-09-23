@@ -1,16 +1,36 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, afterNextRender } from '@angular/core';
 import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
+import { resolverImagemUrl } from '../../services/produto.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
   imports: [RouterLink],
   template: `
-    <header class="navbar">
-      <span class="brand">Cardápio Digital</span>
+    <header
+      class="navbar"
+      [class.hero]="rotaCliente()"
+      [class.padrao]="navPadrao()"
+      [style.background-image]="rotaCliente() ? fundoHero() : null"
+    >
+      <span class="brand" [class.hero]="rotaCliente()">
+        @if (mostrarLogo() && logoCardapio(); as logo) {
+          <img
+            class="brand-logo"
+            [class.hero]="rotaCliente()"
+            [src]="logo"
+            alt="Logo do estabelecimento"
+          />
+        } @else if (!rotaCliente()) {
+          <span class="brand-marca" aria-hidden="true"></span>
+        }
+        @if (!rotaCliente()) {
+          <span class="brand-nome" [class.hero]="rotaCliente()">{{ marca() }}</span>
+        }
+      </span>
       <nav class="nav-links">
         @if (authService.isAutenticado() && naRotaAdmin()) {
           <button
@@ -45,16 +65,75 @@ import { ConfiguracoesService } from '../../services/configuracoes.service';
       justify-content: space-between;
       gap: 12px;
       padding: 14px 26px;
-      background: var(--nav-bg);
-      -webkit-backdrop-filter: blur(16px);
-      backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--nav-border);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-bottom: none;
+      transition: background 0.3s ease;
+    }
+    /* Navbar padrão (login e admin): cores padrão do app, sem configuração do cardápio */
+    .navbar.padrao {
+      background: linear-gradient(135deg, var(--primary-default), var(--primary-default-dark));
+      border-bottom: none;
+    }
+    html[data-theme='dark'] .navbar.padrao {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    /* Cabeçalho hero do cardápio público: capa como fundo, logo + nome centralizados */
+    .navbar.hero {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      min-height: 180px;
+      padding: 12px 24px 14px;
+      background-color: var(--surface-hover);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      background-size: cover;
+      background-position: center;
+      border-bottom: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-bottom-left-radius: 26px;
+      border-bottom-right-radius: 26px;
+      box-shadow:
+        0 14px 34px rgba(15, 23, 42, 0.26),
+        0 4px 12px rgba(15, 23, 42, 0.14);
+    }
+    .navbar.hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(15, 23, 42, 0.18),
+        rgba(15, 23, 42, 0.42)
+      );
+      pointer-events: none;
+    }
+    .navbar.hero > * {
+      position: relative;
+      z-index: 1;
+    }
+    /* Sombra na linha de transição entre a barra e o conteúdo */
+    .navbar.hero::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(
+        180deg,
+        rgba(15, 23, 42, 0.34),
+        rgba(15, 23, 42, 0)
+      );
+      pointer-events: none;
     }
     .brand {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      color: var(--text);
+      color: #fff;
       text-decoration: none;
       font-size: 1.1rem;
       font-weight: 800;
@@ -62,16 +141,60 @@ import { ConfiguracoesService } from '../../services/configuracoes.service';
       white-space: nowrap;
       transition: color var(--transition);
     }
-    .brand::before {
+    .brand.hero {
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      white-space: normal;
+      text-align: center;
+    }
+    .brand-marca {
       content: '';
       width: 11px;
       height: 11px;
       border-radius: 4px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 50%, transparent);
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
     }
-    .brand:hover { color: var(--primary); }
+    .brand-marca.hero {
+      width: 100px;
+      height: 100px;
+      border-radius: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .brand-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .brand-logo.hero {
+      width: 126px;
+      height: 126px;
+      border-radius: 24px;
+      border-color: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .brand-nome.hero {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fff;
+      text-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.65),
+        0 5px 20px rgba(0, 0, 0, 0.55);
+    }
+    .navbar.padrao .brand:hover { color: #fff; opacity: 0.9; }
+    .brand:hover { color: var(--primary-light); }
+    .brand.hero:hover { color: #fff; }
     .nav-links { display: flex; align-items: center; gap: 10px; }
+    .navbar.hero .nav-links {
+      position: absolute;
+      top: 12px;
+      right: 24px;
+    }
     .theme-btn {
       width: 40px;
       height: 40px;
@@ -150,19 +273,38 @@ export class NavbarComponent implements OnInit {
   isDark = false;
   private readonly rotaAdmin = signal(false);
 
+  // URL atual após cada navegação. Usar um sinal garante que a navbar seja
+  // reavaliada quando o roteador termina de navegar — sem isso, os getters que
+  // leem router.url ficavam presos ao valor inicial ("/") e o cabeçalho hero
+  // (capa/logo do cardápio) nunca era renderizado.
+  private readonly urlAtual = signal('');
+
   constructor() {
+    this.urlAtual.set(this.router.url);
+    // Aplica o tema salvo já no construtor (só no navegador) para a página
+    // nascer com o tema certo, sem "pulo". O isDark do botão só é sincronizado
+    // depois da hidratação (afterNextRender) para não causar mismatch com o SSR.
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
-      this.isDark = saved === 'dark';
-      document.documentElement.setAttribute('data-theme', this.isDark ? 'dark' : 'light');
+      const salvo = localStorage.getItem('theme');
+      document.documentElement.setAttribute('data-theme', salvo === 'dark' ? 'dark' : 'light');
     }
+    afterNextRender(() => {
+      if (typeof window !== 'undefined') {
+        this.isDark = localStorage.getItem('theme') === 'dark';
+      }
+    });
   }
 
   ngOnInit(): void {
+    this.authService.restaurarSessao();
+    // Nome do estabelecimento para clientes não logados (também usado como marca)
+    this.configuracoes.carregarNome();
+
     // Estado online/offline só existe nas telas de admin
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((event) => {
+        this.urlAtual.set(event.urlAfterRedirects);
         this.rotaAdmin.set(event.urlAfterRedirects.startsWith('/admin'));
         if (this.rotaAdmin() && this.authService.isAutenticado()) {
           this.configuracoes.carregar();
@@ -187,10 +329,48 @@ export class NavbarComponent implements OnInit {
   }
 
   naRotaLogin(): boolean {
-    return this.router.url === '/';
+    return this.urlAtual() === '' || this.urlAtual() === '/';
+  }
+
+  // O título da marca mostra o nome do estabelecimento; só o login é fixo
+  marca(): string {
+    if (this.naRotaLogin()) return 'Cardápio Digital';
+    const logado = this.authService.usuarioLogado()?.nome;
+    if (logado) return logado;
+    return this.configuracoes.nome() ?? 'Cardápio Digital';
+  }
+
+  // A logo aparece no cardápio (grande) e no admin (padrão), mas não no login
+  mostrarLogo(): boolean {
+    return this.rotaCliente() || this.naRotaAdmin();
+  }
+
+  // /login e /admin usam o navbar padrão: estilo e cores neutras,
+  // sem configuração de visual do cardápio
+  navPadrao(): boolean {
+    return this.naRotaLogin() || this.urlAtual().startsWith('/admin');
+  }
+
+  // Logo personalizada do estabelecimento (imagem) quando configurada
+  logoCardapio(): string | undefined {
+    const logo = this.configuracoes.visualCardapio().logoUrl;
+    return resolverImagemUrl(logo ?? undefined);
+  }
+
+  // Capa como fundo do cabeçalho hero (só no cardápio público)
+  fundoHero(): string | null {
+    const capa = resolverImagemUrl(
+      this.configuracoes.visualCardapio().capaUrl ?? undefined,
+    );
+    return capa ? `url('${capa}')` : null;
+  }
+
+  // O cabeçalho hero (capa + logo/nome) só aparece no cardápio do cliente
+  rotaCliente(): boolean {
+    return this.urlAtual().startsWith('/cardapio');
   }
 
   naRotaAdmin(): boolean {
-    return this.rotaAdmin() || this.router.url.startsWith('/admin');
+    return this.rotaAdmin() || this.urlAtual().startsWith('/admin');
   }
 }

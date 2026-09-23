@@ -1,11 +1,14 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-// Cardápio público: mostra o link para compartilhar e permite copiar/abrir
+import { AdminPersonalizacaoComponent } from '../admin-personalizacao/admin-personalizacao.component';
+
+// Cardápio público: mostra o link para compartilhar e permite copiar/abrir,
+// além da personalização visual (cor, logo e tema) aplicada a esse cardápio
 @Component({
   selector: 'app-admin-cardapio',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AdminPersonalizacaoComponent],
   template: `
     <section class="admin-form cardapio-share">
       <h2 class="titulo-secao">Cardápio público</h2>
@@ -21,6 +24,8 @@ import { CommonModule } from '@angular/common';
         Abrir em nova aba ↗
       </a>
     </section>
+
+    <app-admin-personalizacao></app-admin-personalizacao>
   `,
 })
 export class AdminCardapioComponent {

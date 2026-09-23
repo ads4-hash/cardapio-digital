@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
-import { PedidoService, Pedido, PedidoStatus } from '../../services/pedidos.service';
+import { PedidoService, Pedido, PedidoStatus, FormaPagamento, FORMA_PAGAMENTO_LABEL, formatarTelefone as formatarTelefoneBr } from '../../services/pedidos.service';
 import { RealtimeService } from '../../services/realtime.service';
 
 const STATUS_CORES: Record<PedidoStatus, string> = {
@@ -70,7 +70,6 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
                     {{ STATUS_LABELS[pedido.status] }}
                   </span>
                 </div>
-                <button class="btn-remove" (click)="excluir(pedido.id)">Excluir</button>
               </div>
 
               <p class="pedido-info">
@@ -83,11 +82,20 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
                 <p class="dados-entrega">📍 {{ pedido.endereco }}</p>
               }
               @if (pedido.telefone) {
-                <p class="dados-entrega">📞 {{ pedido.telefone }}</p>
+                <p class="dados-entrega">📞 {{ formatarTelefone(pedido.telefone) }}</p>
               }
               @if (pedido.taxaEntrega > 0) {
                 <p class="dados-entrega taxa">Taxa de entrega: {{ pedido.taxaEntrega | currency:'BRL' }}</p>
               }
+              <p class="dados-entrega pag">
+                💵 {{ rotuloPagamento(pedido.formaPagamento) }}
+                @if (pedido.formaPagamento === 'DINHEIRO' && trocoDevolver(pedido) > 0) {
+                  · Troco: {{ trocoDevolver(pedido) | currency:'BRL' }}
+                  (pagando com {{ pedido.trocoPara | currency:'BRL' }})
+                } @else if (pedido.formaPagamento === 'DINHEIRO' && pedido.trocoPara != null) {
+                  · Pagará exato {{ pedido.trocoPara | currency:'BRL' }}
+                }
+              </p>
 
               <ul class="itens">
                 @for (item of pedido.itens; track item.id) {
@@ -98,7 +106,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
                         <span class="pers-tag removido">sem {{ listaRemovidos(item).join(', ') }}</span>
                       }
                       @if (listaAdicionados(item).length > 0) {
-                        <span class="pers-tag adicionado">+ {{ listaAdicionados(item).join(', ') }}</span>
+                        <span class="pers-tag adicionado">+ {{ agrupar(this.listaAdicionados(item)) }}</span>
                       }
                     </span>
                     <span>{{ item.preco * item.quantidade | currency:'BRL' }}</span>
@@ -119,6 +127,24 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
         </div>
       }
     </section>
+
+    @if (confirmacao(); as item) {
+      <div class="modal-overlay" (click)="cancelarConfirmacao()">
+        <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="modal-cancelar-titulo">
+          <h3 id="modal-cancelar-titulo">Cancelar pedido</h3>
+          <p>
+            Tem certeza que deseja cancelar o pedido
+            <strong>#{{ item.pedido.id.slice(0, 8).toUpperCase() }}</strong> de
+            <strong>{{ item.pedido.cliente }}</strong>?
+          </p>
+          <p class="modal-aviso">O cliente será informado e o pedido não seguirá para produção.</p>
+          <div class="modal-acoes">
+            <button class="btn-voltar-confirmacao" (click)="cancelarConfirmacao()">Voltar</button>
+            <button class="btn-confirmar-cancelamento" (click)="confirmarCancelamento()">Cancelar pedido</button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .pedidos-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
@@ -216,19 +242,56 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
       transition: border-color var(--transition), box-shadow var(--transition);
     }
     .pedido-bottom select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
-    .btn-remove {
-      padding: 7px 12px;
-      background: var(--danger);
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: var(--overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: modal-fade var(--transition-slow);
+    }
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      padding: 26px 24px 22px;
+      animation: modal-pop var(--transition-slow);
+    }
+    .modal h3 { margin: 0 0 10px; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.015em; }
+    .modal p { margin: 0 0 6px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.55; }
+    .modal p strong { color: var(--text); }
+    .modal-aviso { color: var(--danger) !important; font-weight: 600; }
+    .modal-acoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .btn-voltar-confirmacao, .btn-confirmar-cancelamento {
+      padding: 10px 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: filter var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+    .btn-voltar-confirmacao { background: var(--surface-hover); color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-voltar-confirmacao:hover { color: var(--text); border-color: var(--text-muted); }
+    .btn-voltar-confirmacao:active { transform: scale(0.97); }
+    .btn-confirmar-cancelamento {
+      background: linear-gradient(135deg, var(--danger), #b91c1c);
       color: #fff;
       border: none;
-      border-radius: 9px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      transition: filter var(--transition), transform var(--transition);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--danger) 30%, transparent);
     }
-    .btn-remove:hover { filter: brightness(1.1); }
-    .btn-remove:active { transform: scale(0.95); }
+    .btn-confirmar-cancelamento:hover { filter: brightness(1.08); box-shadow: 0 6px 16px color-mix(in srgb, var(--danger) 40%, transparent); }
+    .btn-confirmar-cancelamento:active { transform: scale(0.97); }
+    @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modal-pop {
+      from { opacity: 0; transform: translateY(14px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
   `],
 })
 export class AdminPedidosComponent implements OnInit {
@@ -250,6 +313,8 @@ export class AdminPedidosComponent implements OnInit {
   pedidos = signal<Pedido[]>([]);
   carregando = signal(false);
   filtroStatus = signal<PedidoStatus | null>(null);
+  // Pedido aguardando confirmação de cancelamento
+  confirmacao = signal<{ pedido: Pedido; status: PedidoStatus } | null>(null);
 
   // Lista já filtrada pelo status selecionado (aplica automaticamente
   // também nas atualizações em tempo real)
@@ -317,6 +382,32 @@ export class AdminPedidosComponent implements OnInit {
     return this.parseLista(item.adicionados);
   }
 
+  agrupar(lista: string[]): string {
+    const contagem = new Map<string, number>();
+    for (const nome of lista) {
+      contagem.set(nome, (contagem.get(nome) ?? 0) + 1);
+    }
+    return [...contagem.entries()]
+      .map(([nome, qtd]) => (qtd > 1 ? `${qtd}x ${nome}` : nome))
+      .join(', ');
+  }
+
+  formatarTelefone(valor: string | null | undefined): string {
+    return formatarTelefoneBr(valor);
+  }
+
+  rotuloPagamento(valor: FormaPagamento): string {
+    return FORMA_PAGAMENTO_LABEL[valor];
+  }
+
+  // Quanto de troco devolver (trocoPara - total), ou 0 quando não se aplica
+  trocoDevolver(pedido: Pedido): number {
+    if (pedido.formaPagamento !== 'DINHEIRO' || pedido.trocoPara == null) {
+      return 0;
+    }
+    return Math.max(0, pedido.trocoPara - pedido.total);
+  }
+
   carregar(): void {
     this.carregando.set(true);
     this.pedidoService.listar().subscribe({
@@ -331,23 +422,33 @@ export class AdminPedidosComponent implements OnInit {
 
   mudarStatus(pedidoId: string, event: Event): void {
     const status = (event.target as HTMLSelectElement).value as PedidoStatus;
+    const pedido = this.pedidos().find((p) => p.id === pedidoId);
+    // Cancelar pedido exige confirmação
+    if (status === 'CANCELADO' && pedido) {
+      this.confirmacao.set({ pedido, status });
+      return;
+    }
+    this.aplicarStatus(pedidoId, status);
+  }
+
+  private aplicarStatus(pedidoId: string, status: PedidoStatus): void {
     this.pedidoService.atualizarStatus(pedidoId, status).subscribe({
       next: (atualizado) =>
-        this.pedidos.update((pedidos) =>
-          pedidos.map((p) => (p.id === pedidoId ? atualizado : p)),
+        this.pedidos.update((lista) =>
+          lista.map((p) => (p.id === pedidoId ? atualizado : p)),
         ),
       error: (err) => console.error('Erro ao atualizar status:', err),
     });
   }
 
-  excluir(pedidoId: string): void {
-    if (!confirm('Deseja excluir este pedido?')) return;
-    this.pedidoService.excluir(pedidoId).subscribe({
-      next: () =>
-        this.pedidos.update((pedidos) =>
-          pedidos.filter((p) => p.id !== pedidoId),
-        ),
-      error: (err) => console.error('Erro ao excluir pedido:', err),
-    });
+  cancelarConfirmacao(): void {
+    this.confirmacao.set(null);
+  }
+
+  confirmarCancelamento(): void {
+    const item = this.confirmacao();
+    if (!item) return;
+    this.confirmacao.set(null);
+    this.aplicarStatus(item.pedido.id, item.status);
   }
 }

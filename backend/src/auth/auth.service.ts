@@ -25,6 +25,7 @@ export interface UsuarioPublico {
   id: string;
   nome: string;
   email: string;
+  telefone: string | null;
 }
 
 @Injectable()
@@ -42,6 +43,7 @@ export class AuthService {
     email: string,
     senha: string,
     confirmarSenha: string,
+    telefone: string | null | undefined,
     ip: string,
   ): Promise<{ token: string; usuario: UsuarioPublico }> {
     if (senha !== confirmarSenha) {
@@ -61,8 +63,13 @@ export class AuthService {
     const senhaHash = await hash(senha, CUSTO_HASH_BCRYPT);
     const usuario = await this.prisma.usuario
       .create({
-        data: { nome, email: emailNormalizado, senhaHash },
-        select: { id: true, nome: true, email: true },
+        data: {
+          nome,
+          email: emailNormalizado,
+          senhaHash,
+          telefone: telefone?.trim() || null,
+        },
+        select: { id: true, nome: true, email: true, telefone: true },
       })
       .catch((erro: { code?: string }) => {
         if (erro?.code === 'P2002') {
@@ -115,14 +122,29 @@ export class AuthService {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
+      telefone: usuario.telefone,
     });
+  }
+
+  // Dados públicos do estabelecimento exibidos nas telas públicas
+  // (cardápio e acompanhamento de pedido). Como o cadastro é restrito a um
+  // único administrador, expõe nome e telefone para contato dessa conta.
+  async obterInfoCardapio(): Promise<{
+    nome: string | null;
+    telefone: string | null;
+  }> {
+    const usuario = await this.prisma.usuario.findFirst({
+      orderBy: { criadoEm: 'asc' },
+      select: { nome: true, telefone: true },
+    });
+    return { nome: usuario?.nome ?? null, telefone: usuario?.telefone ?? null };
   }
 
   // Retorna os dados do usuário logado (usado para validar sessão)
   async me(id: string): Promise<UsuarioPublico> {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id },
-      select: { id: true, nome: true, email: true },
+      select: { id: true, nome: true, email: true, telefone: true },
     });
     if (!usuario) {
       throw new NotFoundException('Usuário não encontrado.');
@@ -130,27 +152,37 @@ export class AuthService {
     return usuario;
   }
 
-  // Edita os dados do usuário logado (mesmos campos do cadastro).
-  // A senha é re-hash cada vez; o token atual continua válido (por id).
+  // Edita os dados do usuário logado (nome, e-mail e, opcionalmente, senha).
+  // A senha só é re-hash quando informada; o token atual continua válido (por id).
   async atualizarPerfil(
     id: string,
     nome: string,
     email: string,
-    senha: string,
-    confirmarSenha: string,
+    senha?: string,
+    confirmarSenha?: string,
+    telefone?: string | null,
   ): Promise<UsuarioPublico> {
-    if (senha !== confirmarSenha) {
-      throw new BadRequestException('As senhas não conferem.');
+    if (senha) {
+      if (senha !== confirmarSenha) {
+        throw new BadRequestException('As senhas não conferem.');
+      }
     }
 
     const emailNormalizado = email.trim().toLowerCase();
-    const senhaHash = await hash(senha, CUSTO_HASH_BCRYPT);
+    const senhaHash = senha ? await hash(senha, CUSTO_HASH_BCRYPT) : undefined;
 
     const usuario = await this.prisma.usuario
       .update({
         where: { id },
-        data: { nome, email: emailNormalizado, senhaHash },
-        select: { id: true, nome: true, email: true },
+        data: {
+          nome,
+          email: emailNormalizado,
+          ...(telefone !== undefined
+            ? { telefone: telefone?.trim() || null }
+            : {}),
+          ...(senhaHash ? { senhaHash } : {}),
+        },
+        select: { id: true, nome: true, email: true, telefone: true },
       })
       .catch((erro: { code?: string }) => {
         if (erro?.code === 'P2002') {

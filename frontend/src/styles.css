@@ -4,6 +4,10 @@
   --primary-dark: #e11d48;
   --primary-light: #ffe4e6;
 
+  /* Cores padrão do app (não alteradas pela identidade visual do cardápio) */
+  --primary-default: #f43f5e;
+  --primary-default-dark: #e11d48;
+
   --accent: #10b981;
   --accent-dark: #059669;
   --accent-light: #d1fae5;
@@ -53,6 +57,9 @@
   --primary: #fb7185;
   --primary-dark: #f43f5e;
   --primary-light: #3a2026;
+
+  --primary-default: #334155;
+  --primary-default-dark: #111827;
 
   --accent: #34d399;
   --accent-dark: #10b981;

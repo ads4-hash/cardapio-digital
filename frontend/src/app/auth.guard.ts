@@ -14,7 +14,9 @@ export const authGuard: CanActivateFn = async () => {
   }
 
   try {
-    await lastValueFrom(auth.verificarSessao());
+    const usuario = await lastValueFrom(auth.verificarSessao());
+    // Mantém os dados atuais do usuário (nome/e-mail) disponíveis para as telas
+    auth.aplicarPerfil(usuario);
     return true;
   } catch {
     auth.logout();

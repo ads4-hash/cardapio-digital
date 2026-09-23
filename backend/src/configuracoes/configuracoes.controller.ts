@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ConfiguracoesService } from './configuracoes.service';
+import { AtualizarCardapioDto } from './dto/atualizar-cardapio.dto';
 import { AtualizarConfiguracaoDto } from './dto/atualizar-configuracao.dto';
 import { AtualizarTaxaEntregaDto } from './dto/atualizar-taxa-entrega.dto';
 import { AuthGuard } from '../auth/auth.guard';
@@ -27,6 +28,19 @@ export class ConfiguracoesController {
   @Get('taxa-entrega')
   obterTaxaEntrega() {
     return this.configuracoesService.obterTaxaEntrega();
+  }
+
+  // Personalização visual do cardápio (cor, logo, tema) — pública, p/ clientes
+  @Get('cardapio')
+  obterVisualCardapio() {
+    return this.configuracoesService.obterVisualCardapio();
+  }
+
+  // Salva a personalização visual (somente admin) — PATCH
+  @UseGuards(AuthGuard)
+  @Patch('cardapio')
+  definirVisualCardapio(@Body() dto: AtualizarCardapioDto) {
+    return this.configuracoesService.definirVisualCardapio(dto);
   }
 
   // Valor definido pelo admin na tela de Faturamento — somente autenticado

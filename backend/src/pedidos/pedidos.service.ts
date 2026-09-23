@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePedidoDto, TipoEntrega } from './dto/create-pedido.dto';
+import { CreatePedidoDto, FormaPagamento, TipoEntrega } from './dto/create-pedido.dto';
 import { PedidosGateway } from './pedidos.gateway';
 import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
 
@@ -66,8 +66,10 @@ export class PedidosService {
       );
     }
 
-    // Busca os preços atuais de cada produto e seus ingredientes
-    const produtoIds = data.itens.map((i) => i.produtoId);
+    // Busca os preços atuais de cada produto e seus ingredientes. O mesmo
+    // produto pode aparecer mais de uma vez no pedido (cada personalização
+    // gera uma linha própria), então valida por ids únicos.
+    const produtoIds = [...new Set(data.itens.map((i) => i.produtoId))];
     const produtos = await this.prisma.produto.findMany({
       where: { id: { in: produtoIds } },
       include: {
@@ -133,6 +135,21 @@ export class PedidosService {
       total += taxaEntrega;
     }
 
+    // Forma de pagamento e troco (apenas válidos para dinheiro)
+    const formaPagamento =
+      data.formaPagamento ?? FormaPagamento.DINHEIRO;
+    let trocoPara: number | null = data.trocoPara ?? null;
+    if (trocoPara !== null && formaPagamento !== FormaPagamento.DINHEIRO) {
+      throw new BadRequestException(
+        'Troco só é aceito para pagamento em dinheiro.',
+      );
+    }
+    if (trocoPara !== null && trocoPara < total) {
+      throw new BadRequestException(
+        'O valor informado para troco é menor que o total do pedido.',
+      );
+    }
+
     // Cria o pedido junto com seus itens na mesma transação
     const pedido = await this.prisma.pedido.create({
       data: {
@@ -142,6 +159,8 @@ export class PedidosService {
         telefone: data.telefone,
         taxaEntrega,
         total,
+        formaPagamento,
+        trocoPara,
         itens: {
           create: itensParaCriar,
         },
@@ -213,6 +232,8 @@ export class PedidosService {
       telefone: pedido.telefone,
       taxaEntrega: pedido.taxaEntrega,
       total: pedido.total,
+      formaPagamento: pedido.formaPagamento,
+      trocoPara: pedido.trocoPara,
       criadoEm: pedido.createdAt,
       itens: pedido.itens.map((item) => ({
         nome: item.produto.nome,

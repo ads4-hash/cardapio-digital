@@ -50,17 +50,19 @@ model ProdutoIngrediente {
 }
 
 model Pedido {
-  id          String       @id @default(uuid())
-  cliente     String
-  tipoEntrega String       @default("RETIRADA") // RETIRADA ou ENTREGA
-  endereco    String?
-  telefone    String?
-  taxaEntrega Float        @default(0)
-  status      String       @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
-  total       Float
-  itens       ItemPedido[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id              String   @id @default(uuid())
+  cliente         String
+  tipoEntrega     String   @default("RETIRADA") // RETIRADA ou ENTREGA
+  endereco        String?
+  telefone        String?
+  taxaEntrega     Float    @default(0)
+  status          String   @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
+  total           Float
+  formaPagamento  String   @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
+  trocoPara       Float? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
+  itens           ItemPedido[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model ItemPedido {
@@ -80,6 +82,7 @@ model Usuario {
   nome         String
   email        String    @unique // usado no login; sempre armazenado em minúsculas
   senhaHash    String
+  telefone     String? // contato do estabelecimento (exibido no pedido/WhatsApp)
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
 }

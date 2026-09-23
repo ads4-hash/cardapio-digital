@@ -5,6 +5,19 @@ import { Observable } from 'rxjs';
 import { environment } from '../environment';
 import { Produto } from './produto.service';
 
+// Formata telefones brasileiros: (85) 9 9988-4433
+export function formatarTelefone(valor: string | null | undefined): string {
+  if (!valor) return '';
+  const digitos = valor.replace(/\D/g, '');
+  if (digitos.length === 11) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 3)} ${digitos.slice(3, 7)}-${digitos.slice(7)}`;
+  }
+  if (digitos.length === 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return valor;
+}
+
 export type PedidoStatus =
   | 'PENDENTE'
   | 'EM_PREPARO'
@@ -25,6 +38,14 @@ export interface ItemPedido {
 
 export type TipoEntrega = 'RETIRADA' | 'ENTREGA';
 
+export type FormaPagamento = 'DINHEIRO' | 'PIX' | 'CARTAO';
+
+export const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
+  DINHEIRO: 'Dinheiro',
+  PIX: 'Pix',
+  CARTAO: 'Cartão',
+};
+
 export interface Pedido {
   id: string;
   cliente: string;
@@ -34,6 +55,8 @@ export interface Pedido {
   taxaEntrega: number;
   status: PedidoStatus;
   total: number;
+  formaPagamento: FormaPagamento;
+  trocoPara: number | null;
   createdAt: string;
   updatedAt: string;
   itens: ItemPedido[];
@@ -44,6 +67,8 @@ export interface CreatePedido {
   tipoEntrega: TipoEntrega;
   telefone: string;
   endereco?: string;
+  formaPagamento: FormaPagamento;
+  trocoPara?: number;
   itens: {
     produtoId: string;
     quantidade: number;
@@ -62,6 +87,8 @@ export interface PedidoRastreio {
   telefone?: string | null;
   taxaEntrega: number;
   total: number;
+  formaPagamento: FormaPagamento;
+  trocoPara: number | null;
   criadoEm: string;
   itens: {
     nome: string;

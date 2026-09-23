@@ -31,8 +31,16 @@ export class AuthController {
       dto.email,
       dto.senha,
       dto.confirmarSenha,
+      dto.telefone,
       obterIpCliente(req),
     );
+  }
+
+  // Nome e contato do estabelecimento exibidos nas telas públicas. Não exige
+  // autenticação para que clientes que veem o cardápio/pedido tenham contato.
+  @Get('cardapio')
+  infoCardapio() {
+    return this.authService.obterInfoCardapio();
   }
 
   // Limite menor no login (em conjunto com o bloqueio por IP no AuthService)
@@ -62,6 +70,7 @@ export class AuthController {
       dto.email,
       dto.senha,
       dto.confirmarSenha,
+      dto.telefone,
     );
   }
 }

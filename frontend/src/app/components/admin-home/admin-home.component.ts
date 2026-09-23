@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 export type SecaoAdmin =
   | 'inicio'
@@ -54,7 +54,7 @@ export type SecaoAdmin =
           <span class="icone">🍽️</span>
           <span class="rotulo">
             <strong>Cardápio</strong>
-            <small>Compartilhar o cardápio com os clientes</small>
+            <small>Compartilhar e personalizar a aparência do cardápio</small>
           </span>
         </button>
 
@@ -64,6 +64,9 @@ export type SecaoAdmin =
             <strong>Histórico de Pedidos</strong>
             <small>Acompanhar e gerenciar pedidos</small>
           </span>
+          @if (novosPedidos > 0) {
+            <span class="badge-novos" aria-label="{{ novosPedidos }} pedido(s) novo(s)">{{ novosPedidos }}</span>
+          }
         </button>
 
         <button class="botao-grande faturamento" (click)="navegar.emit('faturamento')">
@@ -84,7 +87,33 @@ export type SecaoAdmin =
       </div>
     </div>
   `,
+  styles: [`
+    .botao-grande { position: relative; }
+    .badge-novos {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--danger);
+      color: #fff;
+      border-radius: var(--radius-pill);
+      font-size: 0.78rem;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      animation: badge-pop var(--transition-slow);
+    }
+    @keyframes badge-pop {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+  `],
 })
 export class AdminHomeComponent {
+  @Input() novosPedidos = 0;
   @Output() navegar = new EventEmitter<SecaoAdmin>();
 }

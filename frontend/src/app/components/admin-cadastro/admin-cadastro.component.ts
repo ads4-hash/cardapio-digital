@@ -80,25 +80,48 @@ import {
 
         <div>
           <label for="imagem">Imagem do produto:</label>
-          <input
-            type="file"
-            id="imagem"
-            name="imagem"
-            accept="image/*"
-            (change)="onImagemSelecionada($event)"
-            [disabled]="enviandoImagem()"
-          />
-          @if (enviandoImagem()) {
-            <p class="img-status">Enviando imagem...</p>
-          }
-          @if (novoProduto().imagemUrl) {
-            <div class="img-preview">
-              <img [src]="resolverImg(novoProduto().imagemUrl)" alt="Pré-visualização" />
-              <button type="button" class="btn-cancel" (click)="removerImagem()">
+          <div class="arquivo-box">
+            @if (novoProduto().imagemUrl) {
+              <div class="arquivo-preview">
+                <img [src]="resolverImg(novoProduto().imagemUrl)" alt="Pré-visualização da imagem do produto" />
+              </div>
+            }
+            <label class="btn-arquivo" [class.enviando]="enviandoImagem()" for="imagem">
+              <input
+                type="file"
+                id="imagem"
+                name="imagem"
+                accept="image/*"
+                class="arquivo-input"
+                (change)="onImagemSelecionada($event)"
+                [disabled]="enviandoImagem()"
+                aria-label="Escolher imagem do produto"
+              />
+              @if (enviandoImagem()) {
+                <span class="btn-arquivo-spinner" aria-hidden="true"></span>
+                <span class="btn-arquivo-texto">
+                  <strong>Enviando imagem...</strong>
+                </span>
+              } @else {
+                <span class="btn-arquivo-icone" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                    <path d="M12 12v9"></path>
+                    <path d="m16 16-4-4-4 4"></path>
+                  </svg>
+                </span>
+                <span class="btn-arquivo-texto">
+                  <strong>{{ novoProduto().imagemUrl ? 'Trocar imagem' : 'Escolher imagem' }}</strong>
+                  <small>JPG, PNG, WEBP ou GIF · até 5 MB</small>
+                </span>
+              }
+            </label>
+            @if (novoProduto().imagemUrl && !enviandoImagem()) {
+              <button type="button" class="btn-remover" (click)="removerImagem()">
                 Remover imagem
               </button>
-            </div>
-          }
+            }
+          </div>
         </div>
 
         <div class="ingredientes-form">
@@ -167,6 +190,112 @@ import {
       </form>
     </section>
   `,
+  styles: [
+    `
+      .arquivo-box {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px;
+        border: 2px dashed var(--border);
+        border-radius: 14px;
+        background: var(--surface-hover);
+        transition: border-color var(--transition), background var(--transition);
+      }
+      .arquivo-box:hover {
+        border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+        background: color-mix(in srgb, var(--primary-light) 35%, var(--surface-hover));
+      }
+
+      .arquivo-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      .btn-arquivo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card);
+        color: var(--text);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+        transition: border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+      }
+      .btn-arquivo:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+      }
+      .btn-arquivo:active { transform: translateY(0) scale(0.99); }
+      .btn-arquivo:focus-within {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px var(--primary-light);
+      }
+      .btn-arquivo.enviando { cursor: wait; opacity: 0.85; }
+
+      .btn-arquivo-icone {
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: var(--primary-light);
+        color: var(--primary);
+      }
+      .btn-arquivo-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .btn-arquivo-texto strong { font-size: 0.92rem; font-weight: 700; }
+      .btn-arquivo-texto small { font-size: 0.76rem; color: var(--text-muted); font-weight: 500; line-height: 1.3; }
+
+      .btn-arquivo-spinner {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        border: 2px solid var(--primary-light);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .arquivo-preview { display: flex; justify-content: center; padding: 4px; }
+      .arquivo-preview img {
+        max-width: 100%;
+        height: 140px;
+        object-fit: contain;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        padding: 6px;
+      }
+
+      .btn-remover {
+        align-self: flex-start;
+        border: none;
+        background: transparent;
+        color: var(--danger);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 5px 8px;
+        border-radius: 8px;
+        transition: background var(--transition);
+      }
+      .btn-remover:hover { background: var(--danger-light); }
+    `,
+  ],
 })
 export class AdminCadastroComponent implements OnInit {
   protected readonly produtoService = inject(ProdutoService);
@@ -356,7 +485,7 @@ export class AdminCadastroComponent implements OnInit {
   }
 
   removerImagem(): void {
-    this.novoProduto.set({ ...this.novoProduto(), imagemUrl: undefined });
+    this.novoProduto.set({ ...this.novoProduto(), imagemUrl: null });
   }
 
   salvar(): void {
@@ -399,7 +528,7 @@ export class AdminCadastroComponent implements OnInit {
       descricao?: string;
       preco: number;
       categoriaId: string;
-      imagemUrl?: string;
+      imagemUrl?: string | null;
       ingredientes?: { ingredienteId: string; precoAdicional: number }[];
     },
   ): void {
