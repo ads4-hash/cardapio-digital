@@ -42,17 +42,17 @@ interface EstadoIngrediente {
                 <li class="linha" [class.fora]="removido(ing)">
                   <div class="info">
                     <span class="nome">{{ ing.vinculo.ingrediente!.nome }}</span>
-                    @if (ing.vinculo.precoAdicional > 0) {
+                    @if (removido(ing)) {
+                      <span class="extra sem">Sem este ingrediente</span>
+                    } @else if (ing.vinculo.precoAdicional > 0) {
                       <span class="extra">
                         +{{ ing.vinculo.precoAdicional | currency:'BRL' }}
-                        @if (ing.quantidade > 0) {
+                        @if (ing.quantidade > 1) {
                           <span class="extra-total">
-                            × {{ ing.quantidade }} = {{ ing.vinculo.precoAdicional * ing.quantidade | currency:'BRL' }}
+                            × {{ ing.quantidade - 1 }} extra = {{ ing.vinculo.precoAdicional * (ing.quantidade - 1) | currency:'BRL' }}
                           </span>
                         }
                       </span>
-                    } @else if (removido(ing)) {
-                      <span class="extra sem">Sem este ingrediente</span>
                     }
                   </div>
                   <div class="stepper" [class.bloqueado]="removido(ing)">
@@ -246,9 +246,9 @@ export class PersonalizacaoProdutoComponent {
       this.ingredientes.set(
         vinculos.map((vinculo) => ({
           vinculo,
-          // Ingrediente base (sem custo) já vem no produto por padrão → 1;
-          // adicional pago começa em 0 (não incluído).
-          quantidade: vinculo.precoAdicional > 0 ? 0 : 1,
+          // Todo ingrediente já vem incluso no produto por padrão (1); copias
+          // extras podem ser adicionadas apenas quando haver valor agregado.
+          quantidade: 1,
         })),
       );
       this.quantidade.set(1);
@@ -263,25 +263,23 @@ export class PersonalizacaoProdutoComponent {
     this.quantidade.update((q) => Math.max(1, q - 1));
   }
 
-  // Ingrediente "base": já incluso no produto por padrão, sem custo extra
-  base(ing: EstadoIngrediente): boolean {
-    return ing.vinculo.precoAdicional <= 0;
-  }
-
-  // Base removida pelo cliente (quantidade zerada com o botão −)
+  // Ingrediente não incluso (removido pelo cliente: quantidade zerada)
   removido(ing: EstadoIngrediente): boolean {
-    return this.base(ing) && ing.quantidade === 0;
+    return ing.quantidade === 0;
   }
 
-  // Há cópias extras além do padrão (base começa em 1, adicional em 0)
+  // Há cópias extras além do padrão incluso (lembrando que todo ingrediente
+  // começa em 1)
   adicional(ing: EstadoIngrediente): boolean {
-    return ing.quantidade > (this.base(ing) ? 1 : 0);
+    return ing.quantidade > 1;
   }
 
   precoTotal(): number {
     const base = this.produto()?.preco ?? 0;
+    // Cobra apenas as cópias extras (além da 1ª já inclusa no produto)
     const extras = this.ingredientes().reduce(
-      (acc, i) => acc + (i.vinculo.precoAdicional ?? 0) * i.quantidade,
+      (acc, i) =>
+        acc + Math.max(0, i.quantidade - 1) * (i.vinculo.precoAdicional ?? 0),
       0,
     );
     return base + extras;
@@ -323,12 +321,12 @@ export class PersonalizacaoProdutoComponent {
         preco: 0,
       }));
 
-    // "Adicionados": cópias extras além do padrão de cada ingrediente
+    // "Adicionados": cópias extras além da 1ª já inclusa de cada ingrediente
     const adicionados = this.ingredientes()
       .filter((i) => this.adicional(i))
       .flatMap((i) =>
         Array.from(
-          { length: i.quantidade - (this.base(i) ? 1 : 0) },
+          { length: i.quantidade - 1 },
           () => ({
             ingredienteId: i.vinculo.ingredienteId,
             nome: i.vinculo.ingrediente!.nome,
