@@ -16,23 +16,31 @@ import { ProdutosService } from './produtos.service';
 import { CreateProdutoDto } from './dto/create-produto.dto';
 import { UpdateProdutoDto } from './dto/update-produto.dto';
 import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { UsuarioAutenticado } from '../auth/current-user.decorator';
+import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
 
 @Controller('produtos')
 export class ProdutosController {
   constructor(
     private readonly produtosService: ProdutosService,
     private readonly jwtService: JwtService,
+    private readonly estabelecimentos: EstabelecimentosService,
   ) {}
 
-  // Público: retorna os produtos. Sem um token válido, devolve apenas produtos
-  // de categorias visíveis (não vaza itens de categorias ocultas).
+  // Público: retorna os produtos do estabelecimento (?slug=). Sem um token
+  // válido, devolve apenas produtos de categorias visíveis (não vaza itens
+  // de categorias ocultas).
   @Get()
   async findAll(
+    @Query('slug') slug: string,
     @Query('categoriaId') categoriaId?: string,
     @Req() request?: Request,
   ) {
+    const estabelecimento = await this.estabelecimentos.porSlug(slug);
     const ehAdmin = await this.temTokenValido(request);
     return this.produtosService.findAll(
+      estabelecimento.id,
       categoriaId,
       ehAdmin ? undefined : true,
     );
@@ -49,26 +57,34 @@ export class ProdutosController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.produtosService.findOne(id);
+  findOne(@CurrentUser() usuario: UsuarioAutenticado, @Param('id') id: string) {
+    return this.produtosService.findOne(usuario.estabelecimentoId, id);
   }
 
   @UseGuards(AuthGuard)
   @Post()
-  create(@Body() dto: CreateProdutoDto) {
-    return this.produtosService.create(dto);
+  create(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @Body() dto: CreateProdutoDto,
+  ) {
+    return this.produtosService.create(usuario.estabelecimentoId, dto);
   }
 
   @UseGuards(AuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateProdutoDto) {
-    return this.produtosService.update(id, dto);
+  update(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @Param('id') id: string,
+    @Body() dto: UpdateProdutoDto,
+  ) {
+    return this.produtosService.update(usuario.estabelecimentoId, id, dto);
   }
 
   @UseGuards(AuthGuard)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.produtosService.remove(id);
+  remove(@CurrentUser() usuario: UsuarioAutenticado, @Param('id') id: string) {
+    return this.produtosService.remove(usuario.estabelecimentoId, id);
   }
 }

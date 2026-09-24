@@ -4,9 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePedidoDto, FormaPagamento, TipoEntrega } from './dto/create-pedido.dto';
+import {
+  CreatePedidoDto,
+  FormaPagamento,
+  TipoEntrega,
+} from './dto/create-pedido.dto';
 import { PedidosGateway } from './pedidos.gateway';
 import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
+import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
 
 @Injectable()
 export class PedidosService {
@@ -14,11 +19,13 @@ export class PedidosService {
     private readonly prisma: PrismaService,
     private readonly gateway: PedidosGateway,
     private readonly configuracoes: ConfiguracoesService,
+    private readonly estabelecimentos: EstabelecimentosService,
   ) {}
 
-  // Listar todos os pedidos com os itens e dados do produto
-  async findAll() {
+  // Listar todos os pedidos de um estabelecimento (console admin escopado)
+  async findAll(estabelecimentoId: string) {
     return this.prisma.pedido.findMany({
+      where: { estabelecimentoId },
       include: {
         itens: {
           include: {
@@ -30,8 +37,8 @@ export class PedidosService {
     });
   }
 
-  // Buscar um pedido por ID
-  async findOne(id: string) {
+  // Buscar um pedido por ID (sempre dentro do estabelecimento)
+  async findOne(estabelecimentoId: string, id: string) {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
       include: {
@@ -43,20 +50,23 @@ export class PedidosService {
       },
     });
 
-    if (!pedido) {
+    if (!pedido || pedido.estabelecimentoId !== estabelecimentoId) {
       throw new NotFoundException(`Pedido com ID ${id} não encontrado.`);
     }
 
     return pedido;
   }
 
-  // Criar um novo pedido
+  // Criar um novo pedido. O slug identifica o estabelecimento de destino; os
+  // produtos são validados dentro do tenant para impedir preço/estoque cruzado.
   async create(data: CreatePedidoDto) {
     if (!data.itens || data.itens.length === 0) {
       throw new BadRequestException(
         'O pedido precisa conter pelo menos um item.',
       );
     }
+
+    const estabelecimento = await this.estabelecimentos.porSlug(data.slug);
 
     // Nome do cliente obrigatório; endereço exigido apenas para entrega
     const tipoEntrega = data.tipoEntrega ?? TipoEntrega.RETIRADA;
@@ -66,12 +76,12 @@ export class PedidosService {
       );
     }
 
-    // Busca os preços atuais de cada produto e seus ingredientes. O mesmo
-    // produto pode aparecer mais de uma vez no pedido (cada personalização
-    // gera uma linha própria), então valida por ids únicos.
+    // Busca os preços atuais de cada produto e seus ingredientes, sempre
+    // restringindo ao estabelecimento informado. O mesmo produto pode aparecer
+    // mais de uma vez no pedido, então valida por ids únicos.
     const produtoIds = [...new Set(data.itens.map((i) => i.produtoId))];
     const produtos = await this.prisma.produto.findMany({
-      where: { id: { in: produtoIds } },
+      where: { id: { in: produtoIds }, estabelecimentoId: estabelecimento.id },
       include: {
         ingredientes: {
           include: { ingrediente: true },
@@ -130,15 +140,16 @@ export class PedidosService {
     // Pedidos de entrega somam a taxa definida pelo admin no Faturamento
     let taxaEntrega = 0;
     if (tipoEntrega === TipoEntrega.ENTREGA) {
-      const config = await this.configuracoes.obterTaxaEntrega();
+      const config = await this.configuracoes.obterTaxaEntrega(
+        estabelecimento.id,
+      );
       taxaEntrega = config.taxaEntrega;
       total += taxaEntrega;
     }
 
     // Forma de pagamento e troco (apenas válidos para dinheiro)
-    const formaPagamento =
-      data.formaPagamento ?? FormaPagamento.DINHEIRO;
-    let trocoPara: number | null = data.trocoPara ?? null;
+    const formaPagamento = data.formaPagamento ?? FormaPagamento.DINHEIRO;
+    const trocoPara: number | null = data.trocoPara ?? null;
     if (trocoPara !== null && formaPagamento !== FormaPagamento.DINHEIRO) {
       throw new BadRequestException(
         'Troco só é aceito para pagamento em dinheiro.',
@@ -161,6 +172,7 @@ export class PedidosService {
         total,
         formaPagamento,
         trocoPara,
+        estabelecimentoId: estabelecimento.id,
         itens: {
           create: itensParaCriar,
         },
@@ -174,13 +186,13 @@ export class PedidosService {
       },
     });
 
-    this.gateway.emitirPedidoCriado(pedido);
+    this.gateway.emitirPedidoCriado(estabelecimento.id, pedido);
     return pedido;
   }
 
   // Atualizar o status do pedido (PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO)
-  async updateStatus(id: string, status: string) {
-    await this.findOne(id);
+  async updateStatus(estabelecimentoId: string, id: string, status: string) {
+    await this.findOne(estabelecimentoId, id);
 
     const pedido = await this.prisma.pedido.update({
       where: { id },
@@ -194,21 +206,22 @@ export class PedidosService {
       },
     });
 
-    this.gateway.emitirPedidoAtualizado(pedido);
+    this.gateway.emitirPedidoAtualizado(estabelecimentoId, pedido);
     return pedido;
   }
 
   // Deletar pedido
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(estabelecimentoId: string, id: string) {
+    await this.findOne(estabelecimentoId, id);
     await this.prisma.pedido.delete({
       where: { id },
     });
-    this.gateway.emitirPedidoRemovido(id);
+    this.gateway.emitirPedidoRemovido(estabelecimentoId, id);
   }
 
   // Consulta pública de acompanhamento: retorna apenas dados minimalistas do
-  // pedido (o ID em UUID já funciona como "senha" de acesso não adivinhável)
+  // pedido (o ID em UUID já funciona como "senha" de acesso não adivinhável).
+  // Inclui o slug para o cliente poder voltar ao cardápio correto.
   async rastrear(id: string) {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
@@ -216,6 +229,7 @@ export class PedidosService {
         itens: {
           include: { produto: { select: { nome: true } } },
         },
+        estabelecimento: { select: { slug: true } },
       },
     });
 
@@ -225,6 +239,7 @@ export class PedidosService {
 
     return {
       id: pedido.id,
+      slug: pedido.estabelecimento.slug,
       status: pedido.status,
       cliente: pedido.cliente,
       tipoEntrega: pedido.tipoEntrega,
@@ -245,11 +260,17 @@ export class PedidosService {
     };
   }
 
-  // Converte os nomes de ingredientes salvos (JSON) de volta para lista
+  // Converte os nomes de ingredientes salvos (JSON) de volta para lista.
+  // Valores corrompidos/vazios viram lista vazia (nunca quebra o rastreio).
   private parseLista(valor: string): string[] {
-    const parsed: unknown = JSON.parse(valor);
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === 'string')
-      : [];
+    if (!valor) return [];
+    try {
+      const parsed: unknown = JSON.parse(valor);
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
 }

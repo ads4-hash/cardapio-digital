@@ -5,9 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class IngredientesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Listar todos os ingredientes com vínculos aos produtos
-  async findAll() {
+  // Listar todos os ingredientes do estabelecimento com vínculos aos produtos
+  async findAll(estabelecimentoId: string) {
     return this.prisma.ingrediente.findMany({
+      where: { estabelecimentoId },
       include: {
         produtos: {
           include: { produto: true },
@@ -17,8 +18,8 @@ export class IngredientesService {
     });
   }
 
-  // Buscar um ingrediente por ID
-  async findOne(id: string) {
+  // Buscar um ingrediente por ID (sempre dentro do estabelecimento)
+  async findOne(estabelecimentoId: string, id: string) {
     const ingrediente = await this.prisma.ingrediente.findUnique({
       where: { id },
       include: {
@@ -26,7 +27,7 @@ export class IngredientesService {
       },
     });
 
-    if (!ingrediente) {
+    if (!ingrediente || ingrediente.estabelecimentoId !== estabelecimentoId) {
       throw new NotFoundException(`Ingrediente com ID ${id} não encontrado.`);
     }
 
@@ -34,17 +35,18 @@ export class IngredientesService {
   }
 
   // Criar um ingrediente
-  async create(data: { nome: string }) {
+  async create(estabelecimentoId: string, data: { nome: string }) {
     return this.prisma.ingrediente.create({
       data: {
         nome: data.nome,
+        estabelecimentoId,
       },
     });
   }
 
   // Atualizar um ingrediente
-  async update(id: string, data: { nome?: string }) {
-    await this.findOne(id);
+  async update(estabelecimentoId: string, id: string, data: { nome?: string }) {
+    await this.findOne(estabelecimentoId, id);
 
     return this.prisma.ingrediente.update({
       where: { id },
@@ -53,8 +55,8 @@ export class IngredientesService {
   }
 
   // Remover um ingrediente
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(estabelecimentoId: string, id: string) {
+    await this.findOne(estabelecimentoId, id);
 
     return this.prisma.ingrediente.delete({
       where: { id },

@@ -16,10 +16,16 @@ export class ProdutosService {
     },
   };
 
-  // Listar produtos (opcional filtrar por categoria e por visibilidade)
-  async findAll(categoriaId?: string, somenteVisiveis?: boolean) {
+  // Listar produtos (opcional filtrar por categoria e por visibilidade),
+  // sempre dentro de um único estabelecimento
+  async findAll(
+    estabelecimentoId: string,
+    categoriaId?: string,
+    somenteVisiveis?: boolean,
+  ) {
     return this.prisma.produto.findMany({
       where: {
+        estabelecimentoId,
         ...(categoriaId ? { categoriaId } : {}),
         ...(somenteVisiveis ? { categoria: { visivel: true } } : {}),
       },
@@ -28,14 +34,14 @@ export class ProdutosService {
     });
   }
 
-  // Buscar um único produto por ID
-  async findOne(id: string) {
+  // Buscar um único produto por ID (sempre dentro do estabelecimento)
+  async findOne(estabelecimentoId: string, id: string) {
     const produto = await this.prisma.produto.findUnique({
       where: { id },
       include: this.includeCompleto,
     });
 
-    if (!produto) {
+    if (!produto || produto.estabelecimentoId !== estabelecimentoId) {
       throw new NotFoundException(`Produto com ID ${id} não encontrado.`);
     }
 
@@ -43,14 +49,20 @@ export class ProdutosService {
   }
 
   // Criar um novo produto
-  async create(data: {
-    nome: string;
-    descricao?: string;
-    preco: number;
-    imagemUrl?: string;
-    categoriaId: string;
-    ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
-  }) {
+  async create(
+    estabelecimentoId: string,
+    data: {
+      nome: string;
+      descricao?: string;
+      preco: number;
+      imagemUrl?: string;
+      categoriaId: string;
+      ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
+    },
+  ) {
+    await this.validarCategoria(estabelecimentoId, data.categoriaId);
+    await this.validarIngredientes(estabelecimentoId, data.ingredientes);
+
     return this.prisma.produto.create({
       data: {
         nome: data.nome,
@@ -58,6 +70,7 @@ export class ProdutosService {
         preco: Number(data.preco),
         imagemUrl: data.imagemUrl,
         categoriaId: data.categoriaId,
+        estabelecimentoId,
         ingredientes: data.ingredientes
           ? {
               create: data.ingredientes.map((i) => ({
@@ -73,6 +86,7 @@ export class ProdutosService {
 
   // Atualizar dados do produto
   async update(
+    estabelecimentoId: string,
     id: string,
     data: {
       nome?: string;
@@ -83,7 +97,12 @@ export class ProdutosService {
       ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
     },
   ) {
-    const atual = await this.findOne(id);
+    const atual = await this.findOne(estabelecimentoId, id);
+
+    if (data.categoriaId) {
+      await this.validarCategoria(estabelecimentoId, data.categoriaId);
+    }
+    await this.validarIngredientes(estabelecimentoId, data.ingredientes);
 
     // Se a imagem foi trocada, remove o arquivo antigo do disco
     if (data.imagemUrl !== undefined && data.imagemUrl !== atual.imagemUrl) {
@@ -113,13 +132,50 @@ export class ProdutosService {
   }
 
   // Remover um produto
-  async remove(id: string) {
-    const produto = await this.findOne(id);
+  async remove(estabelecimentoId: string, id: string) {
+    const produto = await this.findOne(estabelecimentoId, id);
     this.removerImagemDoDisco(produto.imagemUrl);
 
     return this.prisma.produto.delete({
       where: { id },
     });
+  }
+
+  // Impede vínculo com categoria de outro estabelecimento
+  private async validarCategoria(
+    estabelecimentoId: string,
+    categoriaId: string,
+  ): Promise<void> {
+    const categoria = await this.prisma.categoria.findUnique({
+      where: { id: categoriaId },
+      select: { estabelecimentoId: true },
+    });
+    if (!categoria || categoria.estabelecimentoId !== estabelecimentoId) {
+      throw new NotFoundException(
+        `Categoria com ID ${categoriaId} não encontrada.`,
+      );
+    }
+  }
+
+  // Impede vínculo com ingrediente de outro estabelecimento
+  private async validarIngredientes(
+    estabelecimentoId: string,
+    ingredientes?: { ingredienteId: string; precoAdicional?: number }[],
+  ): Promise<void> {
+    if (!ingredientes || ingredientes.length === 0) return;
+    const ids = [...new Set(ingredientes.map((i) => i.ingredienteId))];
+    const encontrados = await this.prisma.ingrediente.findMany({
+      where: {
+        id: { in: ids },
+        estabelecimentoId,
+      },
+      select: { id: true },
+    });
+    if (encontrados.length !== ids.length) {
+      throw new NotFoundException(
+        'Um ou mais ingredientes informados não pertencem ao estabelecimento.',
+      );
+    }
   }
 
   // Apaga do disco imagens locais (/uploads/...) que ficaram órfãs

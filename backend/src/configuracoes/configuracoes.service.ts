@@ -19,25 +19,31 @@ export interface VisualCardapioPublico {
   tema: 'claro' | 'escuro' | 'auto';
 }
 
+// Todas as configurações são escopadas por estabelecimento (tenant): cada casa
+// tem seus próprios valores de aceitação de pedidos, taxa de entrega e visual.
 @Injectable()
 export class ConfiguracoesService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Estado atual (padrão: aceitando pedidos) — GET público
-  async obterAceitandoPedidos(): Promise<{ aceitandoPedidos: boolean }> {
+  async obterAceitandoPedidos(estabelecimentoId: string): Promise<{
+    aceitandoPedidos: boolean;
+  }> {
     const regra = await this.prisma.configuracao.findUnique({
-      where: { chave: CHAVE_ACEITANDO_PEDIDOS },
+      where: this.chaveDe(estabelecimentoId, CHAVE_ACEITANDO_PEDIDOS),
     });
     return { aceitandoPedidos: regra ? regra.valor === 'true' : true };
   }
 
   // Altera o estado (somente admin) — PATCH
   async definirAceitandoPedidos(
+    estabelecimentoId: string,
     aceitandoPedidos: boolean,
   ): Promise<{ aceitandoPedidos: boolean }> {
     await this.prisma.configuracao.upsert({
-      where: { chave: CHAVE_ACEITANDO_PEDIDOS },
+      where: this.chaveDe(estabelecimentoId, CHAVE_ACEITANDO_PEDIDOS),
       create: {
+        estabelecimentoId,
         chave: CHAVE_ACEITANDO_PEDIDOS,
         valor: String(aceitandoPedidos),
       },
@@ -47,9 +53,11 @@ export class ConfiguracoesService {
   }
 
   // Taxa de entrega atual (padrão: R$ 0,00) — GET público
-  async obterTaxaEntrega(): Promise<{ taxaEntrega: number }> {
+  async obterTaxaEntrega(estabelecimentoId: string): Promise<{
+    taxaEntrega: number;
+  }> {
     const regra = await this.prisma.configuracao.findUnique({
-      where: { chave: CHAVE_TAXA_ENTREGA },
+      where: this.chaveDe(estabelecimentoId, CHAVE_TAXA_ENTREGA),
     });
     const valor = regra ? Number(regra.valor) : 0;
     return { taxaEntrega: Number.isFinite(valor) && valor > 0 ? valor : 0 };
@@ -57,13 +65,15 @@ export class ConfiguracoesService {
 
   // Altera a taxa de entrega (somente admin) — PATCH
   async definirTaxaEntrega(
+    estabelecimentoId: string,
     taxaEntrega: number,
   ): Promise<{ taxaEntrega: number }> {
     const valor = Number(taxaEntrega);
     const seguro = Number.isFinite(valor) && valor > 0 ? valor : 0;
     await this.prisma.configuracao.upsert({
-      where: { chave: CHAVE_TAXA_ENTREGA },
+      where: this.chaveDe(estabelecimentoId, CHAVE_TAXA_ENTREGA),
       create: {
+        estabelecimentoId,
         chave: CHAVE_TAXA_ENTREGA,
         valor: String(seguro),
       },
@@ -73,20 +83,22 @@ export class ConfiguracoesService {
   }
 
   // Personalização atual do cardápio (valores padrão quando nada foi definido)
-  // — GET público, para que clientes recebam a identidade visual
-  async obterVisualCardapio(): Promise<VisualCardapioPublico> {
+  // — GET público, para que clientes recebam a identidade visual do tenant
+  async obterVisualCardapio(
+    estabelecimentoId: string,
+  ): Promise<VisualCardapioPublico> {
     const [cor, logo, capa, tema] = await Promise.all([
       this.prisma.configuracao.findUnique({
-        where: { chave: CHAVE_CARDAPIO_COR },
+        where: this.chaveDe(estabelecimentoId, CHAVE_CARDAPIO_COR),
       }),
       this.prisma.configuracao.findUnique({
-        where: { chave: CHAVE_CARDAPIO_LOGO },
+        where: this.chaveDe(estabelecimentoId, CHAVE_CARDAPIO_LOGO),
       }),
       this.prisma.configuracao.findUnique({
-        where: { chave: CHAVE_CARDAPIO_CAPA },
+        where: this.chaveDe(estabelecimentoId, CHAVE_CARDAPIO_CAPA),
       }),
       this.prisma.configuracao.findUnique({
-        where: { chave: CHAVE_CARDAPIO_TEMA },
+        where: this.chaveDe(estabelecimentoId, CHAVE_CARDAPIO_TEMA),
       }),
     ]);
     return {
@@ -102,29 +114,45 @@ export class ConfiguracoesService {
 
   // Salva a personalização visual (somente admin) — PATCH
   async definirVisualCardapio(
+    estabelecimentoId: string,
     dto: AtualizarCardapioDto,
   ): Promise<VisualCardapioPublico> {
-    await this.definirConfig(CHAVE_CARDAPIO_COR, dto.cor);
-    await this.definirConfig(CHAVE_CARDAPIO_LOGO, dto.logoUrl);
-    await this.definirConfig(CHAVE_CARDAPIO_TEMA, dto.tema);
-    await this.definirConfig(CHAVE_CARDAPIO_CAPA, dto.capaUrl);
-    return this.obterVisualCardapio();
+    await this.definirConfig(estabelecimentoId, CHAVE_CARDAPIO_COR, dto.cor);
+    await this.definirConfig(
+      estabelecimentoId,
+      CHAVE_CARDAPIO_LOGO,
+      dto.logoUrl,
+    );
+    await this.definirConfig(estabelecimentoId, CHAVE_CARDAPIO_TEMA, dto.tema);
+    await this.definirConfig(
+      estabelecimentoId,
+      CHAVE_CARDAPIO_CAPA,
+      dto.capaUrl,
+    );
+    return this.obterVisualCardapio(estabelecimentoId);
+  }
+
+  private chaveDe(estabelecimentoId: string, chave: string) {
+    return { estabelecimentoId_chave: { estabelecimentoId, chave } };
   }
 
   // Grava/atualiza uma chave, removendo a linha quando o valor for nulo/vazio
   private async definirConfig(
+    estabelecimentoId: string,
     chave: string,
     valor: string | null | undefined,
   ): Promise<void> {
     if (valor === undefined) return;
     const normalizado = valor === null ? '' : valor.trim();
     if (!normalizado) {
-      await this.prisma.configuracao.deleteMany({ where: { chave } });
+      await this.prisma.configuracao.deleteMany({
+        where: { estabelecimentoId, chave },
+      });
       return;
     }
     await this.prisma.configuracao.upsert({
-      where: { chave },
-      create: { chave, valor: normalizado },
+      where: this.chaveDe(estabelecimentoId, chave),
+      create: { estabelecimentoId, chave, valor: normalizado },
       update: { valor: normalizado },
     });
   }

@@ -3,16 +3,20 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { EstabelecimentosModule } from './estabelecimentos/estabelecimentos.module';
 import { CategoriasModule } from './categorias/categorias.module';
 import { ProdutosModule } from './produtos/produtos.module';
 import { PedidosModule } from './pedidos/pedidos.module';
 import { UploadModule } from './upload/upload.module';
 import { IngredientesModule } from './ingredientes/ingredientes.module';
 import { ConfiguracoesModule } from './configuracoes/configuracoes.module';
+import { EnvioEmailModule } from './envio-email/envio-email.module';
 
 @Module({
   imports: [
     PrismaModule,
+    EnvioEmailModule,
+    EstabelecimentosModule,
     AuthModule,
     CategoriasModule,
     ProdutosModule,

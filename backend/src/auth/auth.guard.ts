@@ -11,6 +11,7 @@ interface PayloadJwt {
   sub?: string;
   nome?: string;
   email?: string;
+  estabelecimentoId?: string;
 }
 
 @Injectable()
@@ -31,6 +32,7 @@ export class AuthGuard implements CanActivate {
         id: payload.sub ?? '',
         nome: payload.nome ?? '',
         email: payload.email ?? '',
+        estabelecimentoId: payload.estabelecimentoId ?? '',
       };
       return true;
     } catch {

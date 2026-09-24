@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { MulterError } from 'multer';
 
 interface CorpoErro {
   statusCode: number;
@@ -55,6 +56,17 @@ export class ErrosGlobaisFilter implements ExceptionFilter {
       if (status === limiteDeTentativas) {
         corpo.mensagem =
           'Muitas tentativas. Aguarde alguns segundos antes de repetir.';
+      }
+    } else if (exception instanceof MulterError) {
+      // Erros do multer (upload): não são HttpException e quebravam com 500
+      if (exception.code === 'LIMIT_FILE_SIZE') {
+        corpo.statusCode = HttpStatus.PAYLOAD_TOO_LARGE;
+        corpo.erro = 'Arquivo muito grande';
+        corpo.mensagem = 'A imagem deve ter no máximo 5 MB.';
+      } else {
+        corpo.statusCode = HttpStatus.BAD_REQUEST;
+        corpo.erro = 'Upload inválido';
+        corpo.mensagem = 'Não foi possível processar o arquivo enviado.';
       }
     } else if (exception instanceof Error) {
       // Erros não-expectados: registra para diagnóstico, sem expor ao cliente

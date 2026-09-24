@@ -7,35 +7,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Estabelecimento (tenant): cada casa/empresa tem seu próprio cardápio, pedidos,
+// produtos e configurações. O slug é usado na URL pública /cardapio/:slug.
+model Estabelecimento {
+  id            String         @id @default(uuid())
+  nome          String
+  slug          String         @unique
+  telefone      String? // contato do estabelecimento (exibido no pedido/WhatsApp)
+  usuarios      Usuario[]
+  categorias    Categoria[]
+  produtos      Produto[]
+  ingredientes  Ingrediente[]
+  pedidos       Pedido[]
+  configuracoes Configuracao[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
 model Categoria {
-  id        String    @id @default(uuid())
-  nome      String
-  visivel   Boolean   @default(true)
-  produtos  Produto[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                String          @id @default(uuid())
+  nome              String
+  visivel           Boolean         @default(true)
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  produtos          Produto[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model Produto {
-  id          String      @id @default(uuid())
-  nome        String
-  descricao   String?
-  preco       Float
-  imagemUrl   String?
-  categoria   Categoria   @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
-  categoriaId String
-  itensPedido ItemPedido[]
-  ingredientes ProdutoIngrediente[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                String          @id @default(uuid())
+  nome              String
+  descricao         String?
+  preco             Float
+  imagemUrl         String?
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  categoria         Categoria       @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  categoriaId       String
+  itensPedido       ItemPedido[]
+  ingredientes      ProdutoIngrediente[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model Ingrediente {
-  id            String      @id @default(uuid())
-  nome          String
-  produtos      ProdutoIngrediente[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                String          @id @default(uuid())
+  nome              String
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  produtos          ProdutoIngrediente[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model ProdutoIngrediente {
@@ -50,19 +73,21 @@ model ProdutoIngrediente {
 }
 
 model Pedido {
-  id              String   @id @default(uuid())
-  cliente         String
-  tipoEntrega     String   @default("RETIRADA") // RETIRADA ou ENTREGA
-  endereco        String?
-  telefone        String?
-  taxaEntrega     Float    @default(0)
-  status          String   @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
-  total           Float
-  formaPagamento  String   @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
-  trocoPara       Float? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
-  itens           ItemPedido[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String          @id @default(uuid())
+  cliente           String
+  tipoEntrega       String          @default("RETIRADA") // RETIRADA ou ENTREGA
+  endereco          String?
+  telefone          String?
+  taxaEntrega       Float           @default(0)
+  status            String          @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
+  total             Float
+  formaPagamento    String          @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
+  trocoPara         Float? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
+  itens             ItemPedido[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model ItemPedido {
@@ -78,19 +103,40 @@ model ItemPedido {
 }
 
 model Usuario {
-  id           String    @id @default(uuid())
-  nome         String
-  email        String    @unique // usado no login; sempre armazenado em minúsculas
-  senhaHash    String
-  telefone     String? // contato do estabelecimento (exibido no pedido/WhatsApp)
-  criadoEm     DateTime  @default(now())
-  atualizadoEm DateTime  @updatedAt
+  id               String           @id @default(uuid())
+  nome             String
+  email            String           @unique // usado no login; sempre armazenado em minúsculas
+  senhaHash        String
+  estabelecimentoId String
+  estabelecimento  Estabelecimento  @relation(fields: [estabelecimentoId], references: [id])
+  recuperacoesSenha RecuperacaoSenha[]
+  criadoEm         DateTime         @default(now())
+  atualizadoEm     DateTime         @updatedAt
 }
 
-// Configurações gerais do estabelecimento (chave -> valor)
+// Tokens de recuperação de senha (single-use, com expiração). O token em si
+// nunca é armazenado: só o seu hash HMAC-SHA256 (mesma técnica do IP).
+model RecuperacaoSenha {
+  id        String    @id @default(uuid())
+  usuarioId String
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiraEm  DateTime
+  usadoEm   DateTime? // preenchido quando consumido/invalidado
+  criadoEm  DateTime  @default(now())
+
+  @@index([usuarioId])
+  @@index([tokenHash])
+}
+
+// Configurações de cada estabelecimento (chave -> valor), escopadas por tenant
 model Configuracao {
-  chave String @id
-  valor String
+  estabelecimentoId String
+  chave             String
+  valor             String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+
+  @@id([estabelecimentoId, chave])
 }
 
 model TentativaLogin {

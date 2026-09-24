@@ -9,6 +9,13 @@ import {
 
 export class RegistrarUsuarioDto {
   @IsString()
+  @IsNotEmpty({ message: 'Informe o nome do estabelecimento.' })
+  @MaxLength(120, {
+    message: 'O nome do estabelecimento deve ter no máximo 120 caracteres.',
+  })
+  nomeEstabelecimento: string;
+
+  @IsString()
   @IsNotEmpty({ message: 'Informe um nome.' })
   @MaxLength(80, { message: 'O nome deve ter no máximo 80 caracteres.' })
   nome: string;

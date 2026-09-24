@@ -53,6 +53,14 @@ export enum FormaPagamento {
 }
 
 export class CreatePedidoDto {
+  // Slug do estabelecimento (da URL /cardapio/:slug) ao qual o pedido pertence
+  @IsString()
+  @IsNotEmpty({ message: 'Informe o estabelecimento.' })
+  @MaxLength(80, {
+    message: 'O estabelecimento informado é inválido.',
+  })
+  slug: string;
+
   @IsString()
   @IsNotEmpty({ message: 'O nome do cliente é obrigatório.' })
   @MaxLength(80, {
@@ -93,7 +101,10 @@ export class CreatePedidoDto {
   // O troco em si é calculado pelo servidor: trocoPara - total.
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Informe um valor de troco válido.' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Informe um valor de troco válido.' },
+  )
   @Min(0.01, { message: 'O valor do troco deve ser maior que zero.' })
   trocoPara?: number;
 

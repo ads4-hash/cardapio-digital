@@ -11,23 +11,36 @@ async function main() {
   await prisma.produto.deleteMany();
   await prisma.categoria.deleteMany();
 
+  // Estabelecimento padrão do seed (mesmo slug/casos usados na migration)
+  const estabelecimento = await prisma.estabelecimento.upsert({
+    where: { slug: 'meu-estabelecimento' },
+    update: {},
+    create: {
+      nome: 'Meu Estabelecimento',
+      slug: 'meu-estabelecimento',
+    },
+  });
+
   console.log('🌱 Criando categorias...');
 
   const lanches = await prisma.categoria.create({
     data: {
       nome: 'Lanches',
+      estabelecimentoId: estabelecimento.id,
     },
   });
 
   const bebidas = await prisma.categoria.create({
     data: {
       nome: 'Bebidas',
+      estabelecimentoId: estabelecimento.id,
     },
   });
 
   const sobremesas = await prisma.categoria.create({
     data: {
       nome: 'Sobremesas',
+      estabelecimentoId: estabelecimento.id,
     },
   });
 
@@ -52,7 +65,7 @@ async function main() {
   const criados: Record<string, { id: string }> = {};
   for (const [chave, dados] of Object.entries(ingredientes)) {
     criados[chave] = await prisma.ingrediente.create({
-      data: { nome: dados.nome },
+      data: { nome: dados.nome, estabelecimentoId: estabelecimento.id },
     });
   }
 
@@ -73,6 +86,7 @@ async function main() {
       nome: 'X-Burguer Artesanal',
       descricao: 'Pão brioche, hambúrguer de 180g, queijo cheddar e molho especial.',
       preco: 28.9,
+      estabelecimentoId: estabelecimento.id,
       categoriaId: lanches.id,
       ingredientes: {
         createMany: {
@@ -100,6 +114,7 @@ async function main() {
       nome: 'X-Salada Especial',
       descricao: 'Pão tradicional, hambúrguer de 150g, queijo, alface, tomate e maionese da casa.',
       preco: 24.5,
+      estabelecimentoId: estabelecimento.id,
       categoriaId: lanches.id,
       ingredientes: {
         createMany: {
@@ -130,18 +145,21 @@ async function main() {
         nome: 'Refrigerante Lata 350ml',
         descricao: 'Coca-Cola, Guaraná Antarctica ou Sprite.',
         preco: 6.0,
+        estabelecimentoId: estabelecimento.id,
         categoriaId: bebidas.id,
       },
       {
         nome: 'Suco Natural de Laranja 500ml',
         descricao: 'Suco 100% natural, sem adição de açúcar.',
         preco: 9.5,
+        estabelecimentoId: estabelecimento.id,
         categoriaId: bebidas.id,
       },
       {
         nome: 'Pudim de Leite Condensado',
         descricao: 'Fatia individual com calda de caramelo.',
         preco: 12.0,
+        estabelecimentoId: estabelecimento.id,
         categoriaId: sobremesas.id,
       },
     ],
