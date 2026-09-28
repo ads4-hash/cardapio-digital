@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UsuarioLogado } from '../../services/auth.service';
 
@@ -23,14 +23,14 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
 
         <form (ngSubmit)="salvar()">
           <div>
-            <label for="nome">Nome de usuário <span class="req">*</span></label>
+            <label for="nome">Nome do estabelecimento <span class="req">*</span></label>
             <input
               id="nome"
               type="text"
               [ngModel]="nome()"
               (ngModelChange)="alterar('nome', $event)"
               name="nome"
-              placeholder="Ex: cozinha01"
+              placeholder="Ex: Casa do Lanche"
             />
           </div>
 
@@ -107,6 +107,34 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
             </div>
           </div>
 
+          @if (exigeSenhaAtual()) {
+            <div>
+              <label for="senhaAtual">
+                Senha atual <span class="req">*</span>
+                <span class="opcional">(confirma a alteração)</span>
+              </label>
+              <div class="senha-wrap">
+                <input
+                  id="senhaAtual"
+                  [type]="mostrarSenhaAtual() ? 'text' : 'password'"
+                  [ngModel]="senhaAtual()"
+                  (ngModelChange)="alterar('senhaAtual', $event)"
+                  name="senhaAtual"
+                  autocomplete="current-password"
+                  placeholder="Sua senha de acesso"
+                />
+                <button
+                  type="button"
+                  class="toggle-senha"
+                  (click)="mostrarSenhaAtual.set(!mostrarSenhaAtual())"
+                  [attr.aria-label]="mostrarSenhaAtual() ? 'Ocultar senha' : 'Mostrar senha'"
+                >
+                  {{ mostrarSenhaAtual() ? '🙈' : '👁️' }}
+                </button>
+              </div>
+            </div>
+          }
+
           <div class="acoes">
             @if (alterado()) {
               <button type="submit" class="btn-submit" [disabled]="salvando()">
@@ -157,18 +185,38 @@ export class AdminPerfilComponent {
   telefone = signal('');
   senha = signal('');
   confirmarSenha = signal('');
+  senhaAtual = signal('');
   mostrarSenha = signal(false);
   mostrarConfirmar = signal(false);
+  mostrarSenhaAtual = signal(false);
   salvando = signal(false);
   sucesso = signal('');
   erro = signal('');
+
+  // E-mail do usuário como está no servidor, para saber se ele realmente mudou
+  private emailOriginal = signal('');
+
+  // O e-mail de acesso é a credencial: trocá-lo, ou trocar a senha, só é
+  // aceito com a senha atual. Nome e telefone não pedem reautenticação.
+  exigeSenhaAtual = computed(
+    () =>
+      this.senha().length > 0 ||
+      (!!this.emailOriginal() &&
+        this.email().trim().toLowerCase() !== this.emailOriginal()),
+  );
 
   // Botão "Salvar alterações" só aparece quando algo foi alterado pelo usuário
   alterado = signal(false);
 
   // Registra qualquer digitação nos campos e marca o formulário como alterado
   alterar(
-    campo: 'nome' | 'email' | 'telefone' | 'senha' | 'confirmarSenha',
+    campo:
+      | 'nome'
+      | 'email'
+      | 'telefone'
+      | 'senha'
+      | 'confirmarSenha'
+      | 'senhaAtual',
     valor: string,
   ): void {
     this[campo].set(valor);
@@ -183,7 +231,9 @@ export class AdminPerfilComponent {
       if (usuario) {
         this.nome.set(usuario.nome);
         this.email.set(usuario.email);
-        this.telefone.set(usuario.telefone ?? '');
+        this.emailOriginal.set(usuario.email.trim().toLowerCase());
+        // O telefone pertence ao estabelecimento do usuário
+        this.telefone.set(usuario.estabelecimento?.telefone ?? '');
       }
     });
   }
@@ -207,12 +257,19 @@ export class AdminPerfilComponent {
       }
     }
 
+    // Reautenticação obrigatória quando mexe na credencial de acesso
+    if (this.exigeSenhaAtual() && !this.senhaAtual()) {
+      this.erro.set('Informe a senha atual para confirmar a alteração.');
+      return;
+    }
+
     const dados: {
       nome: string;
       email: string;
       telefone?: string;
       senha?: string;
       confirmarSenha?: string;
+      senhaAtual?: string;
     } = {
       nome: this.nome().trim(),
       email: this.email().trim(),
@@ -222,6 +279,9 @@ export class AdminPerfilComponent {
     if (senha) {
       dados.senha = senha;
       dados.confirmarSenha = confirmarSenha;
+    }
+    if (this.senhaAtual()) {
+      dados.senhaAtual = this.senhaAtual();
     }
 
     this.salvando.set(true);
@@ -234,8 +294,10 @@ export class AdminPerfilComponent {
           this.sucesso.set('Perfil atualizado com sucesso!');
           this.senha.set('');
           this.confirmarSenha.set('');
+          this.senhaAtual.set('');
           this.mostrarSenha.set(false);
           this.mostrarConfirmar.set(false);
+          this.mostrarSenhaAtual.set(false);
           this.alterado.set(false);
         },
         error: (err) => {
@@ -247,8 +309,12 @@ export class AdminPerfilComponent {
 
   private mensagemErro(err: unknown): string {
     if (err && typeof err === 'object') {
-      const corpo = (err as { error?: { message?: string | string[] } }).error;
-      const mensagem = corpo?.message;
+      // A API padroniza os erros em `mensagem` (ver ErrosGlobaisFilter); um
+      // payload de validação do Nest traz `message` com a lista de problemas.
+      const corpo = (
+        err as { error?: { mensagem?: string | string[]; message?: string | string[] } }
+      ).error;
+      const mensagem = corpo?.mensagem ?? corpo?.message;
       if (Array.isArray(mensagem)) {
         return mensagem[0] ?? 'Não foi possível salvar o perfil.';
       }

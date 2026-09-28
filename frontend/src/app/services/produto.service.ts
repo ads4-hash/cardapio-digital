@@ -1,9 +1,10 @@
 import { Injectable, inject, signal, PLATFORM_ID } from '@angular/core';
 import { isPlatformServer } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Observable, firstValueFrom, shareReplay } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 
 import { environment } from '../environment';
+import { EstabelecimentoContextoService } from './estabelecimento-contexto.service';
 
 // Interface representando a entidade do Categoria
 export interface Categoria {
@@ -42,9 +43,11 @@ export interface Produto {
 }
 
 // Retorna a URL completa de uma imagem (a API devolve caminhos relativos como /uploads/...)
+// Usa a URL pública: o `src` é resolvido pelo browser, mesmo quando o HTML foi
+// gerado pelo SSR, então precisa de um endereço alcançável pelo cliente.
 export function resolverImagemUrl(imagemUrl?: string | null): string | undefined {
   if (!imagemUrl) return undefined;
-  return imagemUrl.startsWith('/') ? `${environment.apiUrl}${imagemUrl}` : imagemUrl;
+  return imagemUrl.startsWith('/') ? `${environment.publicApiUrl}${imagemUrl}` : imagemUrl;
 }
 
 // Filtra produtos por categoria e termo de busca (lógica compartilhada entre as telas)
@@ -71,6 +74,7 @@ export function filtrarProdutos(
 export class ProdutoService {
   private readonly http = inject(HttpClient);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly contexto = inject(EstabelecimentoContextoService);
   private readonly API_URL = `${environment.apiUrl}/produtos`;
   private readonly CATEGORIAS_URL = `${environment.apiUrl}/categorias`;
   private readonly INGREDIENTES_URL = `${environment.apiUrl}/ingredientes`;
@@ -84,51 +88,62 @@ export class ProdutoService {
   carregandoProdutos = signal(false);
   carregandoCategorias = signal(false);
 
-  // Cache com compartilhamento entre vários assinantes
-  private produtosCache$?: Observable<Produto[]>;
-  private categoriasCache$?: Observable<Categoria[]>;
+  // Caches por slug (o catálogo de cada estabelecimento é independente)
+  private produtosPorSlug = new Map<string, Produto[]>();
+  private categoriasPorSlug = new Map<string, Categoria[]>();
+  private categoriasVisiveisPorSlug = new Map<string, Categoria[]>();
+  private carregando = new Set<string>();
 
-  private categoriasEmVoo = false;
-  private produtosEmVoo = false;
+  private defaultSlug(): string | null {
+    return this.contexto.slugAtual();
+  }
 
-  // Carrega categorias uma única vez e reutiliza o resultado em cache
-  loadCategorias(force = false): void {
+  // Carrega categorias do estabelecimento; reutiliza o resultado em cache
+  loadCategorias(force = false, slug = this.defaultSlug() ?? ''): void {
     // Evita chamadas HTTP durante o SSR/prerender (raio do cliente executa após a hidratação)
-    if (isPlatformServer(this.platformId)) return;
-    if (this.categoriasEmVoo) return;
-    if (!force && this.categorias().length > 0) return;
+    if (isPlatformServer(this.platformId) || !slug) return;
+    const emVoo = this.carregando.has(`c:${slug}`);
+    if (emVoo) return;
+    if (!force && this.categoriasPorSlug.has(slug)) {
+      this.categorias.set(this.categoriasPorSlug.get(slug)!);
+      return;
+    }
 
-    this.categoriasEmVoo = true;
+    this.carregando.add(`c:${slug}`);
     this.carregandoCategorias.set(true);
-
-    if (force) this.categoriasCache$ = undefined;
-    this.categoriasCache$ ??= this.listarCategorias().pipe(shareReplay(1));
-    this.categoriasCache$.subscribe({
-      next: (dados) => this.categorias.set(dados),
+    this.listarCategorias(slug).subscribe({
+      next: (dados) => {
+        this.categoriasPorSlug.set(slug, dados);
+        this.categorias.set(dados);
+      },
       error: (err) => console.error('Erro ao carregar categorias:', err),
       complete: () => {
-        this.categoriasEmVoo = false;
+        this.carregando.delete(`c:${slug}`);
         this.carregandoCategorias.set(false);
       },
     });
   }
 
-  // Carrega produtos; se já carregados, apenas retorna sem nova chamada
-  loadProdutos(force = false): void {
-    if (isPlatformServer(this.platformId)) return;
-    if (this.produtosEmVoo) return;
-    if (!force && this.produtos().length > 0) return;
+  // Carrega produtos do estabelecimento; se já carregados, reutiliza o cache
+  loadProdutos(force = false, slug = this.defaultSlug() ?? ''): void {
+    if (isPlatformServer(this.platformId) || !slug) return;
+    const emVoo = this.carregando.has(`p:${slug}`);
+    if (emVoo) return;
+    if (!force && this.produtosPorSlug.has(slug)) {
+      this.produtos.set(this.produtosPorSlug.get(slug)!);
+      return;
+    }
 
-    this.produtosEmVoo = true;
+    this.carregando.add(`p:${slug}`);
     this.carregandoProdutos.set(true);
-
-    if (force) this.produtosCache$ = undefined;
-    this.produtosCache$ ??= this.listar().pipe(shareReplay(1));
-    this.produtosCache$.subscribe({
-      next: (dados) => this.produtos.set(dados),
+    this.listar(slug).subscribe({
+      next: (dados) => {
+        this.produtosPorSlug.set(slug, dados);
+        this.produtos.set(dados);
+      },
       error: (err) => console.error('Erro ao carregar produtos:', err),
       complete: () => {
-        this.produtosEmVoo = false;
+        this.carregando.delete(`p:${slug}`);
         this.carregandoProdutos.set(false);
       },
     });
@@ -143,11 +158,13 @@ export class ProdutoService {
   // tela) e já resolve com a lista atual. Usado para validar o carrinho antes
   // de enviar o pedido; em caso de erro mantém a lista em memória.
   async carregarProdutosAtualizados(): Promise<Produto[]> {
+    const slug = this.defaultSlug() ?? '';
     if (isPlatformServer(this.platformId)) return this.produtos();
+    if (!slug) return this.produtos();
     try {
-      const dados = await firstValueFrom(this.listar());
+      const dados = await firstValueFrom(this.listar(slug));
+      this.produtosPorSlug.set(slug, dados);
       this.produtos.set(dados);
-      this.produtosCache$ = undefined;
       return dados;
     } catch (err) {
       console.error('Erro ao atualizar produtos:', err);
@@ -168,28 +185,40 @@ export class ProdutoService {
     return this.categoriasVisiveis();
   }
 
-  // Carrega as categorias visíveis ao cliente (GET /categorias?somenteVisiveis=true)
-  loadCategoriasVisiveis(): void {
-    if (isPlatformServer(this.platformId)) return;
-    this.listarCategoriasVisiveis().subscribe({
-      next: (dados) => this.categoriasVisiveis.set(dados),
+  // Carrega as categorias visíveis ao cliente (GET /categorias?slug=:slug&somenteVisiveis=true)
+  loadCategoriasVisiveis(slug = this.defaultSlug() ?? ''): void {
+    if (isPlatformServer(this.platformId) || !slug) return;
+
+    if (this.categoriasVisiveisPorSlug.has(slug)) {
+      this.categoriasVisiveis.set(this.categoriasVisiveisPorSlug.get(slug)!);
+      return;
+    }
+    if (this.carregando.has(`cv:${slug}`)) return;
+    this.carregando.add(`cv:${slug}`);
+
+    this.listarCategoriasVisiveis(slug).subscribe({
+      next: (dados) => {
+        this.categoriasVisiveisPorSlug.set(slug, dados);
+        this.categoriasVisiveis.set(dados);
+      },
       error: (err) => console.error('Erro ao carregar categorias visíveis:', err),
+      complete: () => this.carregando.delete(`cv:${slug}`),
     });
   }
 
-  // Buscar todos os produtos (GET /produtos)
-  listar(): Observable<Produto[]> {
-    return this.http.get<Produto[]>(this.API_URL);
+  // Buscar todos os produtos (GET /produtos?slug=:slug)
+  listar(slug = this.defaultSlug() ?? ''): Observable<Produto[]> {
+    return this.http.get<Produto[]>(`${this.API_URL}?slug=${encodeURIComponent(slug)}`);
   }
 
-  // Buscar todas as categorias (GET /categorias)
-  listarCategorias(): Observable<Categoria[]> {
-    return this.http.get<Categoria[]>(this.CATEGORIAS_URL);
+  // Buscar todas as categorias (GET /categorias?slug=:slug)
+  listarCategorias(slug = this.defaultSlug() ?? ''): Observable<Categoria[]> {
+    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}`);
   }
 
-  // Buscar apenas categorias visíveis para o cliente (GET /categorias?somenteVisiveis=true)
-  listarCategoriasVisiveis(): Observable<Categoria[]> {
-    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?somenteVisiveis=true`);
+  // Buscar apenas categorias visíveis para o cliente (GET /categorias?slug=:slug&somenteVisiveis=true)
+  listarCategoriasVisiveis(slug = this.defaultSlug() ?? ''): Observable<Categoria[]> {
+    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}&somenteVisiveis=true`);
   }
 
   // Criar categoria (POST /categorias)
@@ -210,9 +239,9 @@ export class ProdutoService {
     return this.http.delete<void>(`${this.CATEGORIAS_URL}/${id}`);
   }
 
-  // Buscar todos os ingredientes (GET /ingredientes)
-  listarIngredientes(): Observable<Ingrediente[]> {
-    return this.http.get<Ingrediente[]>(this.INGREDIENTES_URL);
+  // Buscar todos os ingredientes (GET /ingredientes?slug=:slug)
+  listarIngredientes(slug = this.defaultSlug() ?? ''): Observable<Ingrediente[]> {
+    return this.http.get<Ingrediente[]>(`${this.INGREDIENTES_URL}?slug=${encodeURIComponent(slug)}`);
   }
 
   // Criar ingrediente (POST /ingredientes)
@@ -220,19 +249,9 @@ export class ProdutoService {
     return this.http.post<Ingrediente>(this.INGREDIENTES_URL, dados);
   }
 
-  // Atualizar ingrediente (PATCH /ingredientes/:id)
-  atualizarIngrediente(id: string, dados: { nome?: string }): Observable<Ingrediente> {
-    return this.http.patch<Ingrediente>(`${this.INGREDIENTES_URL}/${id}`, dados);
-  }
-
   // Deletar ingrediente (DELETE /ingredientes/:id)
   excluirIngrediente(id: string): Observable<void> {
     return this.http.delete<void>(`${this.INGREDIENTES_URL}/${id}`);
-  }
-
-  // Buscar produto por ID (GET /produtos/:id)
-  buscarPorId(id: string): Observable<Produto> {
-    return this.http.get<Produto>(`${this.API_URL}/${id}`);
   }
 
   // Criar novo produto (POST /produtos)

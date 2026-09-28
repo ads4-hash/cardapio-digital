@@ -7,11 +7,24 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiPayloadTooLargeResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { unlinkSync } from 'fs';
 import { resolve } from 'path';
 import { AuthGuard } from '../auth/auth.guard';
+import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
+import { UploadRespostaDto } from './dto/respostas-upload.dto';
 import {
   extensaoDoOriginal,
   extensaoPermitida,
@@ -23,15 +36,56 @@ const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 /** Tamanho máximo de arquivo (5 MB) */
 const MAX_SIZE = 5 * 1024 * 1024;
 
+@ApiTags('upload')
 @Controller('upload')
 export class UploadController {
   @UseGuards(AuthGuard)
   @Post()
+  @ApiBearerAuth('bearer')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Envia a imagem de um produto',
+    description: [
+      'Aceita **JPG, PNG, WEBP e GIF** de até **5 MB**, em `multipart/form-data` com o',
+      'campo `file`.',
+      '',
+      'A validação acontece em duas barreiras: tipo declarado + extensão, e depois os',
+      '*magic bytes* do arquivo gravado — um `.png` renomeado que não seja imagem é',
+      'apagado e rejeitado.',
+      '',
+      'Devolve o caminho (`/uploads/...`), que é o que se envia como `imagemUrl` no',
+      '`POST /produtos`. O prefixo com a URL da API é feito pelo frontend.',
+    ].join('\n'),
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Arquivo de imagem (JPG, PNG, WEBP ou GIF, até 5 MB).',
+        },
+      },
+    },
+  })
+  @ApiCreatedResponse({ type: UploadRespostaDto })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiBadRequestResponse({
+    type: RespostaErroDto,
+    description:
+      'Nenhum arquivo enviado, tipo/extensão não permitida, ou conteúdo que não é uma imagem válida.',
+  })
+  @ApiPayloadTooLargeResponse({
+    type: RespostaErroDto,
+    description: 'Arquivo acima de 5 MB.',
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
-        filename: (req, file, cb) => {
+        filename: (_req, file, cb) => {
           const ext = extensaoPermitida(extname(file.originalname))
             ? extname(file.originalname).toLowerCase()
             : '';
@@ -40,7 +94,7 @@ export class UploadController {
           cb(null, `${uniqueSuffix}${ext}`);
         },
       }),
-      fileFilter: (req, file, cb) => {
+      fileFilter: (_req, file, cb) => {
         // 1ª barreira: tipo declarado + extensão (sem SVG e sem executáveis)
         const extensao = extensaoDoOriginal(file.originalname);
         if (

@@ -63,6 +63,7 @@ export interface Pedido {
 }
 
 export interface CreatePedido {
+  slug: string;
   cliente: string;
   tipoEntrega: TipoEntrega;
   telefone: string;
@@ -80,6 +81,7 @@ export interface CreatePedido {
 // Retorno do rastreio público (dados mínimos, sem produtos completos)
 export interface PedidoRastreio {
   id: string;
+  slug: string;
   status: PedidoStatus;
   cliente: string;
   tipoEntrega: TipoEntrega;
@@ -116,10 +118,6 @@ export class PedidoService {
 
   atualizarStatus(id: string, status: PedidoStatus): Observable<Pedido> {
     return this.http.patch<Pedido>(`${this.API_URL}/${id}/status`, { status });
-  }
-
-  excluir(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/${id}`);
   }
 
   // Acompanhamento público: GET /pedidos/:id/rastrear

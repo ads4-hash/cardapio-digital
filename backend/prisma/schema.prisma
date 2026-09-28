@@ -41,14 +41,34 @@ model Produto {
   descricao         String?
   preco             Float
   imagemUrl         String?
+  // PADRAO: todo ingrediente ja vem incluso e o cliente remove/adiciona.
+  // MARMITA: nada vem incluso, o cliente monta o pedido e cada grupo tem um
+  // teto de escolhas.
+  tipo              String          @default("PADRAO")
   estabelecimentoId String
   estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
   categoria         Categoria       @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   categoriaId       String
   itensPedido       ItemPedido[]
   ingredientes      ProdutoIngrediente[]
+  grupos            ProdutoGrupo[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+// Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
+// maximoEscolhas limita quantas porções o cliente pode somar no grupo, contando
+// repetição: maximoEscolhas = 2 permite duas vezes a mesma proteína.
+model ProdutoGrupo {
+  id             String  @id @default(uuid())
+  produtoId      String
+  nome           String
+  ordem          Int     @default(0)
+  maximoEscolhas Int     @default(99)
+  produto        Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  ingredientes   ProdutoIngrediente[]
+
+  @@unique([produtoId, nome])
 }
 
 model Ingrediente {
@@ -62,14 +82,19 @@ model Ingrediente {
 }
 
 model ProdutoIngrediente {
-  id              String      @id @default(uuid())
+  id              String         @id @default(uuid())
   produtoId       String
   ingredienteId   String
-  precoAdicional  Float       @default(0)
-  produto         Produto     @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  ingrediente     Ingrediente @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+  precoAdicional  Float          @default(0)
+  // Grupo de escolha a que este ingrediente pertence. Nulo = ingrediente
+  // solto, sem teto de escolhas.
+  grupoId         String?
+  produto         Produto        @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  ingrediente     Ingrediente    @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+  grupo           ProdutoGrupo?  @relation(fields: [grupoId], references: [id], onDelete: SetNull)
 
   @@unique([produtoId, ingredienteId])
+  @@index([grupoId])
 }
 
 model Pedido {
@@ -79,7 +104,7 @@ model Pedido {
   endereco          String?
   telefone          String?
   taxaEntrega       Float           @default(0)
-  status            String          @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO
+  status            String          @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, PRONTO, CONCLUIDO, CANCELADO — validado por UpdatePedidoDto
   total             Float
   formaPagamento    String          @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
   trocoPara         Float? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
@@ -140,10 +165,12 @@ model Configuracao {
 }
 
 model TentativaLogin {
-  id       String   @id @default(uuid())
-  ipHash   String // hash (HMAC) do IP, sem armazenar o IP em texto puro
-  sucesso  Boolean  @default(false)
-  criadoEm DateTime @default(now())
+  id        String   @id @default(uuid())
+  ipHash    String // hash (HMAC) do IP, sem armazenar o IP em texto puro
+  emailHash String? // hash (HMAC) do e-mail tentado; nulo em tentativas sem e-mail válido
+  sucesso   Boolean  @default(false)
+  criadoEm  DateTime @default(now())
 
   @@index([ipHash, criadoEm])
+  @@index([emailHash, criadoEm])
 }

@@ -150,6 +150,13 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
       transition: background var(--transition), color var(--transition);
     }
     .npt-fechar:hover { background: var(--border); color: var(--text); }
+    .btn-voltar {
+      position: sticky;
+      top: 74px;
+      z-index: 40;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-voltar:hover { box-shadow: var(--shadow-md); }
   `],
 })
 export class AdminScreenComponent implements OnInit {

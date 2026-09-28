@@ -194,8 +194,6 @@ button, input, select, textarea { font-family: inherit; }
 .admin-form input:focus, .admin-form select:focus, .admin-form textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
 
 .img-status { font-size: 0.85rem; color: var(--text-muted); }
-.img-preview { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
-.img-preview img { width: 88px; height: 88px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); }
 
 .btn-submit, .btn-cancel { padding: 12px 18px; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; transition: transform var(--transition), box-shadow var(--transition), filter var(--transition); }
 .btn-submit { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent); }

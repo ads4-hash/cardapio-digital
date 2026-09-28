@@ -26,6 +26,22 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      # URL que o servidor Node usa durante o SSR: precisa do hostname de rede
+      # do Docker, não "localhost" (que dentro do container seria o próprio
+      # container do frontend).
+      API_URL: "http://backend:3000"
+      # URL que o NAVIGADOR usa (chamadas XHR, WebSocket e o src das imagens no
+      # HTML pré-renderizado). O bundle do browser não tem process.env, então o
+      # servidor publica esta URL em /config.js e o app lê dali — por isso ela
+      # vale no cliente sem rebuild. Em deploy real, aponte para o domínio
+      # público da API; o padrão http://localhost:3000 só vale se o cliente
+      # estiver na mesma máquina que expõe a porta 3000.
+      PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:3000}"
+      # O Angular rejeita com 400 qualquer requisição cujo header Host não esteja
+      # na lista. Em produção, liste o domínio público do cardápio aqui.
+      # Só use "*" se um proxy na frente já validar o Host.
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1}"
     ports:
       - "4000:4000"
 

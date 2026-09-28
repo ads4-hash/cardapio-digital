@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { CartService, ItemIngrediente } from '../../services/cart.service';
+import { CartService, CartItem, ItemIngrediente } from '../../services/cart.service';
 import {
   PedidoService,
   TipoEntrega,
@@ -10,13 +10,15 @@ import {
 } from '../../services/pedidos.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { ProdutoService, Produto } from '../../services/produto.service';
+import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
+import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';
 
 type Etapa = 'carrinho' | 'checkout' | 'sucesso';
 
 @Component({
   selector: 'app-carrinho-drawer',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PersonalizacaoProdutoComponent],
   template: `
     <!-- Botão Flutuante -->
     <button class="cart-float-btn" (click)="abrirCarrinho()">
@@ -76,7 +78,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
 
             <p class="pag-titulo">Forma de pagamento <span class="req">*</span></p>
             <div class="opcoes-pag">
-              @for (opcao of formasPagamento; track opcao.valor) {
+              @for (opcao of formasPagamento(); track opcao.valor) {
                 <label class="opcao" [class.selecionada]="formaPagamento() === opcao.valor">
                   <input
                     type="radio"
@@ -158,7 +160,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
                     <strong>{{ item.produto.nome }}</strong>
                     <p class="item-preco">{{ item.precoUnitario | currency:'BRL' }}</p>
                     @if (item.personalizacao.removidos.length > 0) {
-                      <p class="pers">
+                      <p class="pers removidos">
                         Sem: {{ nomesIngredientes(item.personalizacao.removidos) }}
                       </p>
                     }
@@ -167,6 +169,13 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
                         + {{ agruparAdicionados(item.personalizacao.adicionados) }}
                       </p>
                     }
+                    <button
+                      class="btn-corrigir"
+                      (click)="abrirEdicao(item)"
+                      [attr.aria-label]="'Corrigir ' + item.produto.nome"
+                    >
+                      Corrigir
+                    </button>
                   </div>
                   <div class="controls">
                     <button (click)="cartService.updateQuantity(item.uid, item.quantidade - 1)">-</button>
@@ -182,8 +191,8 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
                     <input
                       type="radio"
                       name="tipoEntrega"
-                      [checked]="tipoEntrega() === 'RETIRADA'"
-                      (change)="tipoEntrega.set('RETIRADA')"
+                    [checked]="tipoEntrega() === 'RETIRADA'"
+                    (change)="selecionarTipoEntrega('RETIRADA')"
                     />
                     <span class="opcao-info">
                       <strong>🏪 Retirada</strong>
@@ -193,8 +202,8 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
                     <input
                       type="radio"
                       name="tipoEntrega"
-                      [checked]="tipoEntrega() === 'ENTREGA'"
-                      (change)="tipoEntrega.set('ENTREGA')"
+                    [checked]="tipoEntrega() === 'ENTREGA'"
+                    (change)="selecionarTipoEntrega('ENTREGA')"
                     />
                     <span class="opcao-info">
                       <strong>🚚 Entrega</strong>
@@ -217,6 +226,14 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
           </div>
         }
       </div>
+    }
+
+    @if (itemEmEdicao(); as item) {
+      <app-personalizacao-produto
+        [produto]="item.produto"
+        [itemEmEdicao]="item"
+        (fecharEvento)="fecharEdicao()"
+      ></app-personalizacao-produto>
     }
   `,
   styles: [`
@@ -313,7 +330,22 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     .controls button:active { transform: scale(0.92); }
     .controls span { min-width: 20px; text-align: center; font-weight: 700; }
     .pers { font-size: 0.8rem; color: var(--text-muted); margin: 3px 0; line-height: 1.4; }
+    .pers.removidos { color: var(--danger); font-weight: 600; }
     .pers.extra { color: var(--accent-dark); font-weight: 600; }
+    .btn-corrigir {
+      display: block;
+      margin: 2px 0 4px;
+      padding: 5px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition), background var(--transition);
+    }
+    .btn-corrigir:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
     .entrega { margin-top: 14px; }
     .entrega-titulo { font-weight: 700; margin: 0 0 6px; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
     .opcao {
@@ -334,7 +366,6 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     .opcao-info small { color: var(--text-muted); font-size: 0.72rem; margin-top: 1px; line-height: 1.2; }
     .linha-total { margin: 2px 0; color: var(--text-muted); font-size: 0.9rem; }
     .linha-total.taxa { color: var(--accent-dark); font-weight: 600; }
-    .dica-entrega { margin: 12px 0 0; font-size: 0.82rem; color: var(--text-muted); }
     .pag-titulo, .troco-titulo { font-weight: 700; margin: 16px 0 6px; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
     .opcoes-entrega { display: flex; gap: 8px; margin-top: 4px; }
     .opcoes-entrega .opcao {
@@ -445,10 +476,13 @@ export class CarrinhoDrawerComponent {
   cartService = inject(CartService);
   private readonly pedidoService = inject(PedidoService);
   private readonly produtoService = inject(ProdutoService);
+  private readonly contexto = inject(EstabelecimentoContextoService);
   readonly configuracoes = inject(ConfiguracoesService);
 
   isOpen = signal<boolean>(false);
   erro = signal<string | null>(null);
+  // Item do carrinho aberto no modal de correção de ingredientes
+  itemEmEdicao = signal<CartItem | null>(null);
   etapa = signal<Etapa>('carrinho');
   cliente = signal<string>('');
   telefone = signal<string>('');
@@ -461,7 +495,7 @@ export class CarrinhoDrawerComponent {
   pedidoSucesso = signal<string>('');
   pedidoId = signal<string>('');
 
-  readonly formasPagamento: {
+  readonly todasFormasPagamento: {
     valor: FormaPagamento;
     rotulo: string;
   }[] = [
@@ -469,6 +503,24 @@ export class CarrinhoDrawerComponent {
     { valor: 'PIX', rotulo: '🟢 Pix' },
     { valor: 'CARTAO', rotulo: '💳 Cartão' },
   ];
+
+  // Na retirada o cliente paga no balcão, então só entram as formas que fazem
+  // sentido ali. Cartão segue disponível apenas para entrega.
+  formasPagamento = computed(() =>
+    this.tipoEntrega() === 'RETIRADA'
+      ? this.todasFormasPagamento.filter((f) => f.valor !== 'CARTAO')
+      : this.todasFormasPagamento,
+  );
+
+  // Trocar a forma de recebimento pode tirar a forma de pagamento escolhida da
+  // lista (ex.: estava no cartão e virou retirada). Sem isso o checkout ficaria
+  // sem nenhuma opção marcada.
+  selecionarTipoEntrega(t: TipoEntrega): void {
+    this.tipoEntrega.set(t);
+    if (!this.formasPagamento().some((f) => f.valor === this.formaPagamento())) {
+      this.formaPagamento.set('DINHEIRO');
+    }
+  }
 
   selecionarPagamento(f: FormaPagamento): void {
     this.formaPagamento.set(f);
@@ -541,6 +593,16 @@ export class CarrinhoDrawerComponent {
 
   nomesIngredientes(lista: ItemIngrediente[]): string {
     return lista.map((i) => i.nome).join(', ');
+  }
+
+  // Abre o modal de personalização já carregado com o estado do item, para o
+  // cliente corrigir o que removeu ou esqueceu de adicionar.
+  abrirEdicao(item: CartItem): void {
+    this.itemEmEdicao.set(item);
+  }
+
+  fecharEdicao(): void {
+    this.itemEmEdicao.set(null);
   }
 
   agruparAdicionados(lista: ItemIngrediente[]): string {
@@ -624,6 +686,7 @@ export class CarrinhoDrawerComponent {
 
     this.pedidoService
       .criar({
+        slug: this.contexto.slugAtual() ?? '',
         cliente: this.cliente().trim(),
         tipoEntrega,
         telefone: this.telefone().trim(),
@@ -650,6 +713,7 @@ export class CarrinhoDrawerComponent {
 
   fechar(): void {
     this.isOpen.set(false);
+    this.itemEmEdicao.set(null);
     this.etapa.set('carrinho');
     this.cliente.set('');
     this.telefone.set('');

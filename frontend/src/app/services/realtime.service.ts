@@ -3,6 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { Observable, Subject } from 'rxjs';
 import { environment } from '../environment';
 import type { Pedido } from './pedidos.service';
+import { AuthService } from './auth.service';
 
 const EVENTO_CRIADO = 'pedido.criado';
 const EVENTO_ATUALIZADO = 'pedido.atualizado';
@@ -12,6 +13,7 @@ const EVENTO_REMOVIDO = 'pedido.removido';
 @Injectable({ providedIn: 'root' })
 export class RealtimeService {
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly auth = inject(AuthService);
 
   private socket?: import('socket.io-client').Socket;
 
@@ -29,8 +31,11 @@ export class RealtimeService {
     // Import dinâmico: mantém o socket.io-client fora do bundle do servidor (SSR)
     const { io } = await import('socket.io-client');
 
-    this.socket = io(environment.apiUrl, {
+    // URL pública: o socket só é aberto no browser, que não resolve hostnames
+    // internos do container (ver comentário em environment.ts)
+    this.socket = io(environment.publicApiUrl, {
       transports: ['websocket'],
+      auth: { token: this.auth.getToken() },
     });
 
     this.socket.on(EVENTO_CRIADO, (pedido: Pedido) => this.novo.next(pedido));

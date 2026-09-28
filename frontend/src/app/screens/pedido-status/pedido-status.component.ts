@@ -11,6 +11,7 @@ import {
   formatarTelefone as formatarTelefoneBr,
 } from '../../services/pedidos.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
+import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 
 const STATUS_LABELS: Record<PedidoStatus, string> = {
   PENDENTE: 'Pendente',
@@ -40,7 +41,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
         <p class="status-msg">Buscando seu pedido...</p>
       } @else if (erro()) {
         <p class="status-msg erro">{{ erro() }}</p>
-        <a routerLink="/cardapio" class="btn-voltar">← Voltar ao cardápio</a>
+        <a [routerLink]="voltarLink()" class="btn-voltar">← Voltar ao cardápio</a>
       } @else if (pedido()) {
         <div class="rastreio-card">
           <div class="rastreio-top">
@@ -193,6 +194,7 @@ export class PedidoStatusComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly pedidoService = inject(PedidoService);
   private readonly configuracoes = inject(ConfiguracoesService);
+  private readonly contexto = inject(EstabelecimentoContextoService);
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_CORES = STATUS_CORES;
@@ -200,6 +202,13 @@ export class PedidoStatusComponent implements OnInit {
   pedido = signal<PedidoRastreio | null>(null);
   carregando = signal(true);
   erro = signal<string | null>(null);
+  private readonly slugPedido = signal<string | null>(null);
+
+  // Link "voltar ao cardápio": usa o slug do pedido quando conhecido
+  voltarLink(): string[] {
+    const slug = this.slugPedido();
+    return slug ? ['/cardapio', slug] : ['/'];
+  }
 
   readonly subtotal = computed(() => {
     const p = this.pedido();
@@ -224,8 +233,12 @@ export class PedidoStatusComponent implements OnInit {
     this.assinaturas.add(
       fluxo.subscribe({
         next: (dados) => {
+          this.slugPedido.set(dados.slug);
           this.pedido.set(dados);
           this.carregando.set(false);
+          // Busca o telefone/nome do estabelecimento para montar o link do WhatsApp
+          this.contexto.definirSlugPublico(dados.slug);
+          this.configuracoes.carregarNome(dados.slug);
         },
         error: () => {
           this.carregando.set(false);
@@ -233,9 +246,6 @@ export class PedidoStatusComponent implements OnInit {
         },
       }),
     );
-
-    // Busca o telefone do estabelecimento para montar o link do WhatsApp
-    this.configuracoes.carregarNome();
   }
 
   ngOnDestroy(): void {

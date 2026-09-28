@@ -39,7 +39,7 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
               @if (!configuracoes.aceitandoPedidos()) {
                 Sem pedidos
               } @else {
-                {{ temIngredientes() ? 'Adicionar' : 'Adicionar' }}
+                Adicionar
               }
             </button>
           }
@@ -163,13 +163,6 @@ export class ProdutoCardComponent {
 
   produtoImagemUrl(): string | undefined {
     return resolverImagemUrl(this.produto().imagemUrl);
-  }
-
-  // Indica se o produto possui ingredientes vinculados (usuário pode
-  // remover/adicionar com valor extra vindo do vínculo no cadastro)
-  temIngredientes(): boolean {
-    const vinculos = this.produto().ingredientes;
-    return !!vinculos && vinculos.length > 0;
   }
 
   adicionar(): void {

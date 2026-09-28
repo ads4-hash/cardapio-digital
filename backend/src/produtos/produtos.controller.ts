@@ -11,6 +11,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 import { ProdutosService } from './produtos.service';
 import { CreateProdutoDto } from './dto/create-produto.dto';
@@ -19,7 +31,10 @@ import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { UsuarioAutenticado } from '../auth/current-user.decorator';
 import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
+import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
+import { ProdutoDto } from './dto/respostas-produto.dto';
 
+@ApiTags('produtos')
 @Controller('produtos')
 export class ProdutosController {
   constructor(
@@ -32,6 +47,32 @@ export class ProdutosController {
   // válido, devolve apenas produtos de categorias visíveis (não vaza itens
   // de categorias ocultas).
   @Get()
+  @ApiOperation({
+    summary: 'Lista os produtos (público, com filtro por visibilidade)',
+    description: [
+      'Alimenta o cardápio público. Sem `Authorization`, a listagem vem **filtrada**:',
+      'produtos de categorias ocultas não aparecem. Com um token válido, tudo volta.',
+      '',
+      'O token é opcional aqui de propósito — o mesmo endpoint serve ao cliente',
+      '(anônimo) e ao painel (autenticado), sem duplicar rota.',
+    ].join('\n'),
+  })
+  @ApiQuery({
+    name: 'slug',
+    required: true,
+    description: 'Slug do estabelecimento.',
+    example: 'pizzaria-do-ze',
+  })
+  @ApiQuery({
+    name: 'categoriaId',
+    required: false,
+    description: 'Filtra por uma categoria específica.',
+  })
+  @ApiOkResponse({ type: [ProdutoDto] })
+  @ApiNotFoundResponse({
+    type: RespostaErroDto,
+    description: 'Slug não informado ou desconhecido.',
+  })
   async findAll(
     @Query('slug') slug: string,
     @Query('categoriaId') categoriaId?: string,
@@ -59,12 +100,31 @@ export class ProdutosController {
 
   @UseGuards(AuthGuard)
   @Get(':id')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Detalha um produto' })
+  @ApiParam({ name: 'id', description: 'UUID do produto.' })
+  @ApiOkResponse({ type: ProdutoDto })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiNotFoundResponse({ type: RespostaErroDto })
   findOne(@CurrentUser() usuario: UsuarioAutenticado, @Param('id') id: string) {
     return this.produtosService.findOne(usuario.estabelecimentoId, id);
   }
 
   @UseGuards(AuthGuard)
   @Post()
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Cria um produto',
+    description:
+      'O `slug` da URL é só do frontend: a imagem vem do `POST /upload` e entra aqui como `imagemUrl` (caminho relativo, ex.: `/uploads/abc.png`).',
+  })
+  @ApiBody({ type: CreateProdutoDto })
+  @ApiCreatedResponse({ type: ProdutoDto })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiNotFoundResponse({
+    type: RespostaErroDto,
+    description: 'Categoria informada não existe neste estabelecimento.',
+  })
   create(
     @CurrentUser() usuario: UsuarioAutenticado,
     @Body() dto: CreateProdutoDto,
@@ -74,6 +134,17 @@ export class ProdutosController {
 
   @UseGuards(AuthGuard)
   @Patch(':id')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Atualiza um produto',
+    description:
+      'Campos omitidos continuam como estão. Enviar `ingredientes` substitui a lista inteira.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID do produto.' })
+  @ApiBody({ type: UpdateProdutoDto })
+  @ApiOkResponse({ type: ProdutoDto })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiNotFoundResponse({ type: RespostaErroDto })
   update(
     @CurrentUser() usuario: UsuarioAutenticado,
     @Param('id') id: string,
@@ -84,6 +155,12 @@ export class ProdutosController {
 
   @UseGuards(AuthGuard)
   @Delete(':id')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Exclui um produto' })
+  @ApiParam({ name: 'id', description: 'UUID do produto.' })
+  @ApiOkResponse({ description: 'Produto excluído. Corpo vazio.' })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiNotFoundResponse({ type: RespostaErroDto })
   remove(@CurrentUser() usuario: UsuarioAutenticado, @Param('id') id: string) {
     return this.produtosService.remove(usuario.estabelecimentoId, id);
   }

@@ -1,9 +1,20 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PedidoService, Pedido } from '../../services/pedidos.service';
+import {
+  PedidoService,
+  Pedido,
+  FormaPagamento,
+  FORMA_PAGAMENTO_LABEL,
+} from '../../services/pedidos.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 
 type Periodo = 'hoje' | 'semana' | 'mes' | 'todos';
+
+const FORMA_PAGAMENTO_ICONE: Record<FormaPagamento, string> = {
+  DINHEIRO: '💵',
+  PIX: '🟢',
+  CARTAO: '💳',
+};
 
 function paraDataIso(d: Date): string {
   const ano = d.getFullYear();
@@ -101,10 +112,31 @@ function paraDataIso(d: Date): string {
             <span>Pedidos concluídos</span>
             <strong>{{ filtrados().length }}</strong>
           </div>
+          <div class="resumo-item">
+            <span>Fretes (taxa de entrega)</span>
+            <strong>{{ totalFretes() | currency:'BRL' }}</strong>
+          </div>
+          <div class="resumo-item">
+            <span>Faturamento (só itens)</span>
+            <strong>{{ totalItens() | currency:'BRL' }}</strong>
+          </div>
           <div class="resumo-item destaque">
-            <span>Faturamento (soma)</span>
+            <span>Faturamento total</span>
             <strong>{{ totalFaturamento() | currency:'BRL' }}</strong>
           </div>
+        </div>
+
+        <div class="pagamento-resumo">
+          @for (item of porFormaPagamento(); track item.forma) {
+            <div class="pagamento-item">
+              <span class="pagamento-icone">{{ item.icone }}</span>
+              <span class="pagamento-info">
+                <strong>{{ item.rotulo }}</strong>
+                <small>{{ item.quantidade }} pedido{{ item.quantidade > 1 ? 's' : '' }}</small>
+              </span>
+              <strong class="pagamento-total">{{ item.total | currency:'BRL' }}</strong>
+            </div>
+          }
         </div>
 
         <table class="tabela">
@@ -192,6 +224,22 @@ function paraDataIso(d: Date): string {
     .resumo-item strong { font-size: 1.3rem; }
     .resumo-item.destaque { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); border: none; color: #fff; box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
     .resumo-item.destaque span { color: rgba(255, 255, 255, 0.85); }
+    .pagamento-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .pagamento-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .pagamento-icone { font-size: 1.3rem; }
+    .pagamento-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .pagamento-info strong { font-size: 0.95rem; font-weight: 800; }
+    .pagamento-info small { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+    .pagamento-total { font-size: 1rem; font-weight: 800; white-space: nowrap; }
     .tabela {
       width: 100%;
       border-collapse: collapse;
@@ -283,6 +331,39 @@ export class AdminFaturamentoComponent implements OnInit {
   totalFaturamento = computed(() =>
     this.filtrados().reduce((soma, pedido) => soma + pedido.total, 0),
   );
+
+  // Soma das taxas de entrega (fretes) dos pedidos filtrados
+  totalFretes = computed(() =>
+    this.filtrados().reduce(
+      (soma, pedido) => soma + (pedido.taxaEntrega ?? 0),
+      0,
+    ),
+  );
+
+  // Faturamento descontando os fretes
+  totalItens = computed(() => this.totalFaturamento() - this.totalFretes());
+
+  // Resumo por forma de pagamento (Dinheiro, Pix, Cartão)
+  porFormaPagamento = computed(() => {
+    const formas: FormaPagamento[] = ['DINHEIRO', 'PIX', 'CARTAO'];
+    return formas
+      .map((forma) => {
+        const pedidosForma = this.filtrados().filter(
+          (pedido) => pedido.formaPagamento === forma,
+        );
+        return {
+          forma,
+          rotulo: FORMA_PAGAMENTO_LABEL[forma],
+          icone: FORMA_PAGAMENTO_ICONE[forma],
+          quantidade: pedidosForma.length,
+          total: pedidosForma.reduce(
+            (soma, pedido) => soma + pedido.total,
+            0,
+          ),
+        };
+      })
+      .filter((item) => item.quantidade > 0);
+  });
 
   ngOnInit(): void {
     this.carregar();

@@ -1,11 +1,13 @@
 import { Component, inject, OnDestroy, OnInit, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 
 import { ProdutoService, Produto, filtrarProdutos } from '../../services/produto.service';
 import { CategoriasTabsComponent } from '../../components/categorias-tabs/categorias-tabs.component';
 import { ProdutoCardComponent } from '../../components/produto-card/produto-card.component';
 import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrinho-drawer.component';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
+import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 
 @Component({
   selector: 'app-cliente-screen',
@@ -35,26 +37,6 @@ import { ConfiguracoesService } from '../../services/configuracoes.service';
   `,
   styles: [
     `
-      .page-header {
-        text-align: center;
-        padding: 8px 0 26px;
-      }
-      .page-header h1 {
-        margin: 0 0 6px;
-        font-size: 1.6rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-      }
-      .page-header p {
-        margin: 0;
-        color: var(--text-muted);
-        font-size: 0.95rem;
-      }
-      @media (max-width: 560px) {
-        .page-header h1 {
-          font-size: 1.35rem;
-        }
-      }
       .cardapio .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -82,6 +64,8 @@ import { ConfiguracoesService } from '../../services/configuracoes.service';
 export class ClienteScreenComponent implements OnInit, OnDestroy {
   protected readonly produtoService = inject(ProdutoService);
   private readonly configuracoes = inject(ConfiguracoesService);
+  private readonly contexto = inject(EstabelecimentoContextoService);
+  private readonly route = inject(ActivatedRoute);
 
   categoriaFiltro = signal<string>('todas');
   buscaFiltro = signal<string>('');
@@ -94,8 +78,14 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.produtoService.loadCategoriasVisiveis();
-    this.produtoService.loadProdutos();
+    // Troca de estabelecimento (navegação de /cardapio/a para /cardapio/b)
+    this.route.paramMap.subscribe((params) => {
+      const slug = params.get('slug');
+      if (!slug) return;
+      this.contexto.definirSlugPublico(slug);
+      this.produtoService.loadCategoriasVisiveis(slug);
+      this.produtoService.loadProdutos(false, slug);
+    });
   }
 
   ngOnDestroy(): void {

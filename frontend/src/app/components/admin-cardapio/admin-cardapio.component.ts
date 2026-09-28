@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { AdminPersonalizacaoComponent } from '../admin-personalizacao/admin-personalizacao.component';
+import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 
 // Cardápio público: mostra o link para compartilhar e permite copiar/abrir,
 // além da personalização visual (cor, logo e tema) aplicada a esse cardápio
@@ -29,10 +30,13 @@ import { AdminPersonalizacaoComponent } from '../admin-personalizacao/admin-pers
   `,
 })
 export class AdminCardapioComponent {
+  private readonly contexto = inject(EstabelecimentoContextoService);
+
   link(): string {
+    const slug = this.contexto.slugAtual() ?? '';
     return typeof window !== 'undefined'
-      ? `${window.location.origin}/cardapio`
-      : '/cardapio';
+      ? `${window.location.origin}/cardapio/${slug}`
+      : `/cardapio/${slug}`;
   }
 
   copiar(): void {

@@ -22,6 +22,15 @@ const CUSTO_HASH_BCRYPT = 10;
 const JANELA_FALHAS_MS = 15 * 60 * 1000;
 /** Número máximo de falhas por IP dentro da janela */
 const MAX_FALHAS_POR_IP = 5;
+/**
+ * Número máximo de falhas por e-mail dentro da janela. Maior que o do IP de
+ * propósito: o limite por IP protege contra "spray" (uma tentativa contra
+ * várias contas), e o por e-mail protege a conta contra credential stuffing
+ * distribuído, em que o atacante rotaciona o IP. Os dois cobrem ataques
+ * diferentes e ficam calibrados assim para não inocentar o usuário legítimo
+ * logo no primeiro erro de digitação.
+ */
+const MAX_FALHAS_POR_EMAIL = 10;
 /** Validade do token de recuperação de senha (30 min) */
 const VALIDADE_RECUPERACAO_MS = 30 * 60 * 1000;
 /** Não gera outro token enquanto existir um ativo recente (evita spam de e-mail) */
@@ -109,7 +118,7 @@ export class AuthService {
         throw erro;
       });
 
-    await this.registrarTentativa(ip, true);
+    await this.registrarTentativa(ip, this.hashEmail(emailNormalizado), true);
     return this.emitirTokenAcesso(usuario);
   }
 
@@ -119,9 +128,17 @@ export class AuthService {
     ip: string,
   ): Promise<{ token: string; usuario: UsuarioPublico }> {
     const ipHash = this.hashIp(ip);
+    // Haspa o e-mail ANTES de consultar o usuário, e registra a tentativa mesmo
+    // quando a conta não existe. Assim a contagem é idêntica para e-mails
+    // cadastrados e inexistentes, e a resposta não revela quais contas existem.
+    const emailHash = this.hashEmail(email);
 
-    // Proteção contra força bruta: limita falhas por IP na janela de tempo
-    if (await this.ipBloqueado(ipHash)) {
+    // Proteção contra força bruta em duas camadas: por IP (contra "spray" em
+    // várias contas) e por e-mail (contra credential stuffing distribuído).
+    if (
+      (await this.ipBloqueado(ipHash)) ||
+      (await this.emailBloqueado(emailHash))
+    ) {
       throw new HttpException(
         'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -141,16 +158,20 @@ export class AuthService {
       : false;
 
     if (!usuario || !senhaConfere) {
-      await this.registrarTentativa(ip, false);
+      await this.registrarTentativa(ip, emailHash, false);
       throw new UnauthorizedException('E-mail ou senha inválidos.');
     }
 
-    // Sucesso: primeiro remove o histórico de falhas desse IP para "destravar"
+    // Sucesso: limpa o histórico de falhas deste IP e deste e-mail para
+    // "destravar" as duas camadas
     const desde = new Date(Date.now() - JANELA_FALHAS_MS);
     await this.prisma.tentativaLogin.deleteMany({
       where: { ipHash, sucesso: false, criadoEm: { gte: desde } },
     });
-    await this.registrarTentativa(ip, true);
+    await this.prisma.tentativaLogin.deleteMany({
+      where: { emailHash, sucesso: false, criadoEm: { gte: desde } },
+    });
+    await this.registrarTentativa(ip, emailHash, true);
 
     return this.emitirTokenAcesso({
       id: usuario.id,
@@ -364,6 +385,9 @@ export class AuthService {
 
   // Edita os dados do usuário logado (nome, e-mail e, opcionalmente, senha).
   // O telefone pertence ao estabelecimento (exibido no pedido/WhatsApp).
+  //
+  // Trocar e-mail ou senha exige `senhaAtual`: sem isso, quem tivesse um token
+  // roubado trocaria o e-mail e a senha num único PATCH e tomaria a conta.
   async atualizarPerfil(
     id: string,
     nome: string,
@@ -371,6 +395,7 @@ export class AuthService {
     senha?: string,
     confirmarSenha?: string,
     telefone?: string | null,
+    senhaAtual?: string,
   ): Promise<UsuarioPublico> {
     if (senha) {
       if (senha !== confirmarSenha) {
@@ -379,8 +404,36 @@ export class AuthService {
     }
 
     const emailNormalizado = email.trim().toLowerCase();
-    const senhaHash = senha ? await hash(senha, CUSTO_HASH_BCRYPT) : undefined;
     const nomeEstabelecimento = nome.trim();
+
+    // Precisa do hash atual para conferir `senhaAtual` antes de qualquer escrita.
+    const atual = await this.prisma.usuario.findUnique({
+      where: { id },
+      select: { email: true, senhaHash: true },
+    });
+    if (!atual) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    // Só exige reautenticação quando o e-mail realmente muda — o formulário
+    // sempre reenvia o e-mail, então comparar sem isso quebraria a edição de nome.
+    const trocaCredencial =
+      Boolean(senha) || emailNormalizado !== atual.email.trim().toLowerCase();
+
+    if (trocaCredencial || senhaAtual) {
+      if (!senhaAtual) {
+        throw new BadRequestException(
+          'Informe a senha atual para alterar o e-mail ou a senha.',
+        );
+      }
+      // 400 e não 401: o token está válido, quem falhou foi o campo do corpo.
+      // Um 401 aqui deslogaria o admin no interceptor do frontend.
+      if (!(await compare(senhaAtual, atual.senhaHash))) {
+        throw new BadRequestException('Senha atual incorreta.');
+      }
+    }
+
+    const senhaHash = senha ? await hash(senha, CUSTO_HASH_BCRYPT) : undefined;
 
     const usuario = await this.prisma.usuario
       .update({
@@ -471,29 +524,48 @@ export class AuthService {
   }
 
   private async ipBloqueado(ipHash: string): Promise<boolean> {
-    const desde = new Date(Date.now() - JANELA_FALHAS_MS);
-    const falhas = await this.prisma.tentativaLogin.count({
+    return (await this.falhasNaJanela({ ipHash })) >= MAX_FALHAS_POR_IP;
+  }
+
+  private async emailBloqueado(emailHash: string): Promise<boolean> {
+    return (await this.falhasNaJanela({ emailHash })) >= MAX_FALHAS_POR_EMAIL;
+  }
+
+  private async falhasNaJanela(alvo: {
+    ipHash?: string;
+    emailHash?: string;
+  }): Promise<number> {
+    return this.prisma.tentativaLogin.count({
       where: {
-        ipHash,
+        ...alvo,
         sucesso: false,
-        criadoEm: { gte: desde },
+        criadoEm: { gte: new Date(Date.now() - JANELA_FALHAS_MS) },
       },
     });
-    return falhas >= MAX_FALHAS_POR_IP;
   }
 
   private async registrarTentativa(
     ip: string,
+    emailHash: string | null,
     sucesso: boolean,
   ): Promise<void> {
     await this.prisma.tentativaLogin.create({
-      data: { ipHash: this.hashIp(ip), sucesso },
+      data: { ipHash: this.hashIp(ip), emailHash, sucesso },
     });
   }
 
   // Nunca armazena o IP em texto puro: grava apenas o hash HMAC-SHA256
   private hashIp(ip: string): string {
-    return createHmac('sha256', obterSegredo()).update(ip).digest('hex');
+    return this.hashSiglao(ip);
+  }
+
+  // Mesmo tratamento do IP: o e-mail também só é gravado como hash
+  private hashEmail(email: string): string {
+    return this.hashSiglao(email.trim().toLowerCase());
+  }
+
+  private hashSiglao(valor: string): string {
+    return createHmac('sha256', obterSegredo()).update(valor).digest('hex');
   }
 
   // Código de recuperação curto (8 caracteres) manualmente digitável

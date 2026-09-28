@@ -12,6 +12,12 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <!--
+      Publicada pelo servidor SSR (ver src/server.ts) e carregada antes dos
+      bundles, para o app já nascer com a URL da API correta. Sem esse script o
+      bundle cai no padrão localhost:3000, porque o browser não tem process.env.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <app-root></app-root>

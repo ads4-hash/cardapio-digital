@@ -3,12 +3,18 @@ import { ClienteScreenComponent } from './screens/cliente-screen/cliente-screen.
 import { AdminScreenComponent } from './screens/admin-screen/admin-screen.component';
 import { LoginScreenComponent } from './screens/login-screen/login-screen.component';
 import { PedidoStatusComponent } from './screens/pedido-status/pedido-status.component';
+import { RecuperarSenhaScreenComponent } from './screens/recuperar-senha/recuperar-senha.component';
 import { authGuard, convidadoGuard } from './auth.guard';
 
 export const routes: Routes = [
   {
-    path: 'cardapio',
+    path: 'cardapio/:slug',
     component: ClienteScreenComponent,
+  },
+  {
+    path: 'cardapio',
+    redirectTo: '/',
+    pathMatch: 'full',
   },
   {
     path: 'pedido/:id',
@@ -17,6 +23,11 @@ export const routes: Routes = [
   {
     path: '',
     component: LoginScreenComponent,
+    canActivate: [convidadoGuard],
+  },
+  {
+    path: 'recuperar-senha',
+    component: RecuperarSenhaScreenComponent,
     canActivate: [convidadoGuard],
   },
   {

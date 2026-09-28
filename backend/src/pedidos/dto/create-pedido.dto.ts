@@ -16,22 +16,40 @@ import {
 } from 'class-validator';
 
 export class ItemPedidoDto {
+  /**
+   * Produto pedido, no formato UUID.
+   * @example f3a4b5c6-d7e8-4f90-a012-3c4d5e6f7081
+   */
   @IsString()
   @IsNotEmpty({ message: 'O produto do item é obrigatório.' })
   produtoId: string;
 
+  /**
+   * Quantas unidades deste produto (1 a 99).
+   * @example 2
+   */
   @Type(() => Number)
   @IsInt({ message: 'A quantidade deve ser um número inteiro.' })
   @Min(1, { message: 'A quantidade deve ser ao menos 1.' })
   @Max(99, { message: 'A quantidade de um item não pode passar de 99.' })
   quantidade: number;
 
+  /**
+   * Nomes dos ingredientes que o cliente não quer neste item. O preço cai
+   * proporcionalmente ao valor do ingrediente.
+   * @example ["cebola", "azeitona"]
+   */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(200)
   removidos?: string[];
 
+  /**
+   * Ingredientes que o cliente somou ao produto. Cada um precisa estar ligado
+   * ao produto com `precoAdicional` no cadastro.
+   * @example ["Queijo extra"]
+   */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -53,7 +71,10 @@ export enum FormaPagamento {
 }
 
 export class CreatePedidoDto {
-  // Slug do estabelecimento (da URL /cardapio/:slug) ao qual o pedido pertence
+  /**
+   * Slug do estabelecimento (da URL /cardapio/:slug) ao qual o pedido pertence.
+   * @example pizzaria-do-ze
+   */
   @IsString()
   @IsNotEmpty({ message: 'Informe o estabelecimento.' })
   @MaxLength(80, {
@@ -61,6 +82,10 @@ export class CreatePedidoDto {
   })
   slug: string;
 
+  /**
+   * Nome de quem fez o pedido, como aparece no painel.
+   * @example João da Silva
+   */
   @IsString()
   @IsNotEmpty({ message: 'O nome do cliente é obrigatório.' })
   @MaxLength(80, {
@@ -68,13 +93,20 @@ export class CreatePedidoDto {
   })
   cliente: string;
 
+  /**
+   * `RETIRADA` o cliente busca no balcão; `ENTREGA` o estabelecimento leva.
+   * @example ENTREGA
+   */
   @IsString()
   @IsIn([TipoEntrega.RETIRADA, TipoEntrega.ENTREGA], {
     message: 'Informe se o pedido é retirada ou entrega.',
   })
   tipoEntrega: TipoEntrega;
 
-  // Contato solicitado no checkout (retirada ou entrega)
+  /**
+   * Contato solicitado no checkout (retirada ou entrega).
+   * @example (11) 98888-7777
+   */
   @IsString()
   @IsNotEmpty({ message: 'Informe um telefone para contato.' })
   @MaxLength(20, {
@@ -82,7 +114,10 @@ export class CreatePedidoDto {
   })
   telefone: string;
 
-  // Endereço exigido quando o pedido é entrega
+  /**
+   * Endereço exigido quando o pedido é entrega. Omitir em pedidos de retirada.
+   * @example Rua das Flores, 120 - Centro
+   */
   @IsOptional()
   @IsString()
   @MaxLength(200, {
@@ -90,15 +125,21 @@ export class CreatePedidoDto {
   })
   endereco?: string;
 
-  // Forma de pagamento escolhida no checkout (padrão: dinheiro)
+  /**
+   * Forma de pagamento escolhida no checkout (padrão: dinheiro).
+   * @example PIX
+   */
   @IsOptional()
   @IsIn([FormaPagamento.DINHEIRO, FormaPagamento.PIX, FormaPagamento.CARTAO], {
     message: 'Informe uma forma de pagamento válida.',
   })
   formaPagamento?: FormaPagamento;
 
-  // Valor em dinheiro entregue para receber troco (apenas quando DINHEIRO).
-  // O troco em si é calculado pelo servidor: trocoPara - total.
+  /**
+   * Valor em dinheiro entregue para receber troco (apenas quando DINHEIRO).
+   * O troco em si é calculado pelo servidor: trocoPara - total.
+   * @example 50
+   */
   @IsOptional()
   @Type(() => Number)
   @IsNumber(
@@ -108,6 +149,9 @@ export class CreatePedidoDto {
   @Min(0.01, { message: 'O valor do troco deve ser maior que zero.' })
   trocoPara?: number;
 
+  /**
+   * Itens do pedido, de 1 a 50.
+   */
   @IsArray()
   @ArrayMinSize(1, { message: 'O pedido precisa conter pelo menos um item.' })
   @ArrayMaxSize(50, { message: 'O pedido não pode ter mais de 50 itens.' })

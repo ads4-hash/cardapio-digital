@@ -136,6 +136,32 @@ export class CartService {
     this.persistir();
   }
 
+  // Substitui a personalização de um item já no carrinho, em vez de criar um
+  // novo. Usado quando o cliente corrige o item de dentro do próprio carrinho.
+  atualizarItem(
+    uid: string,
+    quantidade: number,
+    removidos: ItemIngrediente[],
+    adicionados: ItemIngrediente[],
+  ): void {
+    this._items.update((items) =>
+      items.map((item) =>
+        item.uid === uid
+          ? {
+              ...item,
+              quantidade: Math.max(1, quantidade),
+              precoUnitario: this.calcularPrecoUnitario(
+                item.produto,
+                adicionados,
+              ),
+              personalizacao: { removidos, adicionados },
+            }
+          : item,
+      ),
+    );
+    this.persistir();
+  }
+
   // Remove um item do carrinho
   remove(uid: string): void {
     this._items.update((items) =>

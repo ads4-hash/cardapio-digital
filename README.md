@@ -43,6 +43,20 @@ npm start               # http://localhost:4200
 
 > O frontend chama a API em `http://localhost:3000` (veja `frontend/src/app/environment.ts`).
 
+### Variáveis de ambiente (frontend — em deploy)
+
+Sem variável nenhuma, o app usa `http://localhost:3000` para a API.
+
+| Variável         | Padrão                 | Descrição |
+|------------------|------------------------|-----------|
+| `PUBLIC_API_URL` | `http://localhost:3000` | URL da API **para o navegador** (XHR, WebSocket e `src` das imagens) |
+| `API_URL`        | `http://localhost:3000` | URL da API **para o servidor SSR** (rede interna, ex.: `http://backend:3000`) |
+| `ALLOWED_HOSTS`  | `localhost,127.0.0.1` | Hosts aceitos no SSR. Domínios separados por vírgula; `"*"` só atrás de proxy que já valida o `Host` |
+
+O bundle do browser não tem `process.env`, então o servidor SSR publica `PUBLIC_API_URL`
+em `/config.js`, carregado no `<head>` antes dos bundles. Como a rota é gerada por
+requisição, mudar a URL no `docker-compose` não exige rebuild.
+
 ### Primeiro acesso ao painel
 
 O cadastro de usuário (`POST /auth/registrar`) só cria o **primeiro** usuário — que
@@ -58,6 +72,7 @@ apenas via login (`POST /auth/login`).
 | `PORT`        | `3000` | Porta da API |
 | `CORS_ORIGIN` | `http://localhost:4200` | Origens permitidas, separadas por vírgula |
 | `CONFIAR_PROXY` | `false` | Defina `"true"` apenas atrás de proxy que preenche `X-Forwarded-For` |
+| `DOCS_HABILITADOS` | `true` | Defina `"false"` para desligar o Swagger em `/docs` |
 
 ## Rodando com Docker
 
@@ -70,6 +85,13 @@ docker compose up -d --build
 - Cardápio/painel: `http://localhost:4000`
 
 Volumes persistidos: imagens de produtos (`uploads`) e o banco SQLite (`prisma/`).
+
+Em um deploy real, exporte `PUBLIC_API_URL` e `ALLOWED_HOSTS` com o domínio
+público antes do `docker compose up`:
+
+```bash
+PUBLIC_API_URL=https://api.seudominio.com ALLOWED_HOSTS=seudominio.com docker compose up -d --build
+```
 
 ## Funcionalidades
 
@@ -109,3 +131,7 @@ npm test        # ng test (Vitest, sem watch)
 | POST    | `/upload`                  | admin        | Envio de imagem (JPG/PNG/WEBP/GIF, até 5 MB) |
 | CRUD    | `/produtos`, `/categorias`, `/ingredientes`, `/pedidos/:id/status` | admin | Gestão |
 | WS      | `pedido.criado`, `pedido.atualizado`, `pedido.removido` | admin | Tempo real |
+
+A lista completa, com exemplos de request/response e botão de execução, está no
+Swagger: `http://localhost:3000/docs`. A especificação OpenAPI fica em
+`http://localhost:3000/docs-json`.

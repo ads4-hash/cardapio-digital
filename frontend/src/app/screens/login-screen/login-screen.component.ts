@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
 
 type Modo = 'login' | 'cadastro';
@@ -36,14 +37,14 @@ type Modo = 'login' | 'cadastro';
 
         <form (ngSubmit)="enviar()" autocomplete="on">
           @if (modo() === 'cadastro') {
-            <label for="nome">Nome de usuário</label>
+            <label for="nomeEstabelecimento">Nome do estabelecimento</label>
             <input
-              id="nome"
-              name="nome"
+              id="nomeEstabelecimento"
+              name="nomeEstabelecimento"
               type="text"
-              autocomplete="username"
-              [(ngModel)]="nome"
-              placeholder="Como você quer ser chamado"
+              autocomplete="organization"
+              [(ngModel)]="nomeEstabelecimento"
+              placeholder="Ex: Casa do Lanche"
               required
             />
           }
@@ -104,8 +105,54 @@ type Modo = 'login' | 'cadastro';
           </button>
         </form>
 
+        @if (modo() === 'login') {
+          <div class="recuperacao">
+            <button
+              type="button"
+              class="esqueci"
+              (click)="alternarRecuperacao()"
+            >
+              {{ mostrarRecuperacao() ? 'Fechar recuperação' : 'Esqueceu a senha?' }}
+            </button>
+
+            @if (mostrarRecuperacao()) {
+              <div class="recuperar-painel">
+                @if (erroRecuperacao()) {
+                  <p class="aviso erro">{{ erroRecuperacao() }}</p>
+                }
+                @if (infoRecuperacao()) {
+                  <p class="aviso info">{{ infoRecuperacao() }}</p>
+                }
+
+                <form (ngSubmit)="enviarRecuperacao()" autocomplete="on">
+                  <label for="emailRecuperar">E-mail da conta</label>
+                  <input
+                    id="emailRecuperar"
+                    name="emailRecuperar"
+                    type="email"
+                    autocomplete="email"
+                    [(ngModel)]="emailRecuperacao"
+                    placeholder="voce@exemplo.com"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    class="btn-primary btn-rec"
+                    [disabled]="enviandoRecuperacao()"
+                  >
+                    {{ enviandoRecuperacao() ? 'Enviando...' : 'Enviar código' }}
+                  </button>
+                </form>
+                <p class="ajuda">
+                  O código é de uso único e expira em 30 minutos.
+                </p>
+              </div>
+            }
+          </div>
+        }
+
         @if (modo() === 'cadastro') {
-          <p class="ajuda">A senha precisa ter pelo menos 6 caracteres. Você entrará com o e-mail e a senha cadastrados.</p>
+          <p class="ajuda">Cadastre o nome do seu estabelecimento, o e-mail e a senha (mínimo de 6 caracteres).</p>
         }
       </div>
     </div>
@@ -132,25 +179,11 @@ type Modo = 'login' | 'cadastro';
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .brand-mark {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 35%, transparent);
-      margin-bottom: 18px;
-    }
     h1 {
       margin: 0 0 8px;
       font-size: 1.45rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-    }
-    .subtitle {
-      margin: 0 0 20px;
-      color: var(--text-muted);
-      font-size: 0.92rem;
-      line-height: 1.5;
     }
     .segmented {
       display: grid;
@@ -245,13 +278,40 @@ type Modo = 'login' | 'cadastro';
     .btn-primary:active:not(:disabled) { transform: scale(0.99); }
     .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .ajuda { margin: 16px 0 0; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+    .aviso {
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      margin: 0 0 16px;
+    }
+    .aviso.info { background: color-mix(in srgb, var(--success) 12%, var(--card)); color: var(--success); }
+    .recuperacao {
+      margin-top: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      text-align: center;
+    }
+    .esqueci {
+      border: none;
+      background: transparent;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0;
+    }
+    .esqueci:hover { text-decoration: underline; }
+    .recuperar-painel { margin-top: 14px; text-align: left; }
+    .recuperar-painel form { display: flex; flex-direction: column; gap: 14px; }
+    .btn-rec { width: 100%; margin-top: 0; }
   `],
 })
 export class LoginScreenComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
-  nome = '';
+  nomeEstabelecimento = '';
   email = '';
   senha = '';
   confirmarSenha = '';
@@ -260,10 +320,66 @@ export class LoginScreenComponent {
   enviando = signal(false);
   erro = signal<string | null>(null);
 
+  mostrarRecuperacao = signal(false);
+  emailRecuperacao = '';
+  enviandoRecuperacao = signal(false);
+  erroRecuperacao = signal<string | null>(null);
+  infoRecuperacao = signal<string | null>(null);
+
   alternarModo(novoModo: Modo): void {
     if (this.modo() === novoModo) return;
     this.modo.set(novoModo);
     this.erro.set(null);
+    this.mostrarRecuperacao.set(false);
+  }
+
+  alternarRecuperacao(): void {
+    this.mostrarRecuperacao.set(!this.mostrarRecuperacao());
+    this.erroRecuperacao.set(null);
+    this.infoRecuperacao.set(null);
+  }
+
+  enviarRecuperacao(): void {
+    const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      this.emailRecuperacao.trim(),
+    );
+    if (!emailValido) {
+      this.erroRecuperacao.set('Informe um e-mail válido.');
+      return;
+    }
+    this.enviandoRecuperacao.set(true);
+    this.erroRecuperacao.set(null);
+    this.infoRecuperacao.set(null);
+
+    this.authService
+      .solicitarRecuperacao(this.emailRecuperacao.trim())
+      .subscribe({
+        next: (resposta) => {
+          this.enviandoRecuperacao.set(false);
+          if (resposta.token) {
+            // Sem SMTP (modo local): segue para a tela com o código preenchido
+            this.router.navigate(['/recuperar-senha'], {
+              queryParams: { token: resposta.token },
+            });
+            return;
+          }
+          this.infoRecuperacao.set(resposta.mensagem);
+        },
+        error: (erro: HttpErrorResponse) => {
+          this.enviandoRecuperacao.set(false);
+          const status = erro?.status;
+          if (status === 429) {
+            this.erroRecuperacao.set(
+              'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+            );
+          } else {
+            this.erroRecuperacao.set(
+              erro?.error?.message ??
+                'Não foi possível enviar o código. Tente novamente.',
+            );
+          }
+        },
+      });
   }
 
   enviar(): void {
@@ -283,8 +399,8 @@ export class LoginScreenComponent {
     }
 
     if (this.modo() === 'cadastro') {
-      if (!this.nome.trim()) {
-        this.erro.set('Informe um nome de usuário.');
+      if (!this.nomeEstabelecimento.trim()) {
+        this.erro.set('Informe o nome do estabelecimento.');
         return;
       }
       if (this.senha !== this.confirmarSenha) {
@@ -299,7 +415,7 @@ export class LoginScreenComponent {
     const chamada =
       this.modo() === 'cadastro'
         ? this.authService.registrar(
-            this.nome.trim(),
+            this.nomeEstabelecimento.trim(),
             this.email.trim(),
             this.senha,
             this.confirmarSenha,
@@ -312,7 +428,7 @@ export class LoginScreenComponent {
         this.enviando.set(false);
         this.router.navigate(['/admin']);
       },
-      error: (erro: any) => {
+      error: (erro: HttpErrorResponse) => {
         this.enviando.set(false);
         const status = erro?.status;
         if (status === 409) {

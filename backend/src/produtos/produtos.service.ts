@@ -9,12 +9,64 @@ export class ProdutosService {
 
   private readonly includeCompleto = {
     categoria: true,
+    grupos: { orderBy: { ordem: 'asc' as const } },
     ingredientes: {
       include: {
         ingrediente: true,
+        grupo: true,
       },
     },
   };
+
+  // Nomes de grupo repetidos viram um só, e grupo sem nenhum ingrediente é
+  // descartado para não gerar cabeçalho vazio no cardápio.
+  private normalizarGrupos(
+    grupos?: { nome: string; maximoEscolhas?: number }[],
+    ingredientes?: { grupo?: string }[],
+  ): { nome: string; maximoEscolhas: number }[] {
+    const usados = new Set(
+      (ingredientes ?? [])
+        .map((i) => i.grupo?.trim())
+        .filter((n): n is string => Boolean(n)),
+    );
+
+    const porNome = new Map<string, { nome: string; maximoEscolhas: number }>();
+    for (const grupo of grupos ?? []) {
+      const nome = grupo.nome?.trim();
+      if (!nome || !usados.has(nome)) continue;
+      porNome.set(nome, {
+        nome,
+        maximoEscolhas: Math.min(
+          99,
+          Math.max(1, Math.trunc(Number(grupo.maximoEscolhas ?? 99))),
+        ),
+      });
+    }
+    return [...porNome.values()];
+  }
+
+  // Liga cada ingrediente ao grupo pelo nome. Ingredientes cujo grupo não
+  // exista no payload ficam soltos.
+  private async vincularGrupos(
+    produtoId: string,
+    grupos: { id: string; nome: string }[],
+    ingredientes: { ingredienteId: string; grupo?: string }[],
+  ): Promise<void> {
+    const porNome = new Map(grupos.map((g) => [g.nome, g.id]));
+
+    for (const [nome, grupoId] of porNome) {
+      const ids = ingredientes
+        .filter((i) => i.grupo?.trim() === nome)
+        .map((i) => i.ingredienteId);
+
+      if (ids.length === 0) continue;
+
+      await this.prisma.produtoIngrediente.updateMany({
+        where: { produtoId, ingredienteId: { in: ids } },
+        data: { grupoId },
+      });
+    }
+  }
 
   // Listar produtos (opcional filtrar por categoria e por visibilidade),
   // sempre dentro de um único estabelecimento
@@ -57,20 +109,38 @@ export class ProdutosService {
       preco: number;
       imagemUrl?: string;
       categoriaId: string;
-      ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
+      tipo?: string;
+      grupos?: { nome: string; maximoEscolhas?: number }[];
+      ingredientes?: {
+        ingredienteId: string;
+        precoAdicional?: number;
+        grupo?: string;
+      }[];
     },
   ) {
     await this.validarCategoria(estabelecimentoId, data.categoriaId);
     await this.validarIngredientes(estabelecimentoId, data.ingredientes);
 
-    return this.prisma.produto.create({
+    const grupos = this.normalizarGrupos(data.grupos, data.ingredientes);
+
+    const criado = await this.prisma.produto.create({
       data: {
         nome: data.nome,
         descricao: data.descricao,
         preco: Number(data.preco),
         imagemUrl: data.imagemUrl,
         categoriaId: data.categoriaId,
+        tipo: data.tipo ?? 'PADRAO',
         estabelecimentoId,
+        grupos: grupos.length
+          ? {
+              create: grupos.map((g, indice) => ({
+                nome: g.nome,
+                maximoEscolhas: g.maximoEscolhas,
+                ordem: indice,
+              })),
+            }
+          : undefined,
         ingredientes: data.ingredientes
           ? {
               create: data.ingredientes.map((i) => ({
@@ -80,8 +150,14 @@ export class ProdutosService {
             }
           : undefined,
       },
-      include: this.includeCompleto,
+      include: { grupos: true },
     });
+
+    if (data.ingredientes?.length) {
+      await this.vincularGrupos(criado.id, criado.grupos, data.ingredientes);
+    }
+
+    return this.findOne(estabelecimentoId, criado.id);
   }
 
   // Atualizar dados do produto
@@ -94,7 +170,13 @@ export class ProdutosService {
       preco?: number;
       imagemUrl?: string;
       categoriaId?: string;
-      ingredientes?: { ingredienteId: string; precoAdicional?: number }[];
+      tipo?: string;
+      grupos?: { nome: string; maximoEscolhas?: number }[];
+      ingredientes?: {
+        ingredienteId: string;
+        precoAdicional?: number;
+        grupo?: string;
+      }[];
     },
   ) {
     const atual = await this.findOne(estabelecimentoId, id);
@@ -109,7 +191,11 @@ export class ProdutosService {
       this.removerImagemDoDisco(atual.imagemUrl);
     }
 
-    return this.prisma.produto.update({
+    const recriarGrupos =
+      data.grupos !== undefined || data.ingredientes !== undefined;
+    const grupos = this.normalizarGrupos(data.grupos, data.ingredientes);
+
+    const atualizado = await this.prisma.produto.update({
       where: { id },
       data: {
         nome: data.nome,
@@ -117,6 +203,17 @@ export class ProdutosService {
         preco: data.preco !== undefined ? Number(data.preco) : undefined,
         imagemUrl: data.imagemUrl,
         categoriaId: data.categoriaId,
+        tipo: data.tipo,
+        grupos: recriarGrupos
+          ? {
+              deleteMany: {},
+              create: grupos.map((g, indice) => ({
+                nome: g.nome,
+                maximoEscolhas: g.maximoEscolhas,
+                ordem: indice,
+              })),
+            }
+          : undefined,
         ingredientes: data.ingredientes
           ? {
               deleteMany: {},
@@ -127,8 +224,14 @@ export class ProdutosService {
             }
           : undefined,
       },
-      include: this.includeCompleto,
+      include: { grupos: true },
     });
+
+    if (recriarGrupos && data.ingredientes?.length) {
+      await this.vincularGrupos(id, atualizado.grupos, data.ingredientes);
+    }
+
+    return this.findOne(estabelecimentoId, id);
   }
 
   // Remover um produto
@@ -161,8 +264,7 @@ export class ProdutosService {
   private async validarIngredientes(
     estabelecimentoId: string,
     ingredientes?: { ingredienteId: string; precoAdicional?: number }[],
-  ): Promise<void> {
-    if (!ingredientes || ingredientes.length === 0) return;
+  ): Promise<void> {    if (!ingredientes || ingredientes.length === 0) return;
     const ids = [...new Set(ingredientes.map((i) => i.ingredienteId))];
     const encontrados = await this.prisma.ingrediente.findMany({
       where: {

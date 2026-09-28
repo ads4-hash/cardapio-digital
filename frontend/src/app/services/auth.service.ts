@@ -5,16 +5,31 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../environment';
 
+export interface EstabelecimentoUsuario {
+  id: string;
+  nome: string;
+  slug: string;
+  telefone?: string | null;
+}
+
 export interface UsuarioLogado {
   id: string;
   nome: string;
   email: string;
+  estabelecimento?: EstabelecimentoUsuario;
   telefone?: string | null;
 }
 
 export interface AuthResponse {
   token: string;
   usuario: UsuarioLogado;
+}
+
+export interface RecuperacaoResponse {
+  enviadoPorEmail: boolean;
+  mensagem: string;
+  token?: string;
+  expiraEm?: string;
 }
 
 const CHAVE_TOKEN = 'auth_token';
@@ -44,15 +59,17 @@ export class AuthService {
     return this.usuario();
   }
 
+  // O nome do usuário passa a ser o nome do estabelecimento (não há campo separado)
   registrar(
-    nome: string,
+    nomeEstabelecimento: string,
     email: string,
     senha: string,
     confirmarSenha: string,
     telefone?: string,
   ): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.AUTH_URL}/registrar`, {
-      nome,
+      nomeEstabelecimento,
+      nome: nomeEstabelecimento,
       email,
       senha,
       confirmarSenha,
@@ -65,6 +82,27 @@ export class AuthService {
       email,
       senha,
     });
+  }
+
+  // Fluxo de recuperação de senha
+  solicitarRecuperacao(
+    email: string,
+  ): Observable<RecuperacaoResponse> {
+    return this.http.post<RecuperacaoResponse>(
+      `${this.AUTH_URL}/recuperar-senha`,
+      { email },
+    );
+  }
+
+  redefinirSenha(
+    token: string,
+    novaSenha: string,
+    confirmarSenha: string,
+  ): Observable<{ mensagem: string }> {
+    return this.http.post<{ mensagem: string }>(
+      `${this.AUTH_URL}/redefinir-senha`,
+      { token, novaSenha, confirmarSenha },
+    );
   }
 
   // Valida se o token ainda é válido
@@ -89,13 +127,15 @@ export class AuthService {
     });
   }
 
-  // Edita os dados do usuário logado (nome, e-mail e, opcionalmente, senha)
+  // Edita os dados do usuário logado (nome, e-mail e, opcionalmente, senha).
+  // `senhaAtual` é exigida pelo backend quando o e-mail ou a senha mudam.
   atualizarPerfil(dados: {
     nome: string;
     email: string;
     telefone?: string | null;
     senha?: string;
     confirmarSenha?: string;
+    senhaAtual?: string;
   }): Observable<UsuarioLogado> {
     return this.http.patch<UsuarioLogado>(`${this.AUTH_URL}/me`, dados);
   }

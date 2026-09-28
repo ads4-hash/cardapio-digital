@@ -84,7 +84,7 @@ export class PedidosService {
       where: { id: { in: produtoIds }, estabelecimentoId: estabelecimento.id },
       include: {
         ingredientes: {
-          include: { ingrediente: true },
+          include: { ingrediente: true, grupo: true },
         },
       },
     });
@@ -101,6 +101,7 @@ export class PedidosService {
     const itensParaCriar = data.itens.map((item) => {
       const produto = produtosMap.get(item.produtoId)!;
       const precoBase = Number(produto.preco);
+      const montagem = produto.tipo === 'MARMITA';
 
       // Soma o preço de cada ingrediente adicionado como extra
       const adicionadosNomes: string[] = [];
@@ -115,13 +116,23 @@ export class PedidosService {
         adicionalTotal += Number(vinculo?.precoAdicional ?? 0);
       }
 
-      // Guarda os nomes dos ingredientes removidos
+      if (montagem) {
+        // O teto do grupo é regra do cardápio, não só da interface: precisa ser
+        // conferido aqui, senão um cliente burla o limite enviando direto.
+        this.validarTetoDosGrupos(produto, item.adicionados ?? []);
+      }
+
+      // Guarda os nomes dos ingredientes removidos. Em produtos de montagem
+      // nada é "removido": o cliente simplesmente não escolheu, e listar tudo o
+      // que ficou de fora só poluiria a tela da cozinha.
       const removidosNomes: string[] = [];
-      for (const id of item.removidos ?? []) {
-        const vinculo = produto.ingredientes.find(
-          (c) => c.ingredienteId === id,
-        );
-        removidosNomes.push(vinculo?.ingrediente.nome ?? id);
+      if (!montagem) {
+        for (const id of item.removidos ?? []) {
+          const vinculo = produto.ingredientes.find(
+            (c) => c.ingredienteId === id,
+          );
+          removidosNomes.push(vinculo?.ingrediente.nome ?? id);
+        }
       }
 
       const precoUnitario = precoBase + adicionalTotal;
@@ -258,6 +269,44 @@ export class PedidosService {
         adicionados: this.parseLista(item.adicionados),
       })),
     };
+  }
+
+  // Confere o teto de porções de cada grupo escolhido no item. A repetição
+  // conta: pedir duas vezes a mesma proteína são duas porções do grupo.
+  private validarTetoDosGrupos(
+    produto: {
+      nome: string;
+      grupos: { id: string; nome: string; maximoEscolhas: number }[];
+      ingredientes: { ingredienteId: string; grupoId: string | null }[];
+    },
+    escolhidos: string[],
+  ): void {
+    if (produto.grupos.length === 0) return;
+
+    const porNome = new Map(produto.grupos.map((g) => [g.nome, g]));
+    const totais = new Map<string, number>();
+
+    for (const ingredienteId of escolhidos) {
+      const vinculo = produto.ingredientes.find(
+        (c) => c.ingredienteId === ingredienteId,
+      );
+      const grupo = vinculo?.grupoId
+        ? produto.grupos.find((g) => g.id === vinculo.grupoId)
+        : undefined;
+      if (!grupo) continue;
+      totais.set(grupo.nome, (totais.get(grupo.nome) ?? 0) + 1);
+    }
+
+    for (const [nome, total] of totais) {
+      const grupo = porNome.get(nome);
+      if (!grupo || total <= grupo.maximoEscolhas) continue;
+
+      const unidade =
+        grupo.maximoEscolhas === 1 ? 'porção' : 'porções';
+      throw new BadRequestException(
+        `Em "${produto.nome}", o grupo "${grupo.nome}" aceita no máximo ${grupo.maximoEscolhas} ${unidade}.`,
+      );
+    }
   }
 
   // Converte os nomes de ingredientes salvos (JSON) de volta para lista.

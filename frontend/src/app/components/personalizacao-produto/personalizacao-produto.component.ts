@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Produto, ProdutoIngrediente } from '../../services/produto.service';
-import { CartService } from '../../services/cart.service';
+import { CartItem, CartService } from '../../services/cart.service';
 
 interface EstadoIngrediente {
   vinculo: ProdutoIngrediente;
@@ -24,7 +24,13 @@ interface EstadoIngrediente {
       <div class="overlay" (click)="fechar()"></div>
       <div class="modal">
         <div class="modal-header">
-          <h3>{{ produto()!.nome }}</h3>
+          <h3>
+            @if (editando()) {
+              Corrigir {{ produto()!.nome }}
+            } @else {
+              {{ produto()!.nome }}
+            }
+          </h3>
           <button (click)="fechar()">✕</button>
         </div>
 
@@ -55,7 +61,7 @@ interface EstadoIngrediente {
                       </span>
                     }
                   </div>
-                  <div class="stepper" [class.bloqueado]="removido(ing)">
+                  <div class="stepper">
                     <button
                       class="toggle"
                       [disabled]="ing.quantidade === 0"
@@ -67,8 +73,7 @@ interface EstadoIngrediente {
                     <span class="qtd-extra">{{ ing.quantidade }}</span>
                     <button
                       class="toggle"
-                      [class.ativo]="adicional(ing)"
-                      [disabled]="ing.quantidade === 99 || ing.vinculo.precoAdicional <= 0"
+                      [disabled]="naoPodeSomar(ing)"
                       (click)="aumentar(ing)"
                       [attr.aria-label]="'Aumentar ' + ing.vinculo.ingrediente!.nome"
                     >
@@ -97,7 +102,11 @@ interface EstadoIngrediente {
             </p>
           </div>
           <button class="btn-adicionar" (click)="adicionar()">
-            Adicionar {{ quantidade() > 1 ? quantidade() + 'x' : '' }} ao Carrinho
+            @if (editando()) {
+              Salvar correções
+            } @else {
+              Adicionar {{ quantidade() > 1 ? quantidade() + 'x' : '' }} ao Carrinho
+            }
           </button>
         </div>
       </div>
@@ -181,8 +190,6 @@ interface EstadoIngrediente {
     }
     .stepper .toggle:hover:not(:disabled) { background: var(--surface-hover); }
     .stepper .toggle:active:not(:disabled) { transform: scale(0.9); }
-    .stepper .toggle.ativo { background: var(--accent); color: #fff; }
-    .stepper.bloqueado { opacity: 0.5; }
     .qtd-extra { min-width: 22px; text-align: center; font-weight: 800; font-size: 0.9rem; }
     .toggle:disabled { opacity: 0.4; cursor: not-allowed; }
     .modal-footer {
@@ -233,6 +240,8 @@ interface EstadoIngrediente {
 })
 export class PersonalizacaoProdutoComponent {
   produto = input.required<Produto>();
+  // Informado quando o modal é aberto para corrigir um item já no carrinho.
+  itemEmEdicao = input<CartItem | null>(null);
   fecharEvento = output<void>();
 
   private readonly cartService = inject(CartService);
@@ -243,16 +252,37 @@ export class PersonalizacaoProdutoComponent {
   constructor() {
     effect(() => {
       const vinculos = this.produto()?.ingredientes ?? [];
+      const item = this.itemEmEdicao();
+
+      // Ao corrigir, o modal abre no estado que já está no carrinho: os
+      // removidos voltam a 0 e cada adicional soma uma cópia à base.
+      const removidos = new Set(
+        item?.personalizacao.removidos.map((r) => r.ingredienteId) ?? [],
+      );
+      const extras = (item?.personalizacao.adicionados ?? []).reduce<
+        Record<string, number>
+      >((acc, a) => {
+        acc[a.ingredienteId] = (acc[a.ingredienteId] ?? 0) + 1;
+        return acc;
+      }, {});
+
       this.ingredientes.set(
         vinculos.map((vinculo) => ({
           vinculo,
           // Todo ingrediente já vem incluso no produto por padrão (1); copias
-          // extras podem ser adicionadas apenas quando haver valor agregado.
-          quantidade: 1,
+          // extras podem ser adicionadas apenas quando houver valor agregado.
+          quantidade: removidos.has(vinculo.ingredienteId)
+            ? 0
+            : 1 + (extras[vinculo.ingredienteId] ?? 0),
         })),
       );
-      this.quantidade.set(1);
+      this.quantidade.set(item?.quantidade ?? 1);
     });
+  }
+
+  // Distingue "adicionar ao carrinho" de "salvar a correção do item"
+  editando(): boolean {
+    return this.itemEmEdicao() !== null;
   }
 
   aumentarQuantidade(): void {
@@ -274,6 +304,14 @@ export class PersonalizacaoProdutoComponent {
     return ing.quantidade > 1;
   }
 
+  // O "+" só fica indisponível quando somar criaria uma cobrada extra sem
+  // preço cadastrado, ou no teto de 99. Com o ingrediente em 0 ele sempre
+  // restaura a cópia base, que já está inclusa no preço.
+  naoPodeSomar(ing: EstadoIngrediente): boolean {
+    if (ing.quantidade >= 99) return true;
+    return ing.quantidade >= 1 && ing.vinculo.precoAdicional <= 0;
+  }
+
   precoTotal(): number {
     const base = this.produto()?.preco ?? 0;
     // Cobra apenas as cópias extras (além da 1ª já inclusa no produto)
@@ -286,9 +324,12 @@ export class PersonalizacaoProdutoComponent {
   }
 
   aumentar(ing: EstadoIngrediente): void {
-    // Ingrediente sem valor agregado (precoAdicional zerado) não pode ser
-    // adicionado como extra — apenas removido do produto.
-    if ((ing.vinculo.precoAdicional ?? 0) <= 0) return;
+    // De 0 para 1 volta a cópia base, que já está inclusa no preço do produto:
+    // sempre liberado, mesmo em ingrediente sem adicional. Era aí que o
+    // ingrediente removido por engano ficava sem volta, obrigando a refazer o
+    // pedido inteiro.
+    // De 1 para cima é cópia EXTRA e, sem preço cadastrado, não pode ser vendida.
+    if (ing.quantidade >= 1 && ing.vinculo.precoAdicional <= 0) return;
     this.ingredientes.update((lista) =>
       lista.map((i) =>
         i.vinculo.ingredienteId === ing.vinculo.ingredienteId
@@ -335,12 +376,23 @@ export class PersonalizacaoProdutoComponent {
         ),
       );
 
-    this.cartService.addPersonalizado(
-      produto,
-      this.quantidade(),
-      removidos,
-      adicionados,
-    );
+    const item = this.itemEmEdicao();
+    if (item) {
+      // Correção vinda do carrinho: substitui o item, não cria outro.
+      this.cartService.atualizarItem(
+        item.uid,
+        this.quantidade(),
+        removidos,
+        adicionados,
+      );
+    } else {
+      this.cartService.addPersonalizado(
+        produto,
+        this.quantidade(),
+        removidos,
+        adicionados,
+      );
+    }
     this.fechar();
   }
 
