@@ -264,7 +264,8 @@ export class ProdutosService {
   private async validarIngredientes(
     estabelecimentoId: string,
     ingredientes?: { ingredienteId: string; precoAdicional?: number }[],
-  ): Promise<void> {    if (!ingredientes || ingredientes.length === 0) return;
+  ): Promise<void> {
+    if (!ingredientes || ingredientes.length === 0) return;
     const ids = [...new Set(ingredientes.map((i) => i.ingredienteId))];
     const encontrados = await this.prisma.ingrediente.findMany({
       where: {

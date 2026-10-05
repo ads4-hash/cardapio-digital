@@ -33,7 +33,9 @@ export class ProdutoGrupoDto {
    */
   @IsString()
   @IsNotEmpty({ message: 'O nome do grupo é obrigatório.' })
-  @MaxLength(60, { message: 'O nome do grupo deve ter no máximo 60 caracteres.' })
+  @MaxLength(60, {
+    message: 'O nome do grupo deve ter no máximo 60 caracteres.',
+  })
   nome: string;
 
   /**
@@ -81,7 +83,9 @@ export class ProdutoIngredienteDto {
    */
   @IsOptional()
   @IsString()
-  @MaxLength(60, { message: 'O nome do grupo deve ter no máximo 60 caracteres.' })
+  @MaxLength(60, {
+    message: 'O nome do grupo deve ter no máximo 60 caracteres.',
+  })
   grupo?: string;
 }
 

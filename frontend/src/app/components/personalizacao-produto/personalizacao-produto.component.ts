@@ -7,7 +7,12 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Produto, ProdutoIngrediente } from '../../services/produto.service';
+import {
+  Produto,
+  ProdutoIngrediente,
+  ProdutoGrupo,
+  ehMontagem,
+} from '../../services/produto.service';
 import { CartItem, CartService } from '../../services/cart.service';
 
 interface EstadoIngrediente {
@@ -41,46 +46,46 @@ interface EstadoIngrediente {
 
           @if (ingredientes().length === 0) {
             <p class="sem-ingredientes">Este produto não possui ingredientes personalizáveis.</p>
+          } @else if (montagem()) {
+            <p class="desc montagem-ajuda">
+              Monte do zero. Cada seção tem um limite de porções.
+            </p>
+
+            @for (grupo of gruposDoProduto(); track grupo.nome) {
+              <section class="grupo">
+                <header class="grupo-header">
+                  <h4>{{ grupo.nome }}</h4>
+                  <span class="grupo-contador" [class.cheio]="grupoCheio(grupo)">
+                    {{ escolhidosNoGrupo(grupo) }} de {{ grupo.maximoEscolhas }}
+                    {{ grupo.maximoEscolhas === 1 ? 'porção' : 'porções' }}
+                  </span>
+                </header>
+                <ul class="ingredientes">
+                  @for (ing of ingredientesDoGrupo(grupo); track ing.vinculo.ingredienteId) {
+                    <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: true }" />
+                  }
+                </ul>
+              </section>
+            }
+
+            @if (ingredientesSoltos().length > 0) {
+              <section class="grupo">
+                <header class="grupo-header">
+                  <h4>Outros ingredientes</h4>
+                  <span class="grupo-contador livre">sem limite</span>
+                </header>
+                <ul class="ingredientes">
+                  @for (ing of ingredientesSoltos(); track ing.vinculo.ingredienteId) {
+                    <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: true }" />
+                  }
+                </ul>
+              </section>
+            }
           } @else {
             <h4>Personalize seus ingredientes</h4>
             <ul class="ingredientes">
               @for (ing of ingredientes(); track ing.vinculo.ingredienteId) {
-                <li class="linha" [class.fora]="removido(ing)">
-                  <div class="info">
-                    <span class="nome">{{ ing.vinculo.ingrediente!.nome }}</span>
-                    @if (removido(ing)) {
-                      <span class="extra sem">Sem este ingrediente</span>
-                    } @else if (ing.vinculo.precoAdicional > 0) {
-                      <span class="extra">
-                        +{{ ing.vinculo.precoAdicional | currency:'BRL' }}
-                        @if (ing.quantidade > 1) {
-                          <span class="extra-total">
-                            × {{ ing.quantidade - 1 }} extra = {{ ing.vinculo.precoAdicional * (ing.quantidade - 1) | currency:'BRL' }}
-                          </span>
-                        }
-                      </span>
-                    }
-                  </div>
-                  <div class="stepper">
-                    <button
-                      class="toggle"
-                      [disabled]="ing.quantidade === 0"
-                      (click)="diminuir(ing)"
-                      [attr.aria-label]="'Diminuir ' + ing.vinculo.ingrediente!.nome"
-                    >
-                      −
-                    </button>
-                    <span class="qtd-extra">{{ ing.quantidade }}</span>
-                    <button
-                      class="toggle"
-                      [disabled]="naoPodeSomar(ing)"
-                      (click)="aumentar(ing)"
-                      [attr.aria-label]="'Aumentar ' + ing.vinculo.ingrediente!.nome"
-                    >
-                      +
-                    </button>
-                  </div>
-                </li>
+                <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: false }" />
               }
             </ul>
           }
@@ -111,6 +116,47 @@ interface EstadoIngrediente {
         </div>
       </div>
     }
+
+    <ng-template #linha let-ing let-semRotulo="semRotulo">
+      <li class="linha" [class.fora]="removido(ing)">
+        <div class="info">
+          <span class="nome">{{ ing.vinculo.ingrediente!.nome }}</span>
+          @if (removido(ing)) {
+            <span class="extra sem">Sem este ingrediente</span>
+          } @else if (ing.vinculo.precoAdicional > 0) {
+            <span class="extra">
+              +{{ ing.vinculo.precoAdicional | currency:'BRL' }}
+              @if (copias(ing) > 1) {
+                <span class="extra-total">
+                  × {{ copias(ing) }} = {{ ing.vinculo.precoAdicional * copias(ing) | currency:'BRL' }}
+                </span>
+              }
+            </span>
+          } @else if (semRotulo) {
+            <span class="extra incluso">incluso no preço</span>
+          }
+        </div>
+        <div class="stepper">
+          <button
+            class="toggle"
+            [disabled]="ing.quantidade === 0"
+            (click)="diminuir(ing)"
+            [attr.aria-label]="'Diminuir ' + ing.vinculo.ingrediente!.nome"
+          >
+            −
+          </button>
+          <span class="qtd-extra">{{ ing.quantidade }}</span>
+          <button
+            class="toggle"
+            [disabled]="naoPodeSomar(ing)"
+            (click)="aumentar(ing)"
+            [attr.aria-label]="'Aumentar ' + ing.vinculo.ingrediente!.nome"
+          >
+            +
+          </button>
+        </div>
+      </li>
+    </ng-template>
   `,
   styles: [`
     .overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); z-index: 200; animation: fadeIn 0.2s ease; }
@@ -154,6 +200,28 @@ interface EstadoIngrediente {
     .desc { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 14px; line-height: 1.5; }
     .sem-ingredientes { color: var(--text-muted); margin: 0; }
     .modal-body h4 { margin: 0 0 12px; font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .montagem-ajuda { margin: 0 0 14px; }
+    .grupo { margin-bottom: 18px; }
+    .grupo:last-child { margin-bottom: 0; }
+    .grupo-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 7px;
+      margin-bottom: 2px;
+      border-bottom: 2px solid var(--primary-light);
+    }
+    .grupo-header h4 { margin: 0; }
+    .grupo-contador {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .grupo-contador.cheio { color: var(--primary); }
+    .grupo-contador.livre { font-weight: 600; }
     .ingredientes { list-style: none; margin: 0; padding: 0; }
     .linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 2px; border-bottom: 1px solid var(--border); }
     .linha:last-child { border-bottom: none; }
@@ -162,6 +230,7 @@ interface EstadoIngrediente {
     .extra { color: var(--accent-dark); font-size: 0.82rem; font-weight: 700; }
     .extra-total { color: var(--text-muted); font-weight: 600; }
     .extra.sem { color: var(--danger); font-size: 0.78rem; font-weight: 600; }
+    .extra.incluso { color: var(--text-muted); font-size: 0.78rem; font-weight: 600; }
     .linha.fora { opacity: 0.55; }
     .linha.fora .nome { text-decoration: line-through; }
     .stepper {
@@ -253,6 +322,7 @@ export class PersonalizacaoProdutoComponent {
     effect(() => {
       const vinculos = this.produto()?.ingredientes ?? [];
       const item = this.itemEmEdicao();
+      const montagem = this.montagem();
 
       // Ao corrigir, o modal abre no estado que já está no carrinho: os
       // removidos voltam a 0 e cada adicional soma uma cópia à base.
@@ -269,15 +339,77 @@ export class PersonalizacaoProdutoComponent {
       this.ingredientes.set(
         vinculos.map((vinculo) => ({
           vinculo,
-          // Todo ingrediente já vem incluso no produto por padrão (1); copias
-          // extras podem ser adicionadas apenas quando houver valor agregado.
-          quantidade: removidos.has(vinculo.ingredienteId)
-            ? 0
-            : 1 + (extras[vinculo.ingredienteId] ?? 0),
+          // Em montagem nada vem incluso: a quantidade é só o que o cliente
+          // escolheu. Em produto comum todo ingrediente começa em 1 e cópias
+          // extras podem ser adicionadas quando houver valor agregado.
+          quantidade: montagem
+            ? (extras[vinculo.ingredienteId] ?? 0)
+            : removidos.has(vinculo.ingredienteId)
+              ? 0
+              : 1 + (extras[vinculo.ingredienteId] ?? 0),
         })),
       );
       this.quantidade.set(item?.quantidade ?? 1);
     });
+  }
+
+  // Produto de montagem: o cliente escolhe do zero, respeitando o teto de cada
+  // grupo. Produto comum mantém o comportamento de remover/acrescentar.
+  montagem(): boolean {
+    return ehMontagem(this.produto());
+  }
+
+  // Seções de escolha do produto, na ordem em que o cardápio apresenta.
+  gruposDoProduto(): ProdutoGrupo[] {
+    return [...(this.produto()?.grupos ?? [])].sort(
+      (a, b) => (a.ordem ?? 0) - (b.ordem ?? 0),
+    );
+  }
+
+  // Ingredientes que pertencem a um grupo. O vínculo vem por id (grupoId); o
+  // nome serve de reserva para quando a API não trouxer o id preenchido.
+  private pertenceAoGrupo(ing: EstadoIngrediente, grupo: ProdutoGrupo): boolean {
+    if (ing.vinculo.grupoId) return ing.vinculo.grupoId === grupo.id;
+    return ing.vinculo.grupo?.nome === grupo.nome;
+  }
+
+  ingredientesDoGrupo(grupo: ProdutoGrupo): EstadoIngrediente[] {
+    return this.ingredientes().filter((i) => this.pertenceAoGrupo(i, grupo));
+  }
+
+  // Ingredientes sem grupo: ficam soltos, sem teto de porções.
+  ingredientesSoltos(): EstadoIngrediente[] {
+    const grupos = this.gruposDoProduto();
+    return this.ingredientes().filter(
+      (i) => !grupos.some((g) => this.pertenceAoGrupo(i, g)),
+    );
+  }
+
+  // Porções já escolhidas no grupo. A repetição conta: pedir duas vezes a mesma
+  // proteína são duas porções, tal como a validação do servidor considera.
+  escolhidosNoGrupo(grupo: ProdutoGrupo): number {
+    return this.ingredientesDoGrupo(grupo).reduce(
+      (acc, i) => acc + i.quantidade,
+      0,
+    );
+  }
+
+  grupoCheio(grupo: ProdutoGrupo): boolean {
+    return this.escolhidosNoGrupo(grupo) >= grupo.maximoEscolhas;
+  }
+
+  // Teto do grupo, sem contar o próprio ingrediente que se quer somar: assim dá
+  // para desmarcar a última porção já escolhida.
+  estourouGrupo(ing: EstadoIngrediente): boolean {
+    if (!this.montagem()) return false;
+    const grupo = this.grupoDe(ing);
+    if (!grupo) return false;
+    const outras = this.escolhidosNoGrupo(grupo) - ing.quantidade;
+    return outras >= grupo.maximoEscolhas;
+  }
+
+  private grupoDe(ing: EstadoIngrediente): ProdutoGrupo | undefined {
+    return this.gruposDoProduto().find((g) => this.pertenceAoGrupo(ing, g));
   }
 
   // Distingue "adicionar ao carrinho" de "salvar a correção do item"
@@ -295,7 +427,7 @@ export class PersonalizacaoProdutoComponent {
 
   // Ingrediente não incluso (removido pelo cliente: quantidade zerada)
   removido(ing: EstadoIngrediente): boolean {
-    return ing.quantidade === 0;
+    return !this.montagem() && ing.quantidade === 0;
   }
 
   // Há cópias extras além do padrão incluso (lembrando que todo ingrediente
@@ -304,32 +436,41 @@ export class PersonalizacaoProdutoComponent {
     return ing.quantidade > 1;
   }
 
-  // O "+" só fica indisponível quando somar criaria uma cobrada extra sem
-  // preço cadastrado, ou no teto de 99. Com o ingrediente em 0 ele sempre
-  // restaura a cópia base, que já está inclusa no preço.
+  // Quantas cópias deste ingrediente vão para a lista de "adicionados" enviada
+  // ao servidor. Em montagem não há cópia base: cada escolha é uma adição.
+  copias(ing: EstadoIngrediente): number {
+    return this.montagem() ? ing.quantidade : Math.max(0, ing.quantidade - 1);
+  }
+
+  // O "+" só fica indisponível quando somar estouraria o teto do grupo, quando
+  // criaria uma cobrada extra sem preço cadastrado, ou no teto de 99. Com o
+  // ingrediente em 0 ele sempre restaura a cópia base, que já está inclusa no
+  // preço.
   naoPodeSomar(ing: EstadoIngrediente): boolean {
+    if (this.montagem()) {
+      // O preço base da marmita já cobre o item, então `precoAdicional: 0`
+      // significa "incluso" e continua escolhível até o teto do grupo.
+      if (ing.quantidade >= 99) return true;
+      return this.estourouGrupo(ing);
+    }
     if (ing.quantidade >= 99) return true;
     return ing.quantidade >= 1 && ing.vinculo.precoAdicional <= 0;
   }
 
   precoTotal(): number {
     const base = this.produto()?.preco ?? 0;
-    // Cobra apenas as cópias extras (além da 1ª já inclusa no produto)
+    // Em montagem cada porção escolhida é cobrada; em produto comum só as
+    // cópias extras além da 1ª já inclusa no produto.
     const extras = this.ingredientes().reduce(
       (acc, i) =>
-        acc + Math.max(0, i.quantidade - 1) * (i.vinculo.precoAdicional ?? 0),
+        acc + this.copias(i) * (i.vinculo.precoAdicional ?? 0),
       0,
     );
     return base + extras;
   }
 
   aumentar(ing: EstadoIngrediente): void {
-    // De 0 para 1 volta a cópia base, que já está inclusa no preço do produto:
-    // sempre liberado, mesmo em ingrediente sem adicional. Era aí que o
-    // ingrediente removido por engano ficava sem volta, obrigando a refazer o
-    // pedido inteiro.
-    // De 1 para cima é cópia EXTRA e, sem preço cadastrado, não pode ser vendida.
-    if (ing.quantidade >= 1 && ing.vinculo.precoAdicional <= 0) return;
+    if (this.naoPodeSomar(ing)) return;
     this.ingredientes.update((lista) =>
       lista.map((i) =>
         i.vinculo.ingredienteId === ing.vinculo.ingredienteId
@@ -339,6 +480,8 @@ export class PersonalizacaoProdutoComponent {
     );
   }
 
+// Em montagem não há "cópia base" a preservar: dar "−" sempre volta uma
+  // porção escolhida, para o cliente poder refazer a monta.
   diminuir(ing: EstadoIngrediente): void {
     this.ingredientes.update((lista) =>
       lista.map((i) =>
@@ -353,21 +496,25 @@ export class PersonalizacaoProdutoComponent {
     const produto = this.produto();
     if (!produto) return;
 
-    // "Sem": ingredientes base removidos (quantidade zerada)
-    const removidos = this.ingredientes()
-      .filter((i) => this.removido(i))
-      .map((i) => ({
-        ingredienteId: i.vinculo.ingredienteId,
-        nome: i.vinculo.ingrediente!.nome,
-        preco: 0,
-      }));
+    // "Sem": ingredientes base removidos (quantidade zerada). Não existe em
+    // montagem — lá o cliente apenas escolhe o que quer, sem remover.
+    const removidos = this.montagem()
+      ? []
+      : this.ingredientes()
+          .filter((i) => this.removido(i))
+          .map((i) => ({
+            ingredienteId: i.vinculo.ingredienteId,
+            nome: i.vinculo.ingrediente!.nome,
+            preco: 0,
+          }));
 
-    // "Adicionados": cópias extras além da 1ª já inclusa de cada ingrediente
+    // "Adicionados": uma entrada por porção escolhida, repetição incluída. O
+    // servidor usa esta lista para conferir o teto de cada grupo.
     const adicionados = this.ingredientes()
-      .filter((i) => this.adicional(i))
+      .filter((i) => this.copias(i) > 0)
       .flatMap((i) =>
         Array.from(
-          { length: i.quantidade - 1 },
+          { length: this.copias(i) },
           () => ({
             ingredienteId: i.vinculo.ingredienteId,
             nome: i.vinculo.ingrediente!.nome,

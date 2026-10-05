@@ -19,11 +19,20 @@ interface IngredienteVinculado {
   ingredienteId: string;
   precoAdicional: number;
   ingrediente: { nome: string };
+  grupoId: string | null;
+}
+
+interface GrupoFake {
+  id: string;
+  nome: string;
+  maximoEscolhas: number;
 }
 
 interface ProdutoFake {
   id: string;
   preco: number;
+  tipo: string;
+  grupos: GrupoFake[];
   ingredientes: IngredienteVinculado[];
 }
 
@@ -63,16 +72,34 @@ describe('PedidosService', () => {
     id: string,
     preco: number,
     ingredientes: IngredienteVinculado[] = [],
+    extras: { tipo?: string; grupos?: GrupoFake[] } = {},
   ): ProdutoFake {
-    return { id, preco, ingredientes };
+    return {
+      id,
+      preco,
+      tipo: extras.tipo ?? 'PADRAO',
+      grupos: extras.grupos ?? [],
+      ingredientes,
+    };
   }
 
   function vinculo(
     ingredienteId: string,
     precoAdicional: number,
     nome: string,
-  ) {
-    return { ingredienteId, precoAdicional, ingrediente: { nome } };
+    grupoId: string | null = null,
+  ): IngredienteVinculado {
+    return { ingredienteId, precoAdicional, ingrediente: { nome }, grupoId };
+  }
+
+  // Produto de montagem: os ingredientes chegam vinculados a um grupo de
+  // escolha, que é o que define o teto de porções.
+  function marmita(
+    preco: number,
+    grupos: GrupoFake[],
+    ingredientes: IngredienteVinculado[],
+  ): ProdutoFake {
+    return produto('p1', preco, ingredientes, { tipo: 'MARMITA', grupos });
   }
 
   function pedidoBase(
@@ -325,6 +352,189 @@ describe('PedidosService', () => {
         ESTABELECIMENTO.id,
         expect.objectContaining({ id: 'ped-1' }),
       );
+    });
+  });
+
+  describe('create — montagem (MARMITA)', () => {
+    const PROTEINAS = { id: 'g-prot', nome: 'Proteínas', maximoEscolhas: 2 };
+
+    it('busca os grupos do produto para conseguir conferir o teto', async () => {
+      // Sem `grupos` no include a validação de teto não tem com o que trabalhar:
+      // o limite do cardápio passaria a ser aceito sem conferência nenhuma.
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [PROTEINAS],
+          [vinculo('ing-frango', 0, 'Frango', 'g-prot')],
+        ),
+      ]);
+
+      await service.create(pedidoBase());
+
+      const [consulta] = produtoFindMany.mock.calls[0] as unknown as [
+        { include: { grupos?: unknown } },
+      ];
+      expect(consulta.include.grupos).toBe(true);
+    });
+
+    it('aceita escolher até o teto do grupo', async () => {
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [PROTEINAS],
+          [
+            vinculo('ing-frango', 0, 'Frango', 'g-prot'),
+            vinculo('ing-carne', 0, 'Carne', 'g-prot'),
+          ],
+        ),
+      ]);
+
+      await service.create(
+        pedidoBase({
+          itens: [
+            {
+              produtoId: 'p1',
+              quantidade: 1,
+              adicionados: ['ing-frango', 'ing-carne'],
+            },
+          ],
+        }),
+      );
+
+      expect(pedidoCreate).toHaveBeenCalled();
+    });
+
+    it('recusa ultrapassar o teto do grupo', async () => {
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [PROTEINAS],
+          [
+            vinculo('ing-frango', 0, 'Frango', 'g-prot'),
+            vinculo('ing-carne', 0, 'Carne', 'g-prot'),
+            vinculo('ing-bacon', 0, 'Bacon', 'g-prot'),
+          ],
+        ),
+      ]);
+
+      await expect(
+        service.create(
+          pedidoBase({
+            itens: [
+              {
+                produtoId: 'p1',
+                quantidade: 1,
+                adicionados: ['ing-frango', 'ing-carne', 'ing-bacon'],
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow(/no máximo 2 porções/i);
+      expect(pedidoCreate).not.toHaveBeenCalled();
+    });
+
+    it('conta repetição como porções diferentes do mesmo grupo', async () => {
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [PROTEINAS],
+          [vinculo('ing-frango', 0, 'Frango', 'g-prot')],
+        ),
+      ]);
+
+      await expect(
+        service.create(
+          pedidoBase({
+            itens: [
+              {
+                produtoId: 'p1',
+                quantidade: 1,
+                adicionados: ['ing-frango', 'ing-frango', 'ing-frango'],
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow(/no máximo 2 porções/i);
+      expect(pedidoCreate).not.toHaveBeenCalled();
+    });
+
+    it('fala "porção" no singular quando o grupo aceita uma', async () => {
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [{ id: 'g-base', nome: 'Base', maximoEscolhas: 1 }],
+          [
+            vinculo('ing-arroz', 0, 'Arroz', 'g-base'),
+            vinculo('ing-fritas', 0, 'Fritas', 'g-base'),
+          ],
+        ),
+      ]);
+
+      await expect(
+        service.create(
+          pedidoBase({
+            itens: [
+              {
+                produtoId: 'p1',
+                quantidade: 1,
+                adicionados: ['ing-arroz', 'ing-fritas'],
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow(/no máximo 1 porção/i);
+    });
+
+    it('conta cada grupo por separado, então estourar um não viola o outro', async () => {
+      const acompanhamentos = {
+        id: 'g-acomp',
+        nome: 'Acompanhamentos',
+        maximoEscolhas: 1,
+      };
+      produtoFindMany.mockResolvedValue([
+        marmita(
+          20,
+          [PROTEINAS, acompanhamentos],
+          [
+            vinculo('ing-frango', 0, 'Frango', 'g-prot'),
+            vinculo('ing-carne', 0, 'Carne', 'g-prot'),
+            vinculo('ing-arroz', 0, 'Arroz', 'g-acomp'),
+          ],
+        ),
+      ]);
+
+      // Duas proteínas (teto 2) e um acompanhamento (teto 1): dentro do limite.
+      await service.create(
+        pedidoBase({
+          itens: [
+            {
+              produtoId: 'p1',
+              quantidade: 1,
+              adicionados: ['ing-frango', 'ing-carne', 'ing-arroz'],
+            },
+          ],
+        }),
+      );
+
+      expect(pedidoCreate).toHaveBeenCalled();
+    });
+
+    it('ignora o teto em produto comum, cujos ingredientes já vêm inclusos', async () => {
+      // Em PADRAO o cliente só acrescenta ou remove; nada aqui tem grupo, então
+      // o teto de porções simplesmente não se aplica.
+      produtoFindMany.mockResolvedValue([
+        produto('p1', 20, [vinculo('ing-extra', 3, 'Queijo extra')]),
+      ]);
+
+      await service.create(
+        pedidoBase({
+          itens: [
+            { produtoId: 'p1', quantidade: 1, adicionados: ['ing-extra'] },
+          ],
+        }),
+      );
+
+      expect(pedidoCreate).toHaveBeenCalled();
     });
   });
 

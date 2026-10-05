@@ -83,6 +83,7 @@ export class PedidosService {
     const produtos = await this.prisma.produto.findMany({
       where: { id: { in: produtoIds }, estabelecimentoId: estabelecimento.id },
       include: {
+        grupos: true,
         ingredientes: {
           include: { ingrediente: true, grupo: true },
         },
@@ -301,8 +302,7 @@ export class PedidosService {
       const grupo = porNome.get(nome);
       if (!grupo || total <= grupo.maximoEscolhas) continue;
 
-      const unidade =
-        grupo.maximoEscolhas === 1 ? 'porção' : 'porções';
+      const unidade = grupo.maximoEscolhas === 1 ? 'porção' : 'porções';
       throw new BadRequestException(
         `Em "${produto.nome}", o grupo "${grupo.nome}" aceita no máximo ${grupo.maximoEscolhas} ${unidade}.`,
       );

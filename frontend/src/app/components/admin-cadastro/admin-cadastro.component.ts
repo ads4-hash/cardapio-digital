@@ -13,6 +13,8 @@ import {
   ProdutoService,
   Produto,
   Ingrediente,
+  ProdutoParaSalvar,
+  TipoProduto,
   resolverImagemUrl,
 } from '../../services/produto.service';
 
@@ -124,6 +126,98 @@ import {
           </div>
         </div>
 
+        <div>
+          <label for="tipo">Modo de montagem:</label>
+          <select
+            id="tipo"
+            name="tipo"
+            [ngModel]="tipoProduto()"
+            (ngModelChange)="definirTipo($event)"
+          >
+            <option [value]="TIPO.PADRAO">Já vem com tudo (padrão)</option>
+            <option [value]="TIPO.MARMITA">Cliente monta do zero</option>
+          </select>
+          <p class="ingredientes-ajuda">
+            @if (ehMarmita()) {
+              O cliente começa sem nada e escolhe cada porção. Abaixo, separe as
+              escolhas em grupos com limite.
+            } @else {
+              Todos os ingredientes vêm inclusos e o cliente pode remover ou acrescentar.
+            }
+          </p>
+        </div>
+
+        @if (ehMarmita()) {
+          <div class="grupos-form">
+            <label>Grupos de escolha</label>
+            <p class="ingredientes-ajuda">
+              Seções do cardápio com limite de porções. Repetição conta: com limite 2 o
+              cliente pode pedir a mesma proteína duas vezes. Um grupo sem ingrediente
+              ligado é descartado.
+            </p>
+            @if (grupos().length === 0) {
+              <p class="img-status">Nenhum grupo ainda.</p>
+            } @else {
+              <ul class="grupos-lista">
+                @for (grupo of grupos(); track $index; let i = $index) {
+                  <li class="grupo-linha">
+                    <input
+                      type="text"
+                      class="grupo-nome"
+                      name="grupoNome{{ i }}"
+                      [ngModel]="grupo.nome"
+                      (ngModelChange)="definirNomeGrupo(i, $event)"
+                      placeholder="Ex: Proteínas"
+                      maxlength="60"
+                    />
+                    <label class="grupo-max">
+                      Máx.
+                      <input
+                        type="number"
+                        class="grupo-max-input"
+                        name="grupoMax{{ i }}"
+                        min="1"
+                        max="99"
+                        step="1"
+                        [ngModel]="grupo.maximoEscolhas"
+                        (ngModelChange)="definirMaximoGrupo(i, $event)"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      class="grupo-remover"
+                      (click)="removerGrupo(i)"
+                      [attr.aria-label]="'Remover grupo ' + grupo.nome"
+                    >
+                      Remover
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="grupo-nova">
+              <input
+                type="text"
+                name="novoGrupo"
+                class="grupo-nova-nome"
+                [ngModel]="novoGrupoNome()"
+                (ngModelChange)="novoGrupoNome.set($event)"
+                (keydown.enter)="adicionarGrupo(); $event.preventDefault()"
+                placeholder="Nome do novo grupo"
+                maxlength="60"
+              />
+              <button
+                type="button"
+                class="btn-grupo"
+                (click)="adicionarGrupo()"
+                [disabled]="!podeAdicionarGrupo()"
+              >
+                Adicionar grupo
+              </button>
+            </div>
+          </div>
+        }
+
         <div class="ingredientes-form">
           <label>Ingredientes</label>
           <p class="ingredientes-ajuda">
@@ -174,6 +268,22 @@ import {
                         (change)="definirPrecoIngrediente(ing.id, $event)"
                       />
                     </label>
+                    @if (ehMarmita()) {
+                      <label class="ing-adicional-grupo">
+                        Grupo
+                        <select
+                          class="ing-grupo"
+                          name="grupoIng{{ ing.id }}"
+                          [ngModel]="grupoDoIngrediente(ing.id)"
+                          (ngModelChange)="definirGrupoIngrediente(ing.id, $event)"
+                        >
+                          <option value="">Solto</option>
+                          @for (grupo of grupos(); track $index) {
+                            <option [value]="grupo.nome">{{ grupo.nome }}</option>
+                          }
+                        </select>
+                      </label>
+                    }
                   </div>
                 }
               </div>
@@ -294,6 +404,69 @@ import {
         transition: background var(--transition);
       }
       .btn-remover:hover { background: var(--danger-light); }
+
+      .grupos-form { margin-bottom: 18px; }
+      .grupos-lista { list-style: none; margin: 0 0 10px; padding: 0; }
+      .grupo-linha {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        padding: 9px;
+        margin-bottom: 7px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--surface-hover);
+      }
+      .grupo-nome { flex: 1; min-width: 0; }
+      .grupo-max {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+      .grupo-max-input { width: 68px; }
+      .grupo-remover {
+        border: none;
+        background: transparent;
+        color: var(--danger);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 8px 6px;
+        border-radius: 8px;
+        flex-shrink: 0;
+        transition: background var(--transition);
+      }
+      .grupo-remover:hover { background: var(--danger-light); }
+      .grupo-nova { display: flex; gap: 8px; align-items: center; }
+      .grupo-nova-nome { flex: 1; min-width: 0; }
+      .btn-grupo {
+        border: 1px solid var(--primary);
+        background: var(--primary-light);
+        color: var(--primary);
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 10px 14px;
+        border-radius: 10px;
+        white-space: nowrap;
+        transition: filter var(--transition), opacity var(--transition);
+      }
+      .btn-grupo:hover:not(:disabled) { filter: brightness(1.05); }
+      .btn-grupo:disabled { opacity: 0.5; cursor: not-allowed; }
+      .ing-adicional-linha { flex-wrap: wrap; }
+      .ing-adicional-grupo {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: var(--text-muted);
+      }
+      .ing-grupo { min-width: 130px; }
     `,
   ],
 })
@@ -311,6 +484,8 @@ export class AdminCadastroComponent implements OnInit {
   @Output() salvo = new EventEmitter<void>();
   @Output() cancelado = new EventEmitter<void>();
 
+  readonly TIPO = { PADRAO: 'PADRAO', MARMITA: 'MARMITA' } as const;
+
   novoProduto = signal<Produto>({
     nome: '',
     descricao: '',
@@ -323,8 +498,15 @@ export class AdminCadastroComponent implements OnInit {
   carregandoCadastro = false;
 
   ingredientesDisponiveis = signal<Ingrediente[]>([]);
+  // id do ingrediente -> preço adicional
   ingredientesSelecionados = signal<Record<string, number>>({});
+  // id do ingrediente -> nome do grupo (vazio = solto, sem limite)
+  gruposDosIngredientes = signal<Record<string, string>>({});
   buscaIngrediente = signal<string>('');
+
+  tipoProduto = signal<TipoProduto>('PADRAO');
+  grupos = signal<{ nome: string; maximoEscolhas: number }[]>([]);
+  novoGrupoNome = signal<string>('');
 
   ngOnInit(): void {
     this.carregarIngredientes();
@@ -348,6 +530,7 @@ export class AdminCadastroComponent implements OnInit {
       this.novoProduto.set({ nome: '', descricao: '', preco: 0, categoriaId: '' });
       this.limparPrecoFormatado();
       this.limparIngredientesSelecionados();
+      this.limparGrupos();
       return;
     }
 
@@ -357,7 +540,9 @@ export class AdminCadastroComponent implements OnInit {
       preco: produto.preco,
       categoriaId: produto.categoriaId,
       imagemUrl: produto.imagemUrl,
+      tipo: produto.tipo ?? 'PADRAO',
     });
+    this.tipoProduto.set(produto.tipo ?? 'PADRAO');
     this.precoFormatado.set(
       produto.preco.toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
@@ -365,10 +550,22 @@ export class AdminCadastroComponent implements OnInit {
       }),
     );
     const selecao: Record<string, number> = {};
+    const vinculos: Record<string, string> = {};
     for (const vinculo of produto.ingredientes ?? []) {
       selecao[vinculo.ingredienteId] = vinculo.precoAdicional ?? 0;
+      // O grupo chega por id (grupoId); o nome serve de reserva quando a API
+      // não trouxer o id preenchido.
+      const nome = vinculo.grupo?.nome ?? '';
+      if (nome) vinculos[vinculo.ingredienteId] = nome;
     }
     this.ingredientesSelecionados.set(selecao);
+    this.gruposDosIngredientes.set(vinculos);
+    this.grupos.set(
+      [...(produto.grupos ?? [])]
+        .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        .map((g) => ({ nome: g.nome, maximoEscolhas: g.maximoEscolhas })),
+    );
+    this.novoGrupoNome.set('');
   }
 
   cancelar(): void {
@@ -376,7 +573,98 @@ export class AdminCadastroComponent implements OnInit {
     this.novoProduto.set({ nome: '', descricao: '', preco: 0, categoriaId: '' });
     this.limparPrecoFormatado();
     this.limparIngredientesSelecionados();
+    this.limparGrupos();
     this.cancelado.emit();
+  }
+
+  ehMarmita(): boolean {
+    return this.tipoProduto() === 'MARMITA';
+  }
+
+  // Trocar o modo descarta os grupos e os vínculos: eles só fazem sentido na
+  // montagem, e manter wreckage deixaria a tela mostrando seções que o
+  // salvamento ignoraria.
+  definirTipo(tipo: TipoProduto): void {
+    if (tipo === this.tipoProduto()) return;
+    this.tipoProduto.set(tipo);
+    if (tipo === 'PADRAO') {
+      this.limparGrupos();
+      return;
+    }
+    this.gruposDosIngredientes.set({});
+  }
+
+  podeAdicionarGrupo(): boolean {
+    const nome = this.novoGrupoNome().trim();
+    return nome !== '' && !this.grupoComNome(nome);
+  }
+
+  private grupoComNome(nome: string): boolean {
+    return this.grupos().some(
+      (g) => g.nome.toLowerCase() === nome.toLowerCase(),
+    );
+  }
+
+  adicionarGrupo(): void {
+    const nome = this.novoGrupoNome().trim();
+    // O backend junta grupos de mesmo nome, então deixar dois com o mesmo nome
+    // no formulário sóuscaria o teto de um sobrescrever o do outro.
+    if (!this.podeAdicionarGrupo()) return;
+    this.grupos.update((lista) => [
+      ...lista,
+      { nome, maximoEscolhas: 2 },
+    ]);
+    this.novoGrupoNome.set('');
+  }
+
+  definirNomeGrupo(indice: number, valor: string): void {
+    this.grupos.update((lista) =>
+      lista.map((g, i) => (i === indice ? { ...g, nome: valor } : g)),
+    );
+  }
+
+  definirMaximoGrupo(indice: number, valor: unknown): void {
+    const n = Math.trunc(Number(valor));
+    // Espelha o limite do DTO: inteiro entre 1 e 99.
+    const maximoEscolhas = Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
+    this.grupos.update((lista) =>
+      lista.map((g, i) => (i === indice ? { ...g, maximoEscolhas } : g)),
+    );
+  }
+
+  removerGrupo(indice: number): void {
+    const nome = this.grupos()[indice]?.nome;
+    this.grupos.update((lista) => lista.filter((_, i) => i !== indice));
+    // Ingredientes apontavam para o grupo pelo nome; sem ele, perdem o vínculo.
+    if (!nome) return;
+    this.gruposDosIngredientes.update((mapa) => {
+      const resto = { ...mapa };
+      for (const [id, g] of Object.entries(resto)) {
+        if (g === nome) delete resto[id];
+      }
+      return resto;
+    });
+  }
+
+  private limparGrupos(): void {
+    this.grupos.set([]);
+    this.gruposDosIngredientes.set({});
+    this.novoGrupoNome.set('');
+    this.tipoProduto.set('PADRAO');
+  }
+
+  grupoDoIngrediente(ingredienteId: string): string {
+    return this.gruposDosIngredientes()[ingredienteId] ?? '';
+  }
+
+  definirGrupoIngrediente(ingredienteId: string, nome: string): void {
+    const atual = this.gruposDosIngredientes();
+    if (!nome) {
+      const { [ingredienteId]: _removido, ...resto } = atual;
+      this.gruposDosIngredientes.set(resto);
+      return;
+    }
+    this.gruposDosIngredientes.set({ ...atual, [ingredienteId]: nome });
   }
 
   onPrecoChange(valor: string): void {
@@ -432,6 +720,10 @@ export class AdminCadastroComponent implements OnInit {
     if (id in atual) {
       const { [id]: _removido, ...resto } = atual;
       this.ingredientesSelecionados.set(resto);
+      // O ingrediente sai do produto, então não pode continuar apontando para
+      // um grupo.
+      const { [id]: _grupo, ...gruposResto } = this.gruposDosIngredientes();
+      this.gruposDosIngredientes.set(gruposResto);
     } else {
       this.ingredientesSelecionados.set({ ...atual, [id]: 0 });
     }
@@ -450,17 +742,37 @@ export class AdminCadastroComponent implements OnInit {
   ingredientesParaSalvar(): {
     ingredienteId: string;
     precoAdicional: number;
+    grupo?: string;
   }[] {
+    const grupos = this.gruposDosIngredientes();
     return Object.entries(this.ingredientesSelecionados()).map(
-      ([ingredienteId, precoAdicional]) => ({
-        ingredienteId,
-        precoAdicional: Number(precoAdicional) || 0,
-      }),
+      ([ingredienteId, precoAdicional]) => {
+        const item: {
+          ingredienteId: string;
+          precoAdicional: number;
+          grupo?: string;
+        } = { ingredienteId, precoAdicional: Number(precoAdicional) || 0 };
+        const grupo = grupos[ingredienteId];
+        if (grupo) item.grupo = grupo;
+        return item;
+      },
     );
   }
 
   limparIngredientesSelecionados(): void {
     this.ingredientesSelecionados.set({});
+  }
+
+  // Grupo só vale para produto de montagem: em produto comum o servidor ignora,
+  // e mandar mesmo assim deixaria vínculo órfão no formulário.
+  gruposParaSalvar(): { nome: string; maximoEscolhas: number }[] | undefined {
+    if (!this.ehMarmita()) return undefined;
+    const usados = new Set(
+      Object.values(this.gruposDosIngredientes()).filter(Boolean),
+    );
+    return this.grupos()
+      .map((g) => ({ nome: g.nome.trim(), maximoEscolhas: g.maximoEscolhas }))
+      .filter((g) => g.nome !== '' && usados.has(g.nome));
   }
 
   onImagemSelecionada(event: Event): void {
@@ -497,16 +809,18 @@ export class AdminCadastroComponent implements OnInit {
 
     this.carregandoCadastro = true;
 
-    const comIngredientes = {
+    const dados: ProdutoParaSalvar = {
       ...produto,
+      tipo: this.tipoProduto(),
+      grupos: this.gruposParaSalvar(),
       ingredientes: this.ingredientesParaSalvar(),
     };
 
     const edicao = this.emEdicao();
     if (edicao?.id) {
-      this.atualizarProduto(edicao.id, comIngredientes);
+      this.atualizarProduto(edicao.id, dados);
     } else {
-      this.produtoService.criar(comIngredientes).subscribe({
+      this.produtoService.criar(dados).subscribe({
         next: () => {
           this.iniciarComProduto(null);
           this.carregandoCadastro = false;
@@ -521,17 +835,7 @@ export class AdminCadastroComponent implements OnInit {
     }
   }
 
-  private atualizarProduto(
-    id: string,
-    dados: {
-      nome: string;
-      descricao?: string;
-      preco: number;
-      categoriaId: string;
-      imagemUrl?: string | null;
-      ingredientes?: { ingredienteId: string; precoAdicional: number }[];
-    },
-  ): void {
+  private atualizarProduto(id: string, dados: ProdutoParaSalvar): void {
     this.produtoService.atualizar(id, dados).subscribe({
       next: () => {
         this.iniciarComProduto(null);

@@ -14,12 +14,34 @@ export interface Categoria {
   produtos?: Produto[];
 }
 
+/**
+ * Como o cliente monta o produto.
+ * - `PADRAO`: todo ingrediente já vem incluso e o cliente remove ou acrescenta.
+ * - `MARMITA`: nada vem incluso, o cliente monta do zero e cada grupo tem um
+ *   teto de porções.
+ */
+export type TipoProduto = 'PADRAO' | 'MARMITA';
+
+// Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
+// maximoEscolhas limita quantas porções o cliente pode somar no grupo, contando
+// repetição: 2 permite escolher a mesma proteína duas vezes.
+export interface ProdutoGrupo {
+  id?: string;
+  nome: string;
+  ordem?: number;
+  maximoEscolhas: number;
+}
+
 // Interface representando o vínculo de um ingrediente a um produto
 export interface ProdutoIngrediente {
   id?: string;
   precoAdicional: number;
   ingredienteId: string;
   ingrediente?: Ingrediente;
+  // Grupo de escolha a que o ingrediente pertence. Nulo = ingrediente solto,
+  // sem teto de porções.
+  grupoId?: string | null;
+  grupo?: ProdutoGrupo | null;
 }
 
 // Interface representando a entidade do Ingrediente
@@ -39,7 +61,33 @@ export interface Produto {
   categoriaId: string;
   categoria?: Categoria;
   categoriaNome?: string;
+  tipo?: TipoProduto;
+  grupos?: ProdutoGrupo[];
   ingredientes?: ProdutoIngrediente[];
+}
+
+// Payload de `POST /produtos` e `PATCH /produtos/:id`. Não é o mesmo formato
+// de `Produto`: aqui o grupo de um ingrediente é o *nome* da seção, enquanto na
+// resposta da API ele vem como objeto.
+export interface ProdutoParaSalvar {
+  nome: string;
+  descricao?: string | null;
+  preco: number;
+  imagemUrl?: string | null;
+  categoriaId: string;
+  tipo?: TipoProduto;
+  grupos?: { nome: string; maximoEscolhas: number }[];
+  ingredientes?: {
+    ingredienteId: string;
+    precoAdicional: number;
+    grupo?: string;
+  }[];
+}
+
+// O teto de porções só vale para montagem; em produto comum o cliente apenas
+// remove ou acrescenta, sem limite por seção.
+export function ehMontagem(produto: Produto | null | undefined): boolean {
+  return produto?.tipo === 'MARMITA';
 }
 
 // Retorna a URL completa de uma imagem (a API devolve caminhos relativos como /uploads/...)
@@ -255,12 +303,12 @@ export class ProdutoService {
   }
 
   // Criar novo produto (POST /produtos)
-  criar(produto: Produto): Observable<Produto> {
+  criar(produto: ProdutoParaSalvar): Observable<Produto> {
     return this.http.post<Produto>(this.API_URL, produto);
   }
 
   // Atualizar produto existente (PATCH /produtos/:id)
-  atualizar(id: string, produto: Partial<Produto>): Observable<Produto> {
+  atualizar(id: string, produto: ProdutoParaSalvar): Observable<Produto> {
     return this.http.patch<Produto>(`${this.API_URL}/${id}`, produto);
   }
 
