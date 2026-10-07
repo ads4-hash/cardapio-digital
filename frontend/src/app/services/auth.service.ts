@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../environment';
 
-export interface EstabelecimentoUsuario {
+interface EstabelecimentoUsuario {
   id: string;
   nome: string;
   slug: string;
@@ -20,12 +20,12 @@ export interface UsuarioLogado {
   telefone?: string | null;
 }
 
-export interface AuthResponse {
+interface AuthResponse {
   token: string;
   usuario: UsuarioLogado;
 }
 
-export interface RecuperacaoResponse {
+interface RecuperacaoResponse {
   enviadoPorEmail: boolean;
   mensagem: string;
   token?: string;

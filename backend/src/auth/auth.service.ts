@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
 import { createHmac, randomBytes } from 'crypto';
 import type { Request } from 'express';
 import { EnvioEmailService } from '../envio-email/envio-email.service';
@@ -87,7 +88,7 @@ export class AuthService {
         const estabelecimento = await tx.estabelecimento.create({
           data: {
             nome: nomeEstabelecimento.trim(),
-            slug: await this.gerarSlugUnico(nomeEstabelecimento),
+            slug: await this.gerarSlugUnico(nomeEstabelecimento, undefined, tx),
             telefone: telefone?.trim() || null,
           },
         });
@@ -109,14 +110,7 @@ export class AuthService {
           },
         });
       })
-      .catch((erro: { code?: string }) => {
-        if (erro?.code === 'P2002') {
-          throw new ConflictException(
-            'Já existe um administrador com este e-mail.',
-          );
-        }
-        throw erro;
-      });
+      .catch((erro) => this.tratarP2002(erro));
 
     await this.registrarTentativa(ip, this.hashEmail(emailNormalizado), true);
     return this.emitirTokenAcesso(usuario);
@@ -449,14 +443,7 @@ export class AuthService {
           },
         },
       })
-      .catch((erro: { code?: string }) => {
-        if (erro?.code === 'P2002') {
-          throw new ConflictException(
-            'Já existe um administrador com este e-mail.',
-          );
-        }
-        throw erro;
-      });
+      .catch((erro) => this.tratarP2002(erro));
 
     // O nome exibido no painel é o do estabelecimento (idêntico ao do usuário);
     // ao renomear, atualiza o estabelecimento e regenera o slug da URL pública.
@@ -472,10 +459,12 @@ export class AuthService {
         nomeEstabelecimento,
         usuario.estabelecimentoId,
       );
-      await this.prisma.estabelecimento.update({
-        where: { id: usuario.estabelecimentoId },
-        data: { nome: nomeEstabelecimento, slug: novoSlug },
-      });
+      await this.prisma.estabelecimento
+        .update({
+          where: { id: usuario.estabelecimentoId },
+          data: { nome: nomeEstabelecimento, slug: novoSlug },
+        })
+        .catch((erro) => this.tratarP2002(erro));
     }
 
     if (telefone !== undefined) {
@@ -490,15 +479,18 @@ export class AuthService {
 
   // Slug único: se o desejado já existir, acrescenta -2, -3, ... até achar livre
   // (excludeId ignora o próprio estabelecimento durante a validação)
+  // O cliente (`db`) pode ser o da transação em andamento, para que a
+  // verificação de unicidade veja o mesmo snapshot da escrita seguinte.
   private async gerarSlugUnico(
     nomeEstabelecimento: string,
     excludeId?: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<string> {
     const base = gerarSlug(nomeEstabelecimento);
     let slug = base;
     let sufixo = 2;
     while (true) {
-      const existente = await this.prisma.estabelecimento.findUnique({
+      const existente = await db.estabelecimento.findUnique({
         where: { slug },
         select: { id: true },
       });
@@ -506,6 +498,29 @@ export class AuthService {
       slug = `${base}-${sufixo}`;
       sufixo += 1;
     }
+  }
+
+  // P2002 = violação de constraint única. O `meta.target` diz qual constraint
+  // estourou (slug ou email), então a mensagem é montada por destino — antes,
+  // qualquer colisão virava "e-mail duplicado" e a de slug saía como 500.
+  private tratarP2002(erro: unknown): never {
+    const prismaErro = erro as { code?: string; meta?: { target?: unknown } };
+    if (prismaErro?.code === 'P2002') {
+      const alvo = String(
+        Array.isArray(prismaErro.meta?.target)
+          ? prismaErro.meta.target.join(',')
+          : prismaErro.meta?.target,
+      );
+      if (alvo.includes('slug')) {
+        throw new ConflictException(
+          'Já existe um estabelecimento com este nome.',
+        );
+      }
+      throw new ConflictException(
+        'Já existe um administrador com este e-mail.',
+      );
+    }
+    throw erro;
   }
 
   private emitirTokenAcesso(usuario: {

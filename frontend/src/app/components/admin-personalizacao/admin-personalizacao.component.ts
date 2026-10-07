@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   ConfiguracoesService,
@@ -14,7 +13,7 @@ import {
 @Component({
   selector: 'app-admin-personalizacao',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <section class="admin-form personalizacao">
       <h2>Personalizar Cardápio</h2>

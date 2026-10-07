@@ -59,12 +59,15 @@ model Produto {
 // Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
 // maximoEscolhas limita quantas porções o cliente pode somar no grupo, contando
 // repetição: maximoEscolhas = 2 permite duas vezes a mesma proteína.
+// minimoEscolhas é o piso: com 1 o cliente é obrigado a escolher no grupo
+// antes de mandar o pedido. Nunca passa do maximoEscolhas.
 model ProdutoGrupo {
   id             String  @id @default(uuid())
   produtoId      String
   nome           String
   ordem          Int     @default(0)
   maximoEscolhas Int     @default(99)
+  minimoEscolhas Int     @default(0)
   produto        Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
   ingredientes   ProdutoIngrediente[]
 

@@ -112,15 +112,22 @@ export class PedidosService {
         const vinculo = produto.ingredientes.find(
           (c) => c.ingredienteId === id,
         );
-        const nome = vinculo?.ingrediente.nome ?? id;
-        adicionadosNomes.push(nome);
-        adicionalTotal += Number(vinculo?.precoAdicional ?? 0);
+        // Rejeita em vez de somar 0: um `adicionados` desconhecido pagaria o
+        // extra sem custo e ainda poluiria o comanda com o bruto do payload.
+        if (!vinculo) {
+          throw new BadRequestException(
+            'Um dos ingredientes adicionados não pertence a este produto.',
+          );
+        }
+        adicionadosNomes.push(vinculo.ingrediente.nome);
+        adicionalTotal += Number(vinculo.precoAdicional ?? 0);
       }
 
       if (montagem) {
-        // O teto do grupo é regra do cardápio, não só da interface: precisa ser
-        // conferido aqui, senão um cliente burla o limite enviando direto.
-        this.validarTetoDosGrupos(produto, item.adicionados ?? []);
+        // Teto e piso do grupo são regra do cardápio, não só da interface:
+        // precisam ser conferidos aqui, senão um cliente burla o limite
+        // enviando o payload direto.
+        this.validarEscolhasDosGrupos(produto, item.adicionados ?? []);
       }
 
       // Guarda os nomes dos ingredientes removidos. Em produtos de montagem
@@ -272,19 +279,24 @@ export class PedidosService {
     };
   }
 
-  // Confere o teto de porções de cada grupo escolhido no item. A repetição
-  // conta: pedir duas vezes a mesma proteína são duas porções do grupo.
-  private validarTetoDosGrupos(
+  // Confere as porções de cada grupo escolhido no item: o teto (maximoEscolhas)
+  // e o piso (minimoEscolhas, o grupo que exige escolha). A repetição conta:
+  // pedir duas vezes a mesma proteína são duas porções do grupo.
+  private validarEscolhasDosGrupos(
     produto: {
       nome: string;
-      grupos: { id: string; nome: string; maximoEscolhas: number }[];
+      grupos: {
+        id: string;
+        nome: string;
+        maximoEscolhas: number;
+        minimoEscolhas: number;
+      }[];
       ingredientes: { ingredienteId: string; grupoId: string | null }[];
     },
     escolhidos: string[],
   ): void {
     if (produto.grupos.length === 0) return;
 
-    const porNome = new Map(produto.grupos.map((g) => [g.nome, g]));
     const totais = new Map<string, number>();
 
     for (const ingredienteId of escolhidos) {
@@ -298,14 +310,24 @@ export class PedidosService {
       totais.set(grupo.nome, (totais.get(grupo.nome) ?? 0) + 1);
     }
 
-    for (const [nome, total] of totais) {
-      const grupo = porNome.get(nome);
-      if (!grupo || total <= grupo.maximoEscolhas) continue;
+    // Percorre todos os grupos, não só os escolhidos: um grupo obrigatório e
+    // ignorado pelo cliente tem total 0 e ainda assim precisa ser recusado.
+    for (const grupo of produto.grupos) {
+      const total = totais.get(grupo.nome) ?? 0;
 
-      const unidade = grupo.maximoEscolhas === 1 ? 'porção' : 'porções';
-      throw new BadRequestException(
-        `Em "${produto.nome}", o grupo "${grupo.nome}" aceita no máximo ${grupo.maximoEscolhas} ${unidade}.`,
-      );
+      if (total > grupo.maximoEscolhas) {
+        const unidade = grupo.maximoEscolhas === 1 ? 'porção' : 'porções';
+        throw new BadRequestException(
+          `Em "${produto.nome}", o grupo "${grupo.nome}" aceita no máximo ${grupo.maximoEscolhas} ${unidade}.`,
+        );
+      }
+
+      if (total < grupo.minimoEscolhas) {
+        const unidade = grupo.minimoEscolhas === 1 ? 'porção' : 'porções';
+        throw new BadRequestException(
+          `Em "${produto.nome}", o grupo "${grupo.nome}" exige ao menos ${grupo.minimoEscolhas} ${unidade}.`,
+        );
+      }
     }
   }
 

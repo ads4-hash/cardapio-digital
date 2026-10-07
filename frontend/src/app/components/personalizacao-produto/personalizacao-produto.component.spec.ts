@@ -60,7 +60,7 @@ describe('PersonalizacaoProdutoComponent - stepper de ingredientes', () => {
       expect(estado(c, 'ing-Cebola').quantidade).toBe(0);
       expect(c.removido(estado(c, 'ing-Cebola'))).toBe(true);
 
-      // Este era o beco sem saída: com preço 0 o "+" ficava desabilitado.
+      // Restaurar a cópia base nunca trava: o ingrediente é gratuito.
       expect(c.naoPodeSomar(estado(c, 'ing-Cebola'))).toBe(false);
 
       c.aumentar(estado(c, 'ing-Cebola'));
@@ -68,14 +68,37 @@ describe('PersonalizacaoProdutoComponent - stepper de ingredientes', () => {
       expect(c.removido(estado(c, 'ing-Cebola'))).toBe(false);
     });
 
-    it('não deixa somar cópia extra de ingrediente sem preço', () => {
+    it('deixa somar quantas quiser cópias gratuitas', () => {
       const c = montar(produtoCom(vinculo('Cebola', 0)));
       const ing = estado(c, 'ing-Cebola');
 
-      expect(c.naoPodeSomar(ing)).toBe(true);
+      expect(c.naoPodeSomar(ing)).toBe(false);
       c.aumentar(ing);
+      c.aumentar(estado(c, 'ing-Cebola'));
 
-      expect(estado(c, 'ing-Cebola').quantidade).toBe(1);
+      expect(estado(c, 'ing-Cebola').quantidade).toBe(3);
+      expect(c.precoTotal()).toBe(40); // cópias gratuitas não mudam o preço
+    });
+
+    it('trava no teto de 99 e segue mandando as cópias ao carrinho', () => {
+      const c = montar(produtoCom(vinculo('Cebola', 0)));
+      for (let i = 0; i < 120; i++) c.aumentar(estado(c, 'ing-Cebola'));
+
+      expect(estado(c, 'ing-Cebola').quantidade).toBe(99);
+      expect(c.naoPodeSomar(estado(c, 'ing-Cebola'))).toBe(true);
+
+      c.adicionar();
+      const [, , removidos, adicionados] = (
+        TestBed.inject(CartService).addPersonalizado as ReturnType<typeof vi.fn>
+      ).mock.calls[0];
+
+      expect(removidos).toEqual([]);
+      expect(adicionados).toHaveLength(98); // 1ª porção já vem no produto
+      expect(adicionados[0]).toEqual({
+        ingredienteId: 'ing-Cebola',
+        nome: 'Cebola',
+        preco: 0,
+      });
     });
   });
 

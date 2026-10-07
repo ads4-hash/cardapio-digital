@@ -19,9 +19,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { unlinkSync } from 'fs';
-import { resolve } from 'path';
+import { extname, resolve } from 'path';
 import { AuthGuard } from '../auth/auth.guard';
 import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
 import { UploadRespostaDto } from './dto/respostas-upload.dto';

@@ -16,6 +16,8 @@ import { obterSegredo } from './segredo';
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthGuard],
-  exports: [JwtModule, AuthGuard, AuthService],
+  // JwtModule já é global (register({ global: true })) e AuthService só é
+  // consumido dentro deste módulo — nenhum dos dois precisa ser exportado.
+  exports: [AuthGuard],
 })
 export class AuthModule {}

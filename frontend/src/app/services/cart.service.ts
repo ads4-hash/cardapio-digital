@@ -7,7 +7,7 @@ export interface ItemIngrediente {
   preco: number;
 }
 
-export interface CartItemPersonalizacao {
+interface CartItemPersonalizacao {
   removidos: ItemIngrediente[];
   adicionados: ItemIngrediente[];
 }
@@ -163,7 +163,7 @@ export class CartService {
   }
 
   // Remove um item do carrinho
-  remove(uid: string): void {
+  private remove(uid: string): void {
     this._items.update((items) =>
       items.filter((item) => item.uid !== uid),
     );

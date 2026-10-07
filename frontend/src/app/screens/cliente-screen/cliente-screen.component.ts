@@ -1,5 +1,4 @@
 import { Component, inject, OnDestroy, OnInit, effect, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 
 import { ProdutoService, Produto, filtrarProdutos } from '../../services/produto.service';
@@ -12,7 +11,7 @@ import { EstabelecimentoContextoService } from '../../services/estabelecimento-c
 @Component({
   selector: 'app-cliente-screen',
   standalone: true,
-  imports: [CommonModule, CategoriasTabsComponent, ProdutoCardComponent, CarrinhoDrawerComponent],
+  imports: [CategoriasTabsComponent, ProdutoCardComponent, CarrinhoDrawerComponent],
   template: `
     <app-categorias-tabs
       [apenasVisiveis]="true"

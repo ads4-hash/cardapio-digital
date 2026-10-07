@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnDestroy,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { PedidoService, Pedido, PedidoStatus, FormaPagamento, FORMA_PAGAMENTO_LABEL, formatarTelefone as formatarTelefoneBr } from '../../services/pedidos.service';
@@ -294,7 +301,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     }
   `],
 })
-export class AdminPedidosComponent implements OnInit {
+export class AdminPedidosComponent implements OnInit, OnDestroy {
   private readonly pedidoService = inject(PedidoService);
   private readonly realtimeService = inject(RealtimeService);
 

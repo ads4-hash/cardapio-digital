@@ -5,13 +5,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-
-// 4200 = `ng serve` em desenvolvimento; 4000 = servidor SSR empacotado pelo Docker
-const ORIGENS_CORS_PADRAO = ['http://localhost:4200', 'http://localhost:4000'];
-
-const ORIGEM_CORS: string[] =
-  process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()) ??
-  ORIGENS_CORS_PADRAO;
+import { origensCors } from '../cors';
 
 /** Eventos emitidos quando um pedido muda, para atualizar o painel admin em tempo real */
 export const EVENTO_PEDIDO_CRIADO = 'pedido.criado';
@@ -25,7 +19,7 @@ function roomDe(estabelecimentoId: string): string {
 }
 
 @WebSocketGateway({
-  cors: { origin: ORIGEM_CORS },
+  cors: { origin: origensCors() },
 })
 export class PedidosGateway implements OnGatewayConnection {
   @WebSocketServer()

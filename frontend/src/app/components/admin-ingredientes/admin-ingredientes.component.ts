@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProdutoService } from '../../services/produto.service';
 
@@ -7,7 +6,7 @@ import { ProdutoService } from '../../services/produto.service';
 @Component({
   selector: 'app-admin-ingredientes',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <section class="admin-form">
       <h2>Gerenciar Ingredientes</h2>

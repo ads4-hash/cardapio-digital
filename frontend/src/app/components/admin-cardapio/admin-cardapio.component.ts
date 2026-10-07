@@ -1,5 +1,4 @@
 import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 import { AdminPersonalizacaoComponent } from '../admin-personalizacao/admin-personalizacao.component';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
@@ -9,7 +8,7 @@ import { EstabelecimentoContextoService } from '../../services/estabelecimento-c
 @Component({
   selector: 'app-admin-cardapio',
   standalone: true,
-  imports: [CommonModule, AdminPersonalizacaoComponent],
+  imports: [AdminPersonalizacaoComponent],
   template: `
     <section class="admin-form cardapio-share">
       <h2 class="titulo-secao">Cardápio público</h2>

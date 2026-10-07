@@ -35,25 +35,36 @@ export class ItemPedidoDto {
   quantidade: number;
 
   /**
-   * Nomes dos ingredientes que o cliente não quer neste item. O preço cai
-   * proporcionalmente ao valor do ingrediente.
-   * @example ["cebola", "azeitona"]
+   * `ingredienteId` dos ingredientes que o cliente retirou do item. Serve só
+   * para o comanda da cozinha — não altera o preço cobrado.
+   * @example ["e2f3a4b5-c6d7-4e8f-9a01-2b3c4d5e6f70"]
    */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(200)
+  @MaxLength(64, {
+    each: true,
+    message: 'Identificador de ingrediente removido inválido.',
+  })
   removidos?: string[];
 
   /**
-   * Ingredientes que o cliente somou ao produto. Cada um precisa estar ligado
-   * ao produto com `precoAdicional` no cadastro.
-   * @example ["Queijo extra"]
+   * `ingredienteId` dos ingredientes somados ao produto. Cada um precisa
+   * estar ligado ao produto com `precoAdicional` no cadastro — o valor é
+   * somado ao preço unitário.
+   * @example ["d1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f"]
    */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ArrayMaxSize(200)
+  @ArrayMaxSize(1000, {
+    message: 'Um item do pedido não pode ter mais de 1000 porções somadas.',
+  })
+  @MaxLength(64, {
+    each: true,
+    message: 'Identificador de ingrediente adicionado inválido.',
+  })
   adicionados?: string[];
 }
 

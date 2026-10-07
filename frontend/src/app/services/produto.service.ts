@@ -134,7 +134,6 @@ export class ProdutoService {
 
   // Sinais de carregamento compartilhados
   carregandoProdutos = signal(false);
-  carregandoCategorias = signal(false);
 
   // Caches por slug (o catálogo de cada estabelecimento é independente)
   private produtosPorSlug = new Map<string, Produto[]>();
@@ -158,7 +157,6 @@ export class ProdutoService {
     }
 
     this.carregando.add(`c:${slug}`);
-    this.carregandoCategorias.set(true);
     this.listarCategorias(slug).subscribe({
       next: (dados) => {
         this.categoriasPorSlug.set(slug, dados);
@@ -167,7 +165,6 @@ export class ProdutoService {
       error: (err) => console.error('Erro ao carregar categorias:', err),
       complete: () => {
         this.carregando.delete(`c:${slug}`);
-        this.carregandoCategorias.set(false);
       },
     });
   }
@@ -260,12 +257,16 @@ export class ProdutoService {
   }
 
   // Buscar todas as categorias (GET /categorias?slug=:slug)
-  listarCategorias(slug = this.defaultSlug() ?? ''): Observable<Categoria[]> {
+  private listarCategorias(
+    slug = this.defaultSlug() ?? '',
+  ): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}`);
   }
 
   // Buscar apenas categorias visíveis para o cliente (GET /categorias?slug=:slug&somenteVisiveis=true)
-  listarCategoriasVisiveis(slug = this.defaultSlug() ?? ''): Observable<Categoria[]> {
+  private listarCategoriasVisiveis(
+    slug = this.defaultSlug() ?? '',
+  ): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}&somenteVisiveis=true`);
   }
 

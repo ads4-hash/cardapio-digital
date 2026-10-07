@@ -5,15 +5,15 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../environment';
 import { EstabelecimentoContextoService } from './estabelecimento-contexto.service';
 
-export interface AceitandoPedidos {
+interface AceitandoPedidos {
   aceitandoPedidos: boolean;
 }
 
-export interface TaxaEntrega {
+interface TaxaEntrega {
   taxaEntrega: number;
 }
 
-export interface InfoCardapio {
+interface InfoCardapio {
   nome: string | null;
   telefone: string | null;
 }
@@ -56,7 +56,6 @@ export class ConfiguracoesService {
 
   // Mantém aceitando por padrão até carregar a configuração do servidor
   aceitandoPedidos = signal(true);
-  carregado = signal(false);
   // Taxa de entrega definida pelo admin (padrão 0, ou seja, grátis)
   taxaEntrega = signal(0);
   // Nome do estabelecimento mostrado na barra — público (clientes também veem).
@@ -86,7 +85,6 @@ export class ConfiguracoesService {
     const naCache = this.aceitandoCache.get(slug);
     if (naCache !== undefined) {
       this.aceitandoPedidos.set(naCache);
-      this.carregado.set(true);
     }
 
     if (this.emVoo.has(`a:${slug}`)) return;
@@ -95,11 +93,9 @@ export class ConfiguracoesService {
       next: (res) => {
         this.aceitandoCache.set(slug, res.aceitandoPedidos);
         this.aceitandoPedidos.set(res.aceitandoPedidos);
-        this.carregado.set(true);
       },
       error: (err) => {
         console.error('Erro ao consultar estado do cardápio:', err);
-        this.carregado.set(true);
       },
       complete: () => this.emVoo.delete(`a:${slug}`),
     });
@@ -284,14 +280,14 @@ function paraHex(rgb: [number, number, number]): string {
 }
 
 // Versão mais escura da cor (fator 0 = igual, 1 = preto)
-export function escurecer(cor: string, fator: number): string {
+function escurecer(cor: string, fator: number): string {
   const [r, g, b] = hexParaRgb(cor);
   const d = 1 - fator;
   return paraHex([Math.round(r * d), Math.round(g * d), Math.round(b * d)]);
 }
 
 // Versão mesclada com branco (fator 0 = igual, 1 = branco puro)
-export function clarear(cor: string, fator: number): string {
+function clarear(cor: string, fator: number): string {
   const [r, g, b] = hexParaRgb(cor);
   const misturar = (c: number) => Math.round(c + (255 - c) * fator);
   return paraHex([misturar(r), misturar(g), misturar(b)]);

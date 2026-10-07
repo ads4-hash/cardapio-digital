@@ -44,14 +44,15 @@ export class ProdutosController {
   ) {}
 
   // Público: retorna os produtos do estabelecimento (?slug=). Sem um token
-  // válido, devolve apenas produtos de categorias visíveis (não vaza itens
-  // de categorias ocultas).
+  // válido do próprio estabelecimento, devolve apenas produtos de categorias
+  // visíveis (não vaza itens de categorias ocultas para admins de outros tenants).
   @Get()
   @ApiOperation({
     summary: 'Lista os produtos (público, com filtro por visibilidade)',
     description: [
       'Alimenta o cardápio público. Sem `Authorization`, a listagem vem **filtrada**:',
-      'produtos de categorias ocultas não aparecem. Com um token válido, tudo volta.',
+      'produtos de categorias ocultas não aparecem. Com um token do **próprio**',
+      'estabelecimento, tudo volta. O token de outro estabelecimento é ignorado.',
       '',
       'O token é opcional aqui de propósito — o mesmo endpoint serve ao cliente',
       '(anônimo) e ao painel (autenticado), sem duplicar rota.',
@@ -79,7 +80,7 @@ export class ProdutosController {
     @Req() request?: Request,
   ) {
     const estabelecimento = await this.estabelecimentos.porSlug(slug);
-    const ehAdmin = await this.temTokenValido(request);
+    const ehAdmin = (await this.tenantDoToken(request)) === estabelecimento.id;
     return this.produtosService.findAll(
       estabelecimento.id,
       categoriaId,
@@ -87,14 +88,20 @@ export class ProdutosController {
     );
   }
 
-  private async temTokenValido(request?: Request): Promise<boolean> {
+  // Só trata como admin quem apresenta um JWT válido **e** do mesmo
+  // estabelecimento resolvido pelo slug — validar o token sem comparar o
+  // `estabelecimentoId` deixaria um admin de outro tenant enxergar a
+  // listagem sem filtro de visibilidade.
+  private async tenantDoToken(request?: Request): Promise<string | null> {
     const [tipo, token] = request?.headers.authorization?.split(' ') ?? [];
-    if (tipo !== 'Bearer' || !token) return false;
+    if (tipo !== 'Bearer' || !token) return null;
     try {
-      await this.jwtService.verifyAsync(token);
-      return true;
+      const payload = await this.jwtService.verifyAsync<{
+        estabelecimentoId?: string;
+      }>(token);
+      return payload.estabelecimentoId ?? null;
     } catch {
-      return false;
+      return null;
     }
   }
 

@@ -1,4 +1,11 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, switchMap, timer } from 'rxjs';
@@ -190,7 +197,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
     `,
   ],
 })
-export class PedidoStatusComponent implements OnInit {
+export class PedidoStatusComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly pedidoService = inject(PedidoService);
   private readonly configuracoes = inject(ConfiguracoesService);

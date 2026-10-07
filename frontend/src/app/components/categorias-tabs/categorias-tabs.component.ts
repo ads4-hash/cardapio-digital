@@ -1,12 +1,11 @@
 import { Component, inject, input, output, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProdutoService, Categoria } from '../../services/produto.service';
 
 @Component({
   selector: 'app-categorias-tabs',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="filter-container">
       <input 

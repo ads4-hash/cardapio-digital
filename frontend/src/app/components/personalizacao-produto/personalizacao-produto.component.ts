@@ -134,6 +134,8 @@ interface EstadoIngrediente {
             </span>
           } @else if (semRotulo) {
             <span class="extra incluso">incluso no preço</span>
+          } @else if (copias(ing) > 0) {
+            <span class="extra incluso">gratuito</span>
           }
         </div>
         <div class="stepper">
@@ -442,19 +444,13 @@ export class PersonalizacaoProdutoComponent {
     return this.montagem() ? ing.quantidade : Math.max(0, ing.quantidade - 1);
   }
 
-  // O "+" só fica indisponível quando somar estouraria o teto do grupo, quando
-  // criaria uma cobrada extra sem preço cadastrado, ou no teto de 99. Com o
-  // ingrediente em 0 ele sempre restaura a cópia base, que já está inclusa no
-  // preço.
+  // O "+" só fica indisponível no teto de 99 ou quando somar estouraria o
+  // teto do grupo. Ingrediente gratuito (`precoAdicional: 0`) soma livremente:
+  // cada cópia a mais não muda o preço, então o cliente leva quantas quiser.
   naoPodeSomar(ing: EstadoIngrediente): boolean {
-    if (this.montagem()) {
-      // O preço base da marmita já cobre o item, então `precoAdicional: 0`
-      // significa "incluso" e continua escolhível até o teto do grupo.
-      if (ing.quantidade >= 99) return true;
-      return this.estourouGrupo(ing);
-    }
     if (ing.quantidade >= 99) return true;
-    return ing.quantidade >= 1 && ing.vinculo.precoAdicional <= 0;
+    if (this.montagem()) return this.estourouGrupo(ing);
+    return false;
   }
 
   precoTotal(): number {

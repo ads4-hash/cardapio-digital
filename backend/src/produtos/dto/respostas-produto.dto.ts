@@ -3,19 +3,12 @@ import { CategoriaDto } from '../../categorias/dto/respostas-categoria.dto';
 import { IngredienteDto } from '../../ingredientes/dto/respostas-ingrediente.dto';
 
 /**
- * Vínculo entre produto e ingrediente, com o adicional de preço.
- *
- * Sufixo `Resposta` porque o DTO de entrada do mesmo vínculo
- * (`ProdutoIngredienteDto` em `create-produto.dto.ts`) só leva
- * `ingredienteId` e `precoAdicional`; nomes iguais se sobrescrevem no índice
- * de schemas do Swagger.
- */
-/**
  * Seção de escolha dentro do produto.
  *
  * Sufixo `Resposta` porque o DTO de entrada com o mesmo nome
- * (`ProdutoGrupoDto` em `create-produto.dto.ts`) só leva `nome` e
- * `maximoEscolhas`, e o `id` não faz sentido no payload de criação.
+ * (`ProdutoGrupoDto` em `create-produto.dto.ts`) só leva `nome`,
+ * `maximoEscolhas` e `minimoEscolhas`, e o `id` não faz sentido no payload de
+ * criação.
  */
 export class ProdutoGrupoRespostaDto {
   @ApiProperty({ example: 'b8a7c6d5-e4f3-4a2b-9c1d-0e9f8a7b6c5d' })
@@ -36,6 +29,13 @@ export class ProdutoGrupoRespostaDto {
     example: 2,
   })
   maximoEscolhas: number;
+
+  @ApiProperty({
+    description:
+      'Piso de porções do grupo. Com 1 o cliente é obrigado a escolher antes de enviar o pedido.',
+    example: 1,
+  })
+  minimoEscolhas: number;
 
   @ApiProperty({ example: 'f3a4b5c6-d7e8-4f90-a012-3c4d5e6f7081' })
   produtoId: string;

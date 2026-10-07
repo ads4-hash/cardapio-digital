@@ -1,5 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProdutoDto } from '../../produtos/dto/respostas-produto.dto';
 
 /**

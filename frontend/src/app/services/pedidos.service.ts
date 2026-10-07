@@ -26,7 +26,7 @@ export type PedidoStatus =
   | 'CONCLUIDO'
   | 'CANCELADO';
 
-export interface ItemPedido {
+interface ItemPedido {
   id: string;
   quantidade: number;
   preco: number;
@@ -62,7 +62,7 @@ export interface Pedido {
   itens: ItemPedido[];
 }
 
-export interface CreatePedido {
+interface CreatePedido {
   slug: string;
   cliente: string;
   tipoEntrega: TipoEntrega;

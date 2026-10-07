@@ -26,6 +26,7 @@ interface GrupoFake {
   id: string;
   nome: string;
   maximoEscolhas: number;
+  minimoEscolhas: number;
 }
 
 interface ProdutoFake {
@@ -356,7 +357,12 @@ describe('PedidosService', () => {
   });
 
   describe('create — montagem (MARMITA)', () => {
-    const PROTEINAS = { id: 'g-prot', nome: 'Proteínas', maximoEscolhas: 2 };
+    const PROTEINAS = {
+      id: 'g-prot',
+      nome: 'Proteínas',
+      maximoEscolhas: 2,
+      minimoEscolhas: 0,
+    };
 
     it('busca os grupos do produto para conseguir conferir o teto', async () => {
       // Sem `grupos` no include a validação de teto não tem com o que trabalhar:
@@ -462,7 +468,14 @@ describe('PedidosService', () => {
       produtoFindMany.mockResolvedValue([
         marmita(
           20,
-          [{ id: 'g-base', nome: 'Base', maximoEscolhas: 1 }],
+          [
+            {
+              id: 'g-base',
+              nome: 'Base',
+              maximoEscolhas: 1,
+              minimoEscolhas: 0,
+            },
+          ],
           [
             vinculo('ing-arroz', 0, 'Arroz', 'g-base'),
             vinculo('ing-fritas', 0, 'Fritas', 'g-base'),
@@ -490,6 +503,7 @@ describe('PedidosService', () => {
         id: 'g-acomp',
         nome: 'Acompanhamentos',
         maximoEscolhas: 1,
+        minimoEscolhas: 0,
       };
       produtoFindMany.mockResolvedValue([
         marmita(

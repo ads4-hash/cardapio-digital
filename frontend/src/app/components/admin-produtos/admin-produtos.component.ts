@@ -1,5 +1,4 @@
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import {
   ProdutoService,
   Produto,
@@ -12,7 +11,7 @@ import { ProdutoCardComponent } from '../produto-card/produto-card.component';
 @Component({
   selector: 'app-admin-produtos',
   standalone: true,
-  imports: [CommonModule, CategoriasTabsComponent, ProdutoCardComponent],
+  imports: [CategoriasTabsComponent, ProdutoCardComponent],
   template: `
     <section class="secao-produtos">
       <h2 class="titulo-secao">Produtos</h2>

@@ -49,6 +49,19 @@ export class ProdutoGrupoDto {
   @Min(1, { message: 'O máximo de escolhas deve ser no mínimo 1.' })
   @Max(99, { message: 'O máximo de escolhas deve ser no máximo 99.' })
   maximoEscolhas?: number;
+
+  /**
+   * Piso de porções que o cliente precisa escolher no grupo. Com `1` ele é
+   * obrigado a escolher antes de mandar o pedido. Nunca passa do
+   * `maximoEscolhas`. Omitir significa 0 (escolha livre).
+   * @example 1
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'O mínimo de escolhas deve ser um número inteiro.' })
+  @Min(0, { message: 'O mínimo de escolhas não pode ser negativo.' })
+  @Max(99, { message: 'O mínimo de escolhas deve ser no máximo 99.' })
+  minimoEscolhas?: number;
 }
 
 export class ProdutoIngredienteDto {

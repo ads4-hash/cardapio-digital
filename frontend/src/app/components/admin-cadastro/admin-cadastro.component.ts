@@ -7,7 +7,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   ProdutoService,
@@ -22,7 +21,7 @@ import {
 @Component({
   selector: 'app-admin-cadastro',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <section class="admin-form">
       <h2>{{ emModoEdicao() ? 'Editar Produto' : 'Cadastrar Novo Produto' }}</h2>
@@ -221,7 +220,7 @@ import {
         <div class="ingredientes-form">
           <label>Ingredientes</label>
           <p class="ingredientes-ajuda">
-            Clique nos ingredientes para incluir no produto. Defina um preço extra para os que o cliente pode adicionar.
+            Clique nos ingredientes para incluir no produto. Deixe o Extra em 0 para o ingrediente ficar gratuito: o cliente escolhe quantas quiser. Informe um valor para cobrar a mais por porção.
           </p>
           @if (ingredientesDisponiveis().length === 0) {
             <p class="img-status">Nenhum ingrediente cadastrado.</p>

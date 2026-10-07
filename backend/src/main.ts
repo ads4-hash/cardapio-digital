@@ -10,14 +10,9 @@ import { join } from 'path';
 import { Response } from 'express';
 import { AppModule } from './app.module';
 import { ErrosGlobaisFilter } from './common/erros-globais.filter';
+import { origensCors } from './cors';
 
-// 4200 = `ng serve` em desenvolvimento; 4000 = servidor SSR empacotado pelo Docker
-const ORIGENS_CORS_PADRAO = ['http://localhost:4200', 'http://localhost:4000'];
-
-// Origens permitidas no CORS (separadas por vírgula no .env)
-const ORIGENS_CORS: string | string[] =
-  process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()) ??
-  ORIGENS_CORS_PADRAO;
+const ORIGENS_CORS = origensCors();
 
 /**
  * Publica a documentação interativa em /docs (UI) e /docs-json (OpenAPI).

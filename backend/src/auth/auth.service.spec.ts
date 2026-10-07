@@ -100,7 +100,8 @@ describe('AuthService.atualizarPerfil', () => {
     } as unknown as PrismaService;
 
     const envioEmail = {
-      enviarRecuperacao: jest.fn(),
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn().mockResolvedValue(false),
     } as unknown as EnvioEmailService;
 
     const estabelecimentos = {

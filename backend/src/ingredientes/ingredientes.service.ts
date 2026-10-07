@@ -18,8 +18,9 @@ export class IngredientesService {
     });
   }
 
-  // Buscar um ingrediente por ID (sempre dentro do estabelecimento)
-  async findOne(estabelecimentoId: string, id: string) {
+  // Buscar um ingrediente por ID (sempre dentro do estabelecimento).
+  // Não há `GET /ingredientes/:id`, então o acesso é só interno (update/remove).
+  private async findOne(estabelecimentoId: string, id: string) {
     const ingrediente = await this.prisma.ingrediente.findUnique({
       where: { id },
       include: {

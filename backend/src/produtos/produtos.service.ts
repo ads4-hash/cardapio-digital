@@ -21,26 +21,37 @@ export class ProdutosService {
   // Nomes de grupo repetidos viram um só, e grupo sem nenhum ingrediente é
   // descartado para não gerar cabeçalho vazio no cardápio.
   private normalizarGrupos(
-    grupos?: { nome: string; maximoEscolhas?: number }[],
+    grupos?: {
+      nome: string;
+      maximoEscolhas?: number;
+      minimoEscolhas?: number;
+    }[],
     ingredientes?: { grupo?: string }[],
-  ): { nome: string; maximoEscolhas: number }[] {
+  ): { nome: string; maximoEscolhas: number; minimoEscolhas: number }[] {
     const usados = new Set(
       (ingredientes ?? [])
         .map((i) => i.grupo?.trim())
         .filter((n): n is string => Boolean(n)),
     );
 
-    const porNome = new Map<string, { nome: string; maximoEscolhas: number }>();
+    const porNome = new Map<
+      string,
+      { nome: string; maximoEscolhas: number; minimoEscolhas: number }
+    >();
     for (const grupo of grupos ?? []) {
       const nome = grupo.nome?.trim();
       if (!nome || !usados.has(nome)) continue;
-      porNome.set(nome, {
-        nome,
-        maximoEscolhas: Math.min(
-          99,
-          Math.max(1, Math.trunc(Number(grupo.maximoEscolhas ?? 99))),
-        ),
-      });
+      const maximoEscolhas = Math.min(
+        99,
+        Math.max(1, Math.trunc(Number(grupo.maximoEscolhas ?? 99))),
+      );
+      // O piso nunca passa do teto: mínimo 3 em um grupo de teto 1 não fecha,
+      // então o menor dos dois prevalece (a interface já impede o caso).
+      const minimoEscolhas = Math.min(
+        maximoEscolhas,
+        Math.max(0, Math.trunc(Number(grupo.minimoEscolhas ?? 0))),
+      );
+      porNome.set(nome, { nome, maximoEscolhas, minimoEscolhas });
     }
     return [...porNome.values()];
   }
@@ -66,6 +77,23 @@ export class ProdutosService {
         data: { grupoId },
       });
     }
+  }
+
+  // `@@unique([produtoId, ingredienteId])`: um id repetido no payload quebraria
+  // o create/update com P2002 (500). Guarda a última ocorrência, mesmo
+  // critério dos grupos normalizados acima.
+  private deduplicarIngredientes(
+    ingredientes?: {
+      ingredienteId: string;
+      precoAdicional?: number;
+      grupo?: string;
+    }[],
+  ):
+    | { ingredienteId: string; precoAdicional?: number; grupo?: string }[]
+    | undefined {
+    if (!ingredientes) return undefined;
+    const porId = new Map(ingredientes.map((i) => [i.ingredienteId, i]));
+    return [...porId.values()];
   }
 
   // Listar produtos (opcional filtrar por categoria e por visibilidade),
@@ -110,7 +138,11 @@ export class ProdutosService {
       imagemUrl?: string;
       categoriaId: string;
       tipo?: string;
-      grupos?: { nome: string; maximoEscolhas?: number }[];
+      grupos?: {
+        nome: string;
+        maximoEscolhas?: number;
+        minimoEscolhas?: number;
+      }[];
       ingredientes?: {
         ingredienteId: string;
         precoAdicional?: number;
@@ -118,10 +150,12 @@ export class ProdutosService {
       }[];
     },
   ) {
-    await this.validarCategoria(estabelecimentoId, data.categoriaId);
-    await this.validarIngredientes(estabelecimentoId, data.ingredientes);
+    const ingredientes = this.deduplicarIngredientes(data.ingredientes);
 
-    const grupos = this.normalizarGrupos(data.grupos, data.ingredientes);
+    await this.validarCategoria(estabelecimentoId, data.categoriaId);
+    await this.validarIngredientes(estabelecimentoId, ingredientes);
+
+    const grupos = this.normalizarGrupos(data.grupos, ingredientes);
 
     const criado = await this.prisma.produto.create({
       data: {
@@ -137,13 +171,14 @@ export class ProdutosService {
               create: grupos.map((g, indice) => ({
                 nome: g.nome,
                 maximoEscolhas: g.maximoEscolhas,
+                minimoEscolhas: g.minimoEscolhas,
                 ordem: indice,
               })),
             }
           : undefined,
-        ingredientes: data.ingredientes
+        ingredientes: ingredientes
           ? {
-              create: data.ingredientes.map((i) => ({
+              create: ingredientes.map((i) => ({
                 ingredienteId: i.ingredienteId,
                 precoAdicional: Number(i.precoAdicional ?? 0),
               })),
@@ -153,8 +188,8 @@ export class ProdutosService {
       include: { grupos: true },
     });
 
-    if (data.ingredientes?.length) {
-      await this.vincularGrupos(criado.id, criado.grupos, data.ingredientes);
+    if (ingredientes?.length) {
+      await this.vincularGrupos(criado.id, criado.grupos, ingredientes);
     }
 
     return this.findOne(estabelecimentoId, criado.id);
@@ -171,7 +206,11 @@ export class ProdutosService {
       imagemUrl?: string;
       categoriaId?: string;
       tipo?: string;
-      grupos?: { nome: string; maximoEscolhas?: number }[];
+      grupos?: {
+        nome: string;
+        maximoEscolhas?: number;
+        minimoEscolhas?: number;
+      }[];
       ingredientes?: {
         ingredienteId: string;
         precoAdicional?: number;
@@ -180,11 +219,12 @@ export class ProdutosService {
     },
   ) {
     const atual = await this.findOne(estabelecimentoId, id);
+    const ingredientes = this.deduplicarIngredientes(data.ingredientes);
 
     if (data.categoriaId) {
       await this.validarCategoria(estabelecimentoId, data.categoriaId);
     }
-    await this.validarIngredientes(estabelecimentoId, data.ingredientes);
+    await this.validarIngredientes(estabelecimentoId, ingredientes);
 
     // Se a imagem foi trocada, remove o arquivo antigo do disco
     if (data.imagemUrl !== undefined && data.imagemUrl !== atual.imagemUrl) {
@@ -192,8 +232,8 @@ export class ProdutosService {
     }
 
     const recriarGrupos =
-      data.grupos !== undefined || data.ingredientes !== undefined;
-    const grupos = this.normalizarGrupos(data.grupos, data.ingredientes);
+      data.grupos !== undefined || ingredientes !== undefined;
+    const grupos = this.normalizarGrupos(data.grupos, ingredientes);
 
     const atualizado = await this.prisma.produto.update({
       where: { id },
@@ -210,14 +250,15 @@ export class ProdutosService {
               create: grupos.map((g, indice) => ({
                 nome: g.nome,
                 maximoEscolhas: g.maximoEscolhas,
+                minimoEscolhas: g.minimoEscolhas,
                 ordem: indice,
               })),
             }
           : undefined,
-        ingredientes: data.ingredientes
+        ingredientes: ingredientes
           ? {
               deleteMany: {},
-              create: data.ingredientes.map((i) => ({
+              create: ingredientes.map((i) => ({
                 ingredienteId: i.ingredienteId,
                 precoAdicional: Number(i.precoAdicional ?? 0),
               })),
@@ -227,8 +268,8 @@ export class ProdutosService {
       include: { grupos: true },
     });
 
-    if (recriarGrupos && data.ingredientes?.length) {
-      await this.vincularGrupos(id, atualizado.grupos, data.ingredientes);
+    if (recriarGrupos && ingredientes?.length) {
+      await this.vincularGrupos(id, atualizado.grupos, ingredientes);
     }
 
     return this.findOne(estabelecimentoId, id);

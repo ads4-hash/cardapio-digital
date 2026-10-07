@@ -4,7 +4,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -15,7 +14,7 @@ type Etapa = 'email' | 'senha' | 'concluido';
 @Component({
   selector: 'app-recuperar-senha',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="login-page">
       <div class="login-card">
