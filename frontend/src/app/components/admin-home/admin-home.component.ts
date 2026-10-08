@@ -100,7 +100,7 @@ export type SecaoAdmin =
       align-items: center;
       justify-content: center;
       background: var(--danger);
-      color: #fff;
+      color: var(--on-accent);
       border-radius: var(--radius-pill);
       font-size: 0.78rem;
       font-weight: 800;

@@ -78,7 +78,7 @@ import { resolverImagemUrl } from '../../services/produto.service';
     .navbar {
       position: sticky;
       top: 0;
-      z-index: 50;
+      z-index: var(--z-nav);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -152,7 +152,7 @@ import { resolverImagemUrl } from '../../services/produto.service';
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      color: #fff;
+      color: var(--on-accent);
       text-decoration: none;
       font-size: 1.1rem;
       font-weight: 800;
@@ -172,7 +172,7 @@ import { resolverImagemUrl } from '../../services/produto.service';
       width: 11px;
       height: 11px;
       border-radius: 4px;
-      background: #fff;
+      background: var(--on-accent);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
       flex-shrink: 0;
     }
@@ -200,14 +200,14 @@ import { resolverImagemUrl } from '../../services/produto.service';
     .brand-nome.hero {
       font-size: 1.3rem;
       font-weight: 800;
-      color: #fff;
+      color: var(--on-accent);
       text-shadow:
         0 1px 3px rgba(0, 0, 0, 0.65),
         0 5px 20px rgba(0, 0, 0, 0.55);
     }
-    .navbar.padrao .brand:hover { color: #fff; opacity: 0.9; }
+    .navbar.padrao .brand:hover { color: var(--on-accent); opacity: 0.9; }
     .brand:hover { color: var(--primary-light); }
-    .brand.hero:hover { color: #fff; }
+    .brand.hero:hover { color: var(--on-accent); }
     .nav-links { display: flex; align-items: center; gap: 10px; }
     .navbar.hero .nav-links {
       position: absolute;

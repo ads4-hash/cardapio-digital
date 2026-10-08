@@ -33,10 +33,11 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
   selector: 'app-admin-pedidos',
   standalone: true,
   imports: [CommonModule],
+  styleUrls: ['../../ui/buttons.css', '../../ui/chips.css', '../../ui/cards.css', '../../ui/forms.css'],
   template: `
     <section class="pedidos-section">
       <div class="pedidos-header">
-        <h2>Pedidos</h2>
+        <h2 class="section-title section-title--mb">Pedidos</h2>
         <button class="btn-refresh" (click)="carregar()">Atualizar</button>
       </div>
 
@@ -61,15 +62,15 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
       </div>
 
       @if (carregando()) {
-        <p>Carregando pedidos...</p>
+        <p class="vazio vazio--md">Carregando pedidos...</p>
       } @else if (pedidosFiltrados().length === 0) {
-        <p>
+        <p class="vazio vazio--md">
           {{ pedidos().length === 0 ? 'Nenhum pedido por enquanto.' : 'Nenhum pedido com esse status.' }}
         </p>
       } @else {
         <div class="pedidos-list">
           @for (pedido of pedidosFiltrados(); track pedido.id) {
-            <div class="pedido-card">
+            <div class="pedido-card card card--lg">
               <div class="pedido-top">
                 <div>
                   <strong>#{{ pedido.id.slice(0, 8).toUpperCase() }}</strong>
@@ -123,7 +124,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
 
               <div class="pedido-bottom">
                 <strong>Total: {{ pedido.total | currency:'BRL' }}</strong>
-                <select [value]="pedido.status" (change)="mudarStatus(pedido.id, $event)">
+                <select class="select select--sm" [value]="pedido.status" (change)="mudarStatus(pedido.id, $event)">
                   @for (status of statusPara(pedido); track status) {
                     <option [value]="status">{{ STATUS_LABELS[status] }}</option>
                   }
@@ -155,68 +156,16 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
   `,
   styles: [`
     .pedidos-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-    .pedidos-header h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.015em; }
-    .btn-refresh {
-      padding: 9px 16px;
-      background: var(--surface-hover);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.85rem;
-      transition: color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
-    }
-    .btn-refresh:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
-    .btn-refresh:active { transform: scale(0.97); }
     .filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    .filtro-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 8px 14px;
-      background: var(--card);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: color var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
-    }
-    .filtro-chip:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
-    .filtro-chip:active { transform: scale(0.97); }
-    .filtro-chip.ativo {
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
-    }
+    .filtro-chip { display: inline-flex; align-items: center; gap: 7px; }
     .filtro-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
-    .pedidos-section > p,
-    .pedidos-list > p {
-      text-align: center;
-      color: var(--text-muted);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 48px 20px;
-      box-shadow: var(--shadow-sm);
-    }
     .pedidos-list { display: flex; flex-direction: column; gap: 16px; }
-    .pedido-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      box-shadow: var(--shadow-sm);
-      transition: box-shadow var(--transition-slow), border-color var(--transition);
-    }
+    .pedido-card { transition: box-shadow var(--transition-slow), border-color var(--transition); }
     .pedido-card:hover { box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--primary) 20%, var(--border)); }
     .pedido-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .pedido-top > div { display: flex; align-items: center; }
     .pedido-top strong { font-size: 0.95rem; }
-    .badge { color: #fff; padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; margin-left: 8px; letter-spacing: 0.4px; }
+    .badge { color: var(--on-accent); padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; margin-left: 8px; letter-spacing: 0.4px; }
     .pedido-info { margin: 6px 0 0; color: var(--text-muted); font-size: 0.9rem; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
     .tipo-tag {
       display: inline-block;
@@ -237,22 +186,10 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     .pers-tag.removido { color: var(--danger); }
     .pers-tag.adicionado { color: var(--accent-dark); }
     .pedido-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
-    .pedido-bottom select {
-      padding: 8px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      outline: none;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .pedido-bottom select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
     .modal-overlay {
       position: fixed;
       inset: 0;
-      z-index: 200;
+      z-index: var(--z-modal);
       background: var(--overlay);
       display: flex;
       align-items: center;
@@ -273,7 +210,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     .modal h3 { margin: 0 0 10px; font-size: 1.15rem; font-weight: 800; letter-spacing: -0.015em; }
     .modal p { margin: 0 0 6px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.55; }
     .modal p strong { color: var(--text); }
-    .modal-aviso { color: var(--danger) !important; font-weight: 600; }
+    .modal p.modal-aviso { color: var(--danger); font-weight: 600; }
     .modal-acoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
     .btn-voltar-confirmacao, .btn-confirmar-cancelamento {
       padding: 10px 18px;
@@ -287,8 +224,8 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     .btn-voltar-confirmacao:hover { color: var(--text); border-color: var(--text-muted); }
     .btn-voltar-confirmacao:active { transform: scale(0.97); }
     .btn-confirmar-cancelamento {
-      background: linear-gradient(135deg, var(--danger), #b91c1c);
-      color: #fff;
+      background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+      color: var(--on-accent);
       border: none;
       box-shadow: 0 4px 12px color-mix(in srgb, var(--danger) 30%, transparent);
     }

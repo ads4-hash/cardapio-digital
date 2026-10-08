@@ -51,6 +51,35 @@
   /* ---- Transições ---- */
   --transition: 160ms ease;
   --transition-slow: 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- Escala de espaçamento ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* ---- Texto sobre superfícies coloridas ---- */
+  --on-accent: #fff;
+
+  /* ---- Tons escuros de apoio ---- */
+  --danger-dark: #b91c1c;
+
+  /* ---- Escala de sobreposição (z-index) ---- */
+  --z-sticky: 40;
+  --z-nav: 50;
+  --z-fab: 100;
+  --z-overlay: 101;
+  --z-drawer: 102;
+  --z-modal: 200;
+  --z-modal-panel: 201;
+  --z-toast: 300;
+
+  /* ---- Anéis de foco ---- */
+  --ring: 0 0 0 4px var(--primary-light);
+  --ring-sm: 0 0 0 3px var(--primary-light);
 }
 
 [data-theme='dark'] {

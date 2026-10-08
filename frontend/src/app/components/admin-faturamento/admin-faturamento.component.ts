@@ -29,14 +29,15 @@ function paraDataIso(d: Date): string {
   selector: 'app-admin-faturamento',
   standalone: true,
   imports: [CommonModule],
+  styleUrls: ['../../ui/buttons.css', '../../ui/chips.css', '../../ui/cards.css', '../../ui/forms.css'],
   template: `
     <section class="faturamento">
       <div class="faturamento-top">
-        <h2>Faturamento</h2>
+        <h2 class="section-title section-title--mb">Faturamento</h2>
         <button class="btn-refresh" (click)="carregar()">Atualizar</button>
       </div>
 
-      <div class="card-taxa">
+      <div class="card-taxa card card--padded">
         <div class="card-taxa-info">
           <strong>Taxa de entrega</strong>
           <small>
@@ -46,6 +47,7 @@ function paraDataIso(d: Date): string {
         </div>
         <div class="card-taxa-controles">
           <input
+            class="input input--md input--focus-accent"
             type="number"
             min="0"
             step="0.50"
@@ -94,11 +96,11 @@ function paraDataIso(d: Date): string {
       <div class="filtro-datas">
         <label>
           De
-          <input type="date" [value]="de()" (change)="de.set($any($event.target).value)" />
+          <input class="input input--sm" type="date" [value]="de()" (change)="de.set($any($event.target).value)" />
         </label>
         <label>
           Até
-          <input type="date" [value]="ate()" (change)="ate.set($any($event.target).value)" />
+          <input class="input input--sm" type="date" [value]="ate()" (change)="ate.set($any($event.target).value)" />
         </label>
       </div>
 
@@ -108,19 +110,19 @@ function paraDataIso(d: Date): string {
         <p class="vazio">Nenhum pedido concluído neste período.</p>
       } @else {
         <div class="resumo">
-          <div class="resumo-item">
+          <div class="resumo-item card card--padded">
             <span>Pedidos concluídos</span>
             <strong>{{ filtrados().length }}</strong>
           </div>
-          <div class="resumo-item">
+          <div class="resumo-item card card--padded">
             <span>Fretes (taxa de entrega)</span>
             <strong>{{ totalFretes() | currency:'BRL' }}</strong>
           </div>
-          <div class="resumo-item">
+          <div class="resumo-item card card--padded">
             <span>Faturamento (só itens)</span>
             <strong>{{ totalItens() | currency:'BRL' }}</strong>
           </div>
-          <div class="resumo-item destaque">
+          <div class="resumo-item destaque card card--padded">
             <span>Faturamento total</span>
             <strong>{{ totalFaturamento() | currency:'BRL' }}</strong>
           </div>
@@ -128,7 +130,7 @@ function paraDataIso(d: Date): string {
 
         <div class="pagamento-resumo">
           @for (item of porFormaPagamento(); track item.forma) {
-            <div class="pagamento-item">
+            <div class="pagamento-item card card--slim">
               <span class="pagamento-icone">{{ item.icone }}</span>
               <span class="pagamento-info">
                 <strong>{{ item.rotulo }}</strong>
@@ -162,131 +164,32 @@ function paraDataIso(d: Date): string {
     `
     .faturamento { display: flex; flex-direction: column; gap: 14px; }
     .faturamento-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .faturamento-top h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.015em; }
-    .btn-refresh {
-      padding: 9px 16px;
-      background: var(--surface-hover);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.85rem;
-      transition: color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
-    }
-    .btn-refresh:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
-    .btn-refresh:active { transform: scale(0.97); }
     .filtros { display: flex; flex-wrap: wrap; gap: 8px; }
-    .filtro-chip {
-      padding: 8px 14px;
-      background: var(--card);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-pill);
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: color var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
-    }
-    .filtro-chip:hover { color: var(--primary); border-color: var(--primary); box-shadow: var(--shadow-sm); }
-    .filtro-chip:active { transform: scale(0.97); }
-    .filtro-chip.ativo {
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
-    }
     .filtro-datas { display: flex; gap: 12px; flex-wrap: wrap; }
     .filtro-datas label { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-    .filtro-datas input {
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--card);
-      color: var(--text);
-      outline: none;
-      font-size: 0.88rem;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .filtro-datas input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
     .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-    .resumo-item {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      box-shadow: var(--shadow-sm);
-    }
+    .resumo-item { display: flex; flex-direction: column; gap: 4px; }
     .resumo-item span { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
     .resumo-item strong { font-size: 1.3rem; }
-    .resumo-item.destaque { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); border: none; color: #fff; box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
+    .resumo-item.destaque { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); border: none; color: var(--on-accent); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); }
     .resumo-item.destaque span { color: rgba(255, 255, 255, 0.85); }
     .pagamento-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-    .pagamento-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      box-shadow: var(--shadow-sm);
-    }
+    .pagamento-item { display: flex; align-items: center; gap: 12px; }
     .pagamento-icone { font-size: 1.3rem; }
     .pagamento-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .pagamento-info strong { font-size: 0.95rem; font-weight: 800; }
     .pagamento-info small { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
     .pagamento-total { font-size: 1rem; font-weight: 800; white-space: nowrap; }
-    .tabela {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
-      font-size: 0.9rem;
-    }
-    .tabela th, .tabela td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-    .tabela thead th { background: var(--surface-hover); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
-    .tabela tbody tr:last-child td { border-bottom: none; }
-    .tabela tbody tr:hover { background: var(--surface-hover); }
     .alinha-direita { text-align: right; }
-    .vazio { text-align: center; color: var(--text-muted); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px 20px; box-shadow: var(--shadow-sm); }
-    .card-taxa {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      box-shadow: var(--shadow-sm);
-    }
+    .card-taxa { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .card-taxa-info { display: flex; flex-direction: column; gap: 3px; }
     .card-taxa-info small { color: var(--text-muted); font-size: 0.82rem; }
     .card-taxa-controles { display: flex; align-items: center; gap: 8px; }
-    .card-taxa-controles input {
-      width: 130px;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--card);
-      color: var(--text);
-      outline: none;
-      font-size: 0.95rem;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-    .card-taxa-controles input:focus { border-color: var(--accent-dark); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+    .card-taxa-controles input { width: 130px; }
     .btn-salvar-taxa {
       padding: 10px 18px;
       background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-      color: #fff;
+      color: var(--on-accent);
       border: none;
       border-radius: 10px;
       font-weight: 700;

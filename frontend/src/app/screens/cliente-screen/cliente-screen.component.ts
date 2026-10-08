@@ -13,6 +13,7 @@ import { CartService } from '../../services/cart.service';
   selector: 'app-cliente-screen',
   standalone: true,
   imports: [CategoriasTabsComponent, ProdutoCardComponent, CarrinhoDrawerComponent],
+  styleUrls: ['../../ui/cards.css'],
   template: `
     <app-categorias-tabs
       [apenasVisiveis]="true"
@@ -21,16 +22,16 @@ import { CartService } from '../../services/cart.service';
 
     <section class="cardapio">
       @if (produtoService.carregandoProdutos()) {
-        <p>Carregando produtos...</p>
+        <p class="vazio vazio--lg">Carregando produtos...</p>
       } @else if (produtoService.erroCardapio()) {
-        <p class="erro">
+        <p class="vazio vazio--lg erro">
           {{ produtoService.erroCardapio() }}
           <button type="button" class="btn-tentar" (click)="tentarDeNovo()">
             Tentar novamente
           </button>
         </p>
       } @else if (produtosFiltrados().length === 0) {
-        <p>Nenhum produto encontrado.</p>
+        <p class="vazio vazio--lg">Nenhum produto encontrado.</p>
       } @else {
         <div class="grid">
           @for (produto of produtosFiltrados(); track produto.id) {
@@ -56,13 +57,6 @@ import { CartService } from '../../services/cart.service';
         }
       }
       .cardapio > p {
-        text-align: center;
-        color: var(--text-muted);
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 56px 20px;
-        box-shadow: var(--shadow-sm);
         line-height: 1.6;
       }
       .cardapio > p.erro {

@@ -1,0 +1,80 @@
+/* ---- Cartão base (superfície com borda, raio e sombra) ---- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.card--xs {
+  padding: 12px 14px;
+}
+.card--slim {
+  padding: 14px 16px;
+}
+.card--padded {
+  padding: 16px 18px;
+}
+.card--lg {
+  padding: 18px;
+}
+
+/* Título de seção/tela (h2 do admin) */
+.section-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.section-title--mb {
+  margin-bottom: 16px;
+}
+
+/* Tabela de dados */
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.9rem;
+}
+.tabela th,
+.tabela td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.tabela thead th {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+.tabela tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+/* Estado vazio/carregando */
+.vazio {
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px 20px;
+  box-shadow: var(--shadow-sm);
+}
+.vazio--md {
+  padding: 48px 20px;
+}
+.vazio--lg {
+  padding: 56px 20px;
+}

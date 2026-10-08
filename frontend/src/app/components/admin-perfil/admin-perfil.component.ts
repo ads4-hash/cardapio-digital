@@ -7,9 +7,10 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
   selector: 'app-admin-perfil',
   standalone: true,
   imports: [FormsModule],
+  styleUrls: ['../../ui/cards.css'],
   template: `
     <section>
-      <h2 class="perfil-titulo">Perfil</h2>
+      <h2 class="section-title section-title--mb">Perfil</h2>
 
       <div class="admin-form">
         <h2>Editar dados do usuário</h2>
@@ -148,7 +149,6 @@ import { AuthService, UsuarioLogado } from '../../services/auth.service';
   `,
   styles: [
     `
-    .perfil-titulo { margin: 0 0 16px; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.015em; }
     .req { color: var(--danger); }
     .opcional { color: var(--text-muted); font-weight: 500; }
     .senha-wrap { position: relative; }

@@ -1,0 +1,54 @@
+/* ---- Controles de formulário base (input/select + foco) ---- */
+
+.input,
+.select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  font-size: 0.95rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.input:focus,
+.select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--ring);
+}
+
+.select {
+  cursor: pointer;
+}
+
+/* Variações de densidade/raio */
+.input--sm {
+  padding: 9px 12px;
+  font-size: 0.88rem;
+}
+.input--sm2 {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+.input--md {
+  padding: 10px 12px;
+}
+.input--radius-lg {
+  border-radius: 12px;
+}
+.select--sm {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+.select--sm:focus {
+  box-shadow: var(--ring-sm);
+}
+
+/* Foco com outra cor de realce */
+.input--focus-accent:focus {
+  border-color: var(--accent-dark);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.input--focus-violet:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 15%, transparent);
+}

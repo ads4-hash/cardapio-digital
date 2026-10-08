@@ -50,7 +50,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
         <p class="status-msg erro">{{ erro() }}</p>
         <a [routerLink]="voltarLink()" class="btn-voltar">← Voltar ao cardápio</a>
       } @else if (pedido()) {
-        <div class="rastreio-card">
+        <div class="rastreio-card card">
           <div class="rastreio-top">
             <strong>Pedido #{{ pedido()!.id.slice(0, 8).toUpperCase() }}</strong>
             <span class="badge" [style.background]="STATUS_CORES[pedido()!.status]">
@@ -158,14 +158,14 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
     .status-msg { text-align: center; color: var(--text-muted); background: var(--card); padding: 40px 20px; border: 1px solid var(--border); border-radius: var(--radius); }
     .status-msg.erro { color: var(--danger); }
     .btn-voltar { display: inline-block; margin-top: 16px; text-align: center; color: var(--primary); text-decoration: none; }
-    .rastreio-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm); }
+    .rastreio-card { padding: var(--space-5); }
     .rastreio-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .badge { color: #fff; padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; }
+    .badge { color: var(--on-accent); padding: 4px 11px; border-radius: var(--radius-pill); font-size: 0.72rem; font-weight: 700; }
     .passos { display: flex; justify-content: space-between; gap: 8px; margin: 20px 0; }
     .passo { flex: 1; text-align: center; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px; align-items: center; }
     .ponto { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-hover); display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; }
     .passo.ativo { color: var(--text); }
-    .passo.ativo .ponto { background: var(--accent); color: #fff; }
+    .passo.ativo .ponto { background: var(--accent); color: var(--on-accent); }
     .info { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 12px; }
     .resumo { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; }
     .linha-resumo { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; font-size: 0.9rem; color: var(--text-muted); }
@@ -185,7 +185,7 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
       margin-top: 14px;
       text-align: center;
       background: #25D366;
-      color: #fff;
+      color: var(--on-accent);
       text-decoration: none;
       font-weight: 700;
       padding: 11px 16px;

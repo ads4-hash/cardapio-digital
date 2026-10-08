@@ -52,7 +52,7 @@ import { ProdutoService, Categoria } from '../../services/produto.service';
       transition: border-color var(--transition), box-shadow var(--transition);
     }
     .search-input::placeholder { color: var(--text-muted); opacity: 0.75; }
-    .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+    .search-input:focus { border-color: var(--primary); box-shadow: var(--ring); }
     .tabs { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
     .tab-btn {
@@ -73,7 +73,7 @@ import { ProdutoService, Categoria } from '../../services/produto.service';
     .tab-btn:active { transform: scale(0.97); }
     .tab-btn.active {
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
+      color: var(--on-accent);
       font-weight: 700;
       box-shadow: 0 6px 14px color-mix(in srgb, var(--primary) 35%, transparent);
     }

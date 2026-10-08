@@ -142,10 +142,10 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       cursor: pointer;
       transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
     }
-    .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
+    .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: var(--on-accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
     .btn-add.disabled { background: var(--surface-hover); color: var(--text-muted); box-shadow: none; cursor: not-allowed; }
-    .btn-edit { background: var(--info); color: #fff; }
-    .btn-remove { background: var(--danger); color: #fff; }
+    .btn-edit { background: var(--info); color: var(--on-accent); }
+    .btn-remove { background: var(--danger); color: var(--on-accent); }
     .btn-add:hover:not(:disabled) { filter: brightness(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent); }
     .btn-edit:hover, .btn-remove:hover { filter: brightness(1.08); }
     .btn-add:active, .btn-edit:active, .btn-remove:active { transform: scale(0.95); }

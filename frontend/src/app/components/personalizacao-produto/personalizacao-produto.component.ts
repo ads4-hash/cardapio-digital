@@ -161,7 +161,7 @@ interface EstadoIngrediente {
     </ng-template>
   `,
   styles: [`
-    .overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); z-index: 200; animation: fadeIn 0.2s ease; }
+    .overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); z-index: var(--z-modal); animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal {
       position: fixed;
@@ -173,7 +173,7 @@ interface EstadoIngrediente {
       max-height: 86vh;
       background: var(--card);
       border-radius: 18px;
-      z-index: 201;
+      z-index: var(--z-modal-panel);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -297,7 +297,7 @@ interface EstadoIngrediente {
       width: 100%;
       padding: 14px;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
+      color: var(--on-accent);
       border: none;
       border-radius: 12px;
       font-weight: 700;

@@ -197,14 +197,14 @@ type Etapa = 'email' | 'senha' | 'concluido';
         text-transform: uppercase;
         transition: border-color var(--transition), box-shadow var(--transition);
       }
-      input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+      input:focus { border-color: var(--primary); box-shadow: var(--ring); }
       input::placeholder { color: var(--text-muted); opacity: 0.7; text-transform: none; }
       input#novaSenha, input#confirmarNovaSenha { text-transform: none; }
       .btn-primary {
         margin-top: 6px;
         padding: 14px;
         background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-        color: #fff;
+        color: var(--on-accent);
         border: none;
         border-radius: 12px;
         font-weight: 700;

@@ -29,6 +29,7 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
     AdminFaturamentoComponent,
     AdminPerfilComponent,
   ],
+  styleUrls: ['../../ui/buttons.css', '../../ui/cards.css'],
   template: `
     <section class="admin-screen">
       @switch (secao()) {
@@ -77,7 +78,7 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
       }
 
       @if (ultimoNovoPedido(); as pedido) {
-        <div class="novo-pedido-toast" role="status" aria-live="polite">
+        <div class="novo-pedido-toast card" role="status" aria-live="polite">
           <div class="npt-icone" aria-hidden="true">🔔</div>
           <div class="npt-conteudo">
             <strong>
@@ -92,7 +93,7 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
             </span>
           </div>
           <button class="npt-ver" (click)="verPedidos()">Ver pedidos</button>
-          <button class="npt-fechar" (click)="dispensarNovos()" aria-label="Fechar">✕</button>
+          <button class="btn--icon btn--icon--sm" (click)="dispensarNovos()" aria-label="Fechar">✕</button>
         </div>
       }
     </section>
@@ -102,16 +103,11 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
       position: fixed;
       right: 20px;
       bottom: 20px;
-      z-index: 300;
+      z-index: var(--z-toast);
       display: flex;
       align-items: center;
       gap: 10px;
       max-width: 420px;
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: var(--shadow-lg);
       padding: 12px 14px;
       animation: npt-pop var(--transition-slow);
     }
@@ -131,29 +127,16 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
       cursor: pointer;
       font-size: 0.82rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--on-accent);
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       transition: filter var(--transition), transform var(--transition);
     }
     .npt-ver:hover { filter: brightness(1.08); }
     .npt-ver:active { transform: scale(0.96); }
-    .npt-fechar {
-      width: 26px;
-      height: 26px;
-      border: none;
-      border-radius: 50%;
-      background: var(--surface-hover);
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 0.8rem;
-      line-height: 1;
-      transition: background var(--transition), color var(--transition);
-    }
-    .npt-fechar:hover { background: var(--border); color: var(--text); }
     .btn-voltar {
       position: sticky;
       top: 74px;
-      z-index: 40;
+      z-index: var(--z-sticky);
       box-shadow: var(--shadow-sm);
     }
     .btn-voltar:hover { box-shadow: var(--shadow-md); }

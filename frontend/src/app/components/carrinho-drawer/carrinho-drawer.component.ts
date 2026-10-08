@@ -239,15 +239,15 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
   styles: [`
     .cart-float-btn {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 100;
+      bottom: var(--space-5);
+      right: var(--space-5);
+      z-index: var(--z-fab);
       display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 15px 22px;
       background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-      color: #fff;
+      color: var(--on-accent);
       border: none;
       border-radius: var(--radius-pill);
       font-weight: 700;
@@ -261,7 +261,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     @media (max-width: 480px) {
       .cart-float-btn { left: 16px; right: 16px; justify-content: center; padding: 14px 18px; font-size: 0.9rem; }
     }
-    .overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); z-index: 101; animation: fadeIn 0.2s ease; }
+    .overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(3px); z-index: var(--z-overlay); animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .drawer {
       position: fixed;
@@ -271,10 +271,10 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
       max-width: 100vw;
       height: 100%;
       background: var(--card);
-      z-index: 102;
+      z-index: var(--z-drawer);
       display: flex;
       flex-direction: column;
-      padding: 20px;
+      padding: var(--space-5);
       box-shadow: -8px 0 40px rgba(16, 24, 40, 0.18);
       animation: slideIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
     }
@@ -297,7 +297,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
       transition: background var(--transition), color var(--transition), transform var(--transition);
     }
     .drawer-header button:hover { color: var(--danger); transform: rotate(90deg); }
-    .drawer-body { flex: 1; overflow-y: auto; padding: 16px 0; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: var(--space-4) 0; }
     .cart-item {
       display: flex;
       justify-content: space-between;
@@ -366,7 +366,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     .opcao-info small { color: var(--text-muted); font-size: 0.72rem; margin-top: 1px; line-height: 1.2; }
     .linha-total { margin: 2px 0; color: var(--text-muted); font-size: 0.9rem; }
     .linha-total.taxa { color: var(--accent-dark); font-weight: 600; }
-    .pag-titulo, .troco-titulo { font-weight: 700; margin: 16px 0 6px; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .pag-titulo, .troco-titulo { font-weight: 700; margin: var(--space-4) 0 6px; font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
     .opcoes-entrega { display: flex; gap: 8px; margin-top: 4px; }
     .opcoes-entrega .opcao {
       flex: 1;
@@ -410,7 +410,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
     }
     .troco-btn.ativo { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
     .opcional { color: var(--text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.8rem; }
-    .drawer-body label { display: block; font-weight: 600; margin: 16px 0 6px; font-size: 0.88rem; color: var(--text); }
+    .drawer-body label { display: block; font-weight: 600; margin: var(--space-4) 0 6px; font-size: 0.88rem; color: var(--text); }
     .drawer-body input {
       width: 100%;
       padding: 12px 14px;
@@ -423,12 +423,12 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
       outline: none;
       transition: border-color var(--transition), box-shadow var(--transition);
     }
-    .drawer-body input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+    .drawer-body input:focus { border-color: var(--primary); box-shadow: var(--ring); }
     .btn-checkout {
       width: 100%;
       padding: 14px;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
+      color: var(--on-accent);
       border: none;
       border-radius: 12px;
       font-weight: 700;
@@ -459,7 +459,7 @@ type Etapa = 'carrinho' | 'checkout' | 'sucesso';
       margin-top: 14px;
       padding: 12px 18px;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      color: #fff;
+      color: var(--on-accent);
       border-radius: 12px;
       font-weight: 700;
       text-decoration: none;
