@@ -9,6 +9,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Response } from 'express';
 import { AppModule } from './app.module';
+import { DecimalInterceptor } from './common/decimal.interceptor';
 import { ErrosGlobaisFilter } from './common/erros-globais.filter';
 import { origensCors } from './cors';
 
@@ -17,13 +18,24 @@ const ORIGENS_CORS = origensCors();
 /**
  * Publica a documentação interativa em /docs (UI) e /docs-json (OpenAPI).
  *
- * A UI fica disponível para qualquer visitante, então em produção é costume
- * desligá-la com DOCS_HABILITADOS=false — ela revela a existência de todos os
- * endpoints e o formato dos payloads.
+ * Em produção ela fica desligada por padrão: a UI é pública e revela a
+ * existência de todos os endpoints e o formato dos payloads. Para ligar em
+ * produção (não recomendado), defina DOCS_HABILITADOS=true; para desligar em
+ * desenvolvimento, DOCS_HABILITADOS=false.
  */
 function publicarDocumentacao(app: NestExpressApplication): void {
-  if (process.env.DOCS_HABILITADOS?.toLowerCase() === 'false') {
-    console.log('Documentação da API desabilitada (DOCS_HABILITADOS=false).');
+  const configurado = process.env.DOCS_HABILITADOS?.toLowerCase();
+  const emProducao = process.env.NODE_ENV === 'production';
+  const desligadoExplicitamente = configurado === 'false';
+  const ligadoExplicitamente = configurado === 'true';
+
+  if (desligadoExplicitamente || (emProducao && !ligadoExplicitamente)) {
+    console.log(
+      'Documentação da API desabilitada' +
+        (emProducao && !ligadoExplicitamente
+          ? ' (padrão em produção; DOCS_HABILITADOS=true para forçar).'
+          : ' (DOCS_HABILITADOS=false).'),
+    );
     return;
   }
 
@@ -123,12 +135,25 @@ async function bootstrap() {
     }),
   );
 
+  // Os campos monetários são `Decimal` no banco; sem esta normalização sairiam
+  // como string no JSON ("25.9") e quebrariam as somas do frontend.
+  app.useGlobalInterceptors(new DecimalInterceptor());
+
   // Habilita o CORS para aceitar chamadas do Angular (origens configuráveis)
   app.enableCors({
     origin: ORIGENS_CORS,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
+
+  // Atrás de proxy/reverse proxy, o ThrottlerGuard (que usa `req.ip`) precisa
+  // enxergar o IP real: sem isto, todo cliente passa a compartilhar o mesmo
+  // contador de rate-limit e o lockout de login bloqueia o IP do proxy para
+  // todos. Só ligue quando houver um proxy que preenche X-Forwarded-For de
+  // forma confiável (o mesmo valor de CONFIAR_PROXY usado pelo login).
+  if (process.env.CONFIAR_PROXY === 'true') {
+    app.set('trust proxy', 1);
+  }
 
   // Respostas de erro padronizadas em pt-BR
   app.useGlobalFilters(new ErrosGlobaisFilter());

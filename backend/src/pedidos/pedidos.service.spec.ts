@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
 import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
@@ -56,15 +60,23 @@ interface DadosPedidoCriado {
 
 type PedidoCreateArgs = { data: DadosPedidoCriado };
 
+interface ArgsPedidoFindMany {
+  where?: { estabelecimentoId?: string; status?: string };
+  take?: number;
+  skip?: number;
+}
+
 describe('PedidosService', () => {
   let service: PedidosService;
 
   let produtoFindMany: jest.Mock;
   let pedidoCreate: jest.Mock<Promise<{ id: string }>, [PedidoCreateArgs]>;
+  let pedidoFindMany: jest.Mock<Promise<unknown[]>, [ArgsPedidoFindMany]>;
   let pedidoFindUnique: jest.Mock;
   let pedidoUpdate: jest.Mock;
   let pedidoDelete: jest.Mock;
   let obterTaxaEntrega: jest.Mock;
+  let obterAceitandoPedidos: jest.Mock;
   let emitirPedidoCriado: jest.Mock;
   let emitirPedidoAtualizado: jest.Mock;
   let emitirPedidoRemovido: jest.Mock;
@@ -129,6 +141,9 @@ describe('PedidosService', () => {
       ({ data }) => Promise.resolve({ id: 'ped-1', ...data }),
     );
     pedidoFindUnique = jest.fn().mockResolvedValue(null);
+    pedidoFindMany = jest
+      .fn<Promise<unknown[]>, [ArgsPedidoFindMany]>()
+      .mockResolvedValue([]);
     pedidoUpdate = jest
       .fn()
       .mockImplementation(({ data }) =>
@@ -136,6 +151,10 @@ describe('PedidosService', () => {
       );
     pedidoDelete = jest.fn().mockResolvedValue({ id: 'ped-1' });
     obterTaxaEntrega = jest.fn().mockResolvedValue({ taxaEntrega: 0 });
+    // Por padrão a casa está aberta; os testes de "fechada" sobrescrevem.
+    obterAceitandoPedidos = jest
+      .fn()
+      .mockResolvedValue({ aceitandoPedidos: true });
     emitirPedidoCriado = jest.fn();
     emitirPedidoAtualizado = jest.fn();
     emitirPedidoRemovido = jest.fn();
@@ -144,6 +163,7 @@ describe('PedidosService', () => {
       produto: { findMany: produtoFindMany },
       pedido: {
         create: pedidoCreate,
+        findMany: pedidoFindMany,
         findUnique: pedidoFindUnique,
         update: pedidoUpdate,
         delete: pedidoDelete,
@@ -152,6 +172,7 @@ describe('PedidosService', () => {
 
     const configuracoes = {
       obterTaxaEntrega,
+      obterAceitandoPedidos,
     } as unknown as ConfiguracoesService;
 
     const estabelecimentos = {
@@ -177,6 +198,18 @@ describe('PedidosService', () => {
       await expect(service.create(pedidoBase({ itens: [] }))).rejects.toThrow(
         BadRequestException,
       );
+      expect(pedidoCreate).not.toHaveBeenCalled();
+    });
+
+    it('recusa pedido quando o estabelecimento não está aceitando pedidos', async () => {
+      obterAceitandoPedidos.mockResolvedValue({ aceitandoPedidos: false });
+
+      await expect(service.create(pedidoBase())).rejects.toThrow(
+        /não está aceitando pedidos/i,
+      );
+      // A checagem é no servidor, antes de qualquer escrita: nem busca produto
+      // nem cria o pedido, mesmo que o payload esteja perfeito.
+      expect(produtoFindMany).not.toHaveBeenCalled();
       expect(pedidoCreate).not.toHaveBeenCalled();
     });
 
@@ -552,6 +585,50 @@ describe('PedidosService', () => {
     });
   });
 
+  describe('findAll — paginação e filtro', () => {
+    // Sem parâmetros o comportamento é o de sempre: lista inteira, sem
+    // take/skip — o painel atual não muda.
+    it('devolve a lista inteira quando não há paginação', async () => {
+      await service.findAll(ESTABELECIMENTO.id);
+
+      const arg = pedidoFindMany.mock.calls[0][0];
+      expect(arg.take).toBeUndefined();
+      expect(arg.skip).toBeUndefined();
+      expect(arg.where?.estabelecimentoId).toBe(ESTABELECIMENTO.id);
+    });
+
+    it('pagina com take/skip quando `pagina` vem na consulta', async () => {
+      await service.findAll(ESTABELECIMENTO.id, {
+        pagina: 3,
+        tamanhoPagina: 20,
+      });
+
+      expect(pedidoFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 20, skip: 40 }),
+      );
+    });
+
+    it('usa tamanho 50 quando só `pagina` é informada', async () => {
+      await service.findAll(ESTABELECIMENTO.id, { pagina: 1 });
+
+      expect(pedidoFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 50, skip: 0 }),
+      );
+    });
+
+    it('filtra por status sem paginar por acidente', async () => {
+      await service.findAll(ESTABELECIMENTO.id, { status: 'EM_PREPARO' });
+
+      const arg = pedidoFindMany.mock.calls[0][0];
+      expect(arg.where).toEqual({
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'EM_PREPARO',
+      });
+      expect(arg.take).toBeUndefined();
+      expect(arg.skip).toBeUndefined();
+    });
+  });
+
   describe('findOne — isolamento de tenant', () => {
     it('devolve o pedido quando pertence ao estabelecimento', async () => {
       pedidoFindUnique.mockResolvedValue({
@@ -615,6 +692,76 @@ describe('PedidosService', () => {
       ).rejects.toThrow(NotFoundException);
       expect(pedidoUpdate).not.toHaveBeenCalled();
       expect(emitirPedidoAtualizado).not.toHaveBeenCalled();
+    });
+
+    // Os terminais encerram o pedido: sem esta regra, um PATCH direto
+    // devolvia um CONCLUIDO para PENDENTE ou ressuscitava um cancelado.
+    it('recusa tirar um pedido concluído do estado terminal', async () => {
+      pedidoFindUnique.mockResolvedValue({
+        id: 'ped-1',
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'CONCLUIDO',
+        tipoEntrega: 'ENTREGA',
+      });
+
+      await expect(
+        service.updateStatus(ESTABELECIMENTO.id, 'ped-1', 'PENDENTE'),
+      ).rejects.toThrow(ConflictException);
+      expect(pedidoUpdate).not.toHaveBeenCalled();
+    });
+
+    it('recusa ressuscitar um pedido cancelado', async () => {
+      pedidoFindUnique.mockResolvedValue({
+        id: 'ped-1',
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'CANCELADO',
+        tipoEntrega: 'RETIRADA',
+      });
+
+      await expect(
+        service.updateStatus(ESTABELECIMENTO.id, 'ped-1', 'EM_PREPARO'),
+      ).rejects.toThrow(ConflictException);
+      expect(pedidoUpdate).not.toHaveBeenCalled();
+    });
+
+    it('aceita repetir o próprio status terminal (idempotente)', async () => {
+      pedidoFindUnique.mockResolvedValue({
+        id: 'ped-1',
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'CONCLUIDO',
+        tipoEntrega: 'ENTREGA',
+      });
+
+      await service.updateStatus(ESTABELECIMENTO.id, 'ped-1', 'CONCLUIDO');
+      expect(pedidoUpdate).toHaveBeenCalled();
+    });
+
+    it('impõe as regras de tipo: retirada não vai para EM_ROTA', async () => {
+      pedidoFindUnique.mockResolvedValue({
+        id: 'ped-1',
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'EM_PREPARO',
+        tipoEntrega: 'RETIRADA',
+      });
+
+      await expect(
+        service.updateStatus(ESTABELECIMENTO.id, 'ped-1', 'EM_ROTA'),
+      ).rejects.toThrow(BadRequestException);
+      expect(pedidoUpdate).not.toHaveBeenCalled();
+    });
+
+    it('impõe as regras de tipo: entrega não vai para PRONTO', async () => {
+      pedidoFindUnique.mockResolvedValue({
+        id: 'ped-1',
+        estabelecimentoId: ESTABELECIMENTO.id,
+        status: 'EM_ROTA',
+        tipoEntrega: 'ENTREGA',
+      });
+
+      await expect(
+        service.updateStatus(ESTABELECIMENTO.id, 'ped-1', 'PRONTO'),
+      ).rejects.toThrow(BadRequestException);
+      expect(pedidoUpdate).not.toHaveBeenCalled();
     });
   });
 

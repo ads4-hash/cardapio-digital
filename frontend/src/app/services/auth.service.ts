@@ -121,8 +121,15 @@ export class AuthService {
         this.aplicarPerfil(usuario);
         this.restaurando = false;
       },
-      error: () => {
+      error: (erro) => {
         this.restaurando = false;
+        // 401 = token expirado/inválido: limpa a sessão local para não deixar
+        // um estado "meio logado" com um token morto (o interceptor já faria
+        // logout na primeira chamada 401, mas isto evita a janela inconsistente
+        // até lá). Outros erros (rede, 500) preservam o token para reavaliar.
+        if (erro?.status === 401) {
+          this.logout();
+        }
       },
     });
   }

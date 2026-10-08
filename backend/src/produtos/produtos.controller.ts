@@ -144,8 +144,13 @@ export class ProdutosController {
   @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Atualiza um produto',
-    description:
+    description: [
       'Campos omitidos continuam como estão. Enviar `ingredientes` substitui a lista inteira.',
+      '',
+      'Os grupos de escolha são recriados **apenas** quando `grupos` vem no payload:',
+      'um PATCH que manda só preço ou só `ingredientes` preserva os grupos já cadastrados',
+      '(teto/piso das marmitas).',
+    ].join('\n'),
   })
   @ApiParam({ name: 'id', description: 'UUID do produto.' })
   @ApiBody({ type: UpdateProdutoDto })

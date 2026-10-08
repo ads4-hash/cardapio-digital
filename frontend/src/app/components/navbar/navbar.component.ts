@@ -394,12 +394,17 @@ export class NavbarComponent implements OnInit {
     return resolverImagemUrl(logo ?? undefined);
   }
 
-  // Capa como fundo do cabeçalho hero (só no cardápio público)
+  // Capa como fundo do cabeçalho hero (só no cardápio público).
+  // A URL vem do banco (configuração do admin), então não é 100% confiável:
+  // aceitar qualquer esquema em `url('...')` abriria porta para `javascript:`
+  // ou `data:` dentro de CSS. Só http(s) e caminhos locais passam; aspas e
+  // parênteses são removidos para não quebrar a propriedade.
   fundoHero(): string | null {
     const capa = resolverImagemUrl(
       this.configuracoes.visualCardapio().capaUrl ?? undefined,
     );
-    return capa ? `url('${capa}')` : null;
+    if (!capa || !/^https?:\/\//i.test(capa)) return null;
+    return `url('${capa.replace(/['"()]/g, '')}')`;
   }
 
   // Link do WhatsApp para o cliente tirar dúvidas (só no cardápio público e

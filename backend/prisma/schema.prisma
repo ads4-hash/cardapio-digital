@@ -33,13 +33,19 @@ model Categoria {
   produtos          Produto[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  // Toda listagem do painel filtra por estabelecimento: sem este índice a
+  // tabela inteira é varrida a cada requisição.
+  @@index([estabelecimentoId])
 }
 
 model Produto {
   id                String          @id @default(uuid())
   nome              String
   descricao         String?
-  preco             Float
+  // Decimal (não Float): dinheiro não pode passar por ponto flutuante,
+  // senão somas como 0.1 + 0.2 guardam 0.30000000000000004.
+  preco             Decimal
   imagemUrl         String?
   // PADRAO: todo ingrediente ja vem incluso e o cliente remove/adiciona.
   // MARMITA: nada vem incluso, o cliente monta o pedido e cada grupo tem um
@@ -54,6 +60,10 @@ model Produto {
   grupos            ProdutoGrupo[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  // Cardápio público: WHERE estabelecimentoId (+ categoriaId opcional)
+  @@index([estabelecimentoId])
+  @@index([categoriaId])
 }
 
 // Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
@@ -82,13 +92,15 @@ model Ingrediente {
   produtos          ProdutoIngrediente[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  @@index([estabelecimentoId])
 }
 
 model ProdutoIngrediente {
   id              String         @id @default(uuid())
   produtoId       String
   ingredienteId   String
-  precoAdicional  Float          @default(0)
+  precoAdicional  Decimal       @default(0)
   // Grupo de escolha a que este ingrediente pertence. Nulo = ingrediente
   // solto, sem teto de escolhas.
   grupoId         String?
@@ -106,28 +118,37 @@ model Pedido {
   tipoEntrega       String          @default("RETIRADA") // RETIRADA ou ENTREGA
   endereco          String?
   telefone          String?
-  taxaEntrega       Float           @default(0)
+  taxaEntrega       Decimal       @default(0)
   status            String          @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, PRONTO, CONCLUIDO, CANCELADO — validado por UpdatePedidoDto
-  total             Float
+  total             Decimal
   formaPagamento    String          @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
-  trocoPara         Float? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
+  trocoPara         Decimal? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
   estabelecimentoId String
   estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
   itens             ItemPedido[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  // Painel: lista os pedidos do tenant em ordem; acompanha o filtro por status
+  @@index([estabelecimentoId])
+  @@index([estabelecimentoId, status])
 }
 
 model ItemPedido {
   id         String   @id @default(uuid())
   quantidade Int
-  preco      Float
+  preco      Decimal
   removidos  String   @default("[]") // nomes dos ingredientes removidos (JSON)
   adicionados String  @default("[]") // nomes dos ingredientes adicionados (JSON)
   pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   pedidoId   String
   produto    Produto  @relation(fields: [produtoId], references: [id])
   produtoId  String
+
+  // Os itens entram sempre pelos dois lados: pelo pedido (listagem) e pelo
+  // produto (cardápio com itens usados)
+  @@index([pedidoId])
+  @@index([produtoId])
 }
 
 model Usuario {
@@ -140,6 +161,9 @@ model Usuario {
   recuperacoesSenha RecuperacaoSenha[]
   criadoEm         DateTime         @default(now())
   atualizadoEm     DateTime         @updatedAt
+
+  // Listagem de usuários do estabelecimento no painel
+  @@index([estabelecimentoId])
 }
 
 // Tokens de recuperação de senha (single-use, com expiração). O token em si

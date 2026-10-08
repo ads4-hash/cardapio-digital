@@ -36,6 +36,14 @@ export class RealtimeService {
     this.socket = io(environment.publicApiUrl, {
       transports: ['websocket'],
       auth: { token: this.auth.getToken() },
+      // Sem reconexão automática, um corte de rede no meio do turno derrubava
+      // o painel do tempo real até o próximo reload — e o admin só percebia
+      // quando faltava um pedido. O token do handshake é reutilizado nas
+      // tentativas (válido por dias, então não há risco de expirar no meio).
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1_000,
+      reconnectionDelayMax: 10_000,
     });
 
     this.socket.on(EVENTO_CRIADO, (pedido: Pedido) => this.novo.next(pedido));

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { unlinkSync } from 'fs';
 import { join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +23,9 @@ export class ProdutosService {
   };
 
   // Nomes de grupo repetidos viram um só, e grupo sem nenhum ingrediente é
-  // descartado para não gerar cabeçalho vazio no cardápio.
+  // descartado para não gerar cabeçalho vazio no cardápio. O descarte só
+  // faz sentido quando os ingredientes vêm junto (dá para saber o que tem
+  // uso); num PATCH que manda só `grupos`, a lista enviada é honrada.
   private normalizarGrupos(
     grupos?: {
       nome: string;
@@ -27,6 +33,7 @@ export class ProdutosService {
       minimoEscolhas?: number;
     }[],
     ingredientes?: { grupo?: string }[],
+    filtrarPorUso = true,
   ): { nome: string; maximoEscolhas: number; minimoEscolhas: number }[] {
     const usados = new Set(
       (ingredientes ?? [])
@@ -40,7 +47,8 @@ export class ProdutosService {
     >();
     for (const grupo of grupos ?? []) {
       const nome = grupo.nome?.trim();
-      if (!nome || !usados.has(nome)) continue;
+      if (!nome) continue;
+      if (filtrarPorUso && !usados.has(nome)) continue;
       const maximoEscolhas = Math.min(
         99,
         Math.max(1, Math.trunc(Number(grupo.maximoEscolhas ?? 99))),
@@ -231,9 +239,21 @@ export class ProdutosService {
       this.removerImagemDoDisco(atual.imagemUrl);
     }
 
-    const recriarGrupos =
-      data.grupos !== undefined || ingredientes !== undefined;
-    const grupos = this.normalizarGrupos(data.grupos, ingredientes);
+    // Só recria os grupos quando o payload trouxe `grupos` de propósito.
+    // Antes, `ingredientes !== undefined` também marcava a recriação, e
+    // `normalizarGrupos(undefined, ...)` devolvia `[]` — o `deleteMany: {}`
+    // apagava TODOS os grupos (teto/piso das marmitas) num PATCH parcial
+    // que só mexia no preço ou nos ingredientes.
+    const recriarGrupos = data.grupos !== undefined;
+    const grupos = recriarGrupos
+      ? this.normalizarGrupos(
+          data.grupos,
+          ingredientes,
+          // Só filtra grupos "vazios" quando os ingredientes vêm junto;
+          // PATCH só com `grupos` honra a lista enviada.
+          ingredientes !== undefined,
+        )
+      : [];
 
     const atualizado = await this.prisma.produto.update({
       where: { id },
@@ -268,8 +288,14 @@ export class ProdutosService {
       include: { grupos: true },
     });
 
-    if (recriarGrupos && ingredientes?.length) {
-      await this.vincularGrupos(id, atualizado.grupos, ingredientes);
+    // Liga os ingredientes aos grupos pelo nome: usa os grupos recém-criados
+    // quando veio `grupos` no payload, ou os já existentes quando só os
+    // ingredientes mudaram (os nomes batem com o estado atual do produto).
+    if (ingredientes?.length) {
+      const gruposParaVinculo = recriarGrupos
+        ? atualizado.grupos
+        : atual.grupos;
+      await this.vincularGrupos(id, gruposParaVinculo, ingredientes);
     }
 
     return this.findOne(estabelecimentoId, id);
@@ -278,11 +304,29 @@ export class ProdutosService {
   // Remover um produto
   async remove(estabelecimentoId: string, id: string) {
     const produto = await this.findOne(estabelecimentoId, id);
-    this.removerImagemDoDisco(produto.imagemUrl);
 
-    return this.prisma.produto.delete({
-      where: { id },
-    });
+    // Apaga primeiro no banco: `ItemPedido.produtoId` é ON DELETE RESTRICT,
+    // então um produto que já aparece em algum pedido não pode ser excluído.
+    // Se a imagem fosse removida antes, o delete falharia depois de já ter
+    // apagado o arquivo, deixando `imagemUrl` apontando para um 404.
+    const removido = await this.prisma.produto
+      .delete({ where: { id } })
+      .catch((erro) => this.tratarRestricao(erro, 'este produto'));
+
+    this.removerImagemDoDisco(produto.imagemUrl);
+    return removido;
+  }
+
+  // `P2003` = violação de chave estrangeira (RESTRICT). Vira 409 com mensagem
+  // amigável em vez de 500 genérico pelo filtro global.
+  private tratarRestricao(erro: unknown, oQue: string): never {
+    const prismaErro = erro as { code?: string };
+    if (prismaErro?.code === 'P2003') {
+      throw new ConflictException(
+        `Não é possível excluir ${oQue}: existem pedidos que o referenciam.`,
+      );
+    }
+    throw erro;
   }
 
   // Impede vínculo com categoria de outro estabelecimento

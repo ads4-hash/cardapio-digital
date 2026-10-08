@@ -7,6 +7,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -38,6 +39,11 @@ const MAX_SIZE = 5 * 1024 * 1024;
 @ApiTags('upload')
 @Controller('upload')
 export class UploadController {
+  // O rate-limit global (100/min) não protege um endpoint que aceita 5 MB por
+  // chamada: 100 uploads já seriam 500 MB/min por IP. O teto de 10/min (~50 MB)
+  // cobre o fluxo normal de um admin montando o cardápio sem abrir espaço para
+  // exaustão de disco.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseGuards(AuthGuard)
   @Post()
   @ApiBearerAuth('bearer')

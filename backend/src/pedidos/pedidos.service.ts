@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -22,10 +23,23 @@ export class PedidosService {
     private readonly estabelecimentos: EstabelecimentosService,
   ) {}
 
-  // Listar todos os pedidos de um estabelecimento (console admin escopado)
-  async findAll(estabelecimentoId: string) {
+  // Listar pedidos do estabelecimento (console admin escopado).
+  // Paginação opcional: sem parâmetros devolve a lista inteira (comportamento
+  // original do painel); com `pagina`, devolve só a fatia pedida.
+  async findAll(
+    estabelecimentoId: string,
+    filtros: { pagina?: number; tamanhoPagina?: number; status?: string } = {},
+  ) {
+    const { pagina, tamanhoPagina, status } = filtros;
+    const paginando = pagina !== undefined || tamanhoPagina !== undefined;
+    const take = paginando ? (tamanhoPagina ?? 50) : undefined;
+    const skip = paginando ? ((pagina ?? 1) - 1) * (take ?? 50) : undefined;
+
     return this.prisma.pedido.findMany({
-      where: { estabelecimentoId },
+      where: {
+        estabelecimentoId,
+        ...(status ? { status } : {}),
+      },
       include: {
         itens: {
           include: {
@@ -34,6 +48,7 @@ export class PedidosService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      ...(take !== undefined ? { take, skip } : {}),
     });
   }
 
@@ -67,6 +82,18 @@ export class PedidosService {
     }
 
     const estabelecimento = await this.estabelecimentos.porSlug(data.slug);
+
+    // O admin pode marcar a casa como "não aceitando pedidos". A checagem
+    // precisa acontecer aqui, no servidor: a interface só esconde o botão de
+    // envio, mas um payload direto à API não pode passar por cima do estado.
+    const { aceitandoPedidos } = await this.configuracoes.obterAceitandoPedidos(
+      estabelecimento.id,
+    );
+    if (!aceitandoPedidos) {
+      throw new ConflictException(
+        'Este estabelecimento não está aceitando pedidos no momento.',
+      );
+    }
 
     // Nome do cliente obrigatório; endereço exigido apenas para entrega
     const tipoEntrega = data.tipoEntrega ?? TipoEntrega.RETIRADA;
@@ -211,7 +238,8 @@ export class PedidosService {
 
   // Atualizar o status do pedido (PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO)
   async updateStatus(estabelecimentoId: string, id: string, status: string) {
-    await this.findOne(estabelecimentoId, id);
+    const atual = await this.findOne(estabelecimentoId, id);
+    this.validarTransicao(atual.status, atual.tipoEntrega, status);
 
     const pedido = await this.prisma.pedido.update({
       where: { id },
@@ -227,6 +255,42 @@ export class PedidosService {
 
     this.gateway.emitirPedidoAtualizado(estabelecimentoId, pedido);
     return pedido;
+  }
+
+  // Estados que encerram o pedido. Depois deles o pedido não volta ao fluxo
+  // ativo: só aceitam repetição do próprio valor (idempotente).
+  private static readonly STATUS_TERMINAIS = [
+    'CONCLUIDO',
+    'CANCELADO',
+  ] as const;
+
+  // O painel já mostra apenas as opções válidas na interface, mas o endpoint é
+  // a autoridade: sem estas regras um PATCH direto marcava CONCLUIDO →
+  // PENDENTE, ressuscitava um cancelado ou encaixava "Em rota" em retirada.
+  private validarTransicao(
+    statusAtual: string,
+    tipoEntrega: string,
+    novoStatus: string,
+  ): void {
+    const terminais = PedidosService.STATUS_TERMINAIS as readonly string[];
+    if (terminais.includes(statusAtual) && statusAtual !== novoStatus) {
+      const rotulo = statusAtual === 'CANCELADO' ? 'cancelado' : 'concluído';
+      throw new ConflictException(
+        `Pedido já está ${rotulo} e não pode voltar para ${novoStatus}.`,
+      );
+    }
+
+    // Retirada não tem "Em rota" (usa "Pronto"); entrega não usa "Pronto".
+    if (tipoEntrega === 'RETIRADA' && novoStatus === 'EM_ROTA') {
+      throw new BadRequestException(
+        'Pedido de retirada não pode ficar "Em rota". Use PRONTO.',
+      );
+    }
+    if (tipoEntrega === 'ENTREGA' && novoStatus === 'PRONTO') {
+      throw new BadRequestException(
+        'Pedido de entrega não usa "Pronto". Use EM_ROTA.',
+      );
+    }
   }
 
   // Deletar pedido

@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   Delete,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import { PedidosService } from './pedidos.service';
 import { CreatePedidoDto } from './dto/create-pedido.dto';
+import { ListarPedidosDto } from './dto/listar-pedidos.dto';
 import { UpdatePedidoDto } from './dto/update-pedido.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -41,13 +43,22 @@ export class PedidosController {
   @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Lista os pedidos do estabelecimento (painel)',
-    description:
-      'Ordena do mais recente para o mais antigo. Sempre escopado no token: um admin não enxerga pedidos de outra casa, mesmo que mande o slug de outro estabelecimento.',
+    description: [
+      'Ordena do mais recente para o mais antigo. Sempre escopado no token: um admin',
+      'não enxerga pedidos de outra casa, mesmo que mande o slug de outro estabelecimento.',
+      '',
+      '**Paginação opcional.** Sem parâmetros devolve a lista inteira (como sempre).',
+      'Com `pagina` (e opcionalmente `tamanhoPagina`, padrão 50, máx. 200) devolve',
+      'só a fatia pedida. `status` filtra por um status exato.',
+    ].join('\n'),
   })
   @ApiOkResponse({ type: [PedidoDto] })
   @ApiUnauthorizedResponse({ type: RespostaErroDto })
-  findAll(@CurrentUser() usuario: UsuarioAutenticado) {
-    return this.pedidosService.findAll(usuario.estabelecimentoId);
+  findAll(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @Query() filtros: ListarPedidosDto,
+  ) {
+    return this.pedidosService.findAll(usuario.estabelecimentoId, filtros);
   }
 
   @UseGuards(AuthGuard)

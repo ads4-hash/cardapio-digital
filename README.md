@@ -72,7 +72,7 @@ apenas via login (`POST /auth/login`).
 | `PORT`        | `3000` | Porta da API |
 | `CORS_ORIGIN` | `http://localhost:4200` | Origens permitidas, separadas por vírgula |
 | `CONFIAR_PROXY` | `false` | Defina `"true"` apenas atrás de proxy que preenche `X-Forwarded-For` |
-| `DOCS_HABILITADOS` | `true` | Defina `"false"` para desligar o Swagger em `/docs` |
+| `DOCS_HABILITADOS` | `true` (dev) / `false` (produção) | Force `"true"`/`"false"`; sem nada, o Swagger fica ligado só fora de produção |
 
 ## Rodando com Docker
 
@@ -125,10 +125,11 @@ npm test        # ng test (Vitest, sem watch)
 |---------|----------------------------|--------------|-----------|
 | POST    | `/auth/registrar`          | público (1º usuário) | Cria o administrador |
 | POST    | `/auth/login`              | público      | Gera o token JWT |
-| GET     | `/categorias`, `/produtos`, `/ingredientes`, `/pedidos` | público leitura | Listagens (filtradas p/ não logados) |
-| POST    | `/pedidos`                 | público      | Cria pedido (cliente) |
-| GET     | `/pedidos/:id/rastrear`    | público      | Acompanhamento do pedido |
-| POST    | `/upload`                  | admin        | Envio de imagem (JPG/PNG/WEBP/GIF, até 5 MB) |
+| GET     | `/categorias`, `/produtos`, `/ingredientes` | público leitura | Listagens (ocultas p/ não logados) |
+| GET     | `/pedidos`                   | admin        | Listagem do painel: aceita `?pagina=&tamanhoPagina=&status=` (sem parâmetros, devolve tudo) |
+| POST    | `/pedidos`                   | público      | Cria pedido (cliente) |
+| GET     | `/pedidos/:id/rastrear`      | público      | Acompanhamento do pedido |
+| POST    | `/upload`                    | admin        | Envio de imagem (JPG/PNG/WEBP/GIF, até 5 MB) |
 | CRUD    | `/produtos`, `/categorias`, `/ingredientes`, `/pedidos/:id/status` | admin | Gestão |
 | WS      | `pedido.criado`, `pedido.atualizado`, `pedido.removido` | admin | Tempo real |
 

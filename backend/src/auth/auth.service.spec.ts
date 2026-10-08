@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { EnvioEmailService } from '../envio-email/envio-email.service';
@@ -264,5 +264,126 @@ describe('AuthService.atualizarPerfil', () => {
     ).rejects.toThrow('Senha atual incorreta.');
 
     expect(usuarioUpdate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Cobre o C1: o POST /auth/registrar é só do bootstrap — o primeiro usuário
+ * vira administrador e, depois dele, o endpoint responde 409 (como o README e
+ * o Swagger documentam). Sem isto, qualquer visitante criava tenants infinitos.
+ */
+describe('AuthService.registrar', () => {
+  let service: AuthService;
+
+  let usuarioFindFirst: jest.Mock;
+  let estabelecimentoCreate: jest.Mock;
+  let usuarioCreate: jest.Mock;
+  let tentativaLoginCreate: jest.Mock;
+
+  function criarService(temUsuarioExistente: boolean): void {
+    usuarioFindFirst = jest
+      .fn()
+      .mockResolvedValue(temUsuarioExistente ? { id: 'usr-antigo' } : null);
+    estabelecimentoCreate = jest.fn().mockResolvedValue({ id: 'est-novo' });
+    usuarioCreate = jest.fn().mockResolvedValue({
+      id: 'usr-novo',
+      nome: 'Pizzaria Nova',
+      email: 'dono@nova.com',
+      estabelecimento: {
+        id: 'est-novo',
+        nome: 'Pizzaria Nova',
+        slug: 'pizzaria-nova',
+        telefone: null,
+      },
+    });
+    tentativaLoginCreate = jest.fn().mockResolvedValue({});
+
+    // `$transaction(cb)` executa o callback com um cliente fake; o `gerarSlugUnico`
+    // também chama `findUnique`, que devolve null (slug livre).
+    const tx = {
+      usuario: { findFirst: usuarioFindFirst, create: usuarioCreate },
+      estabelecimento: {
+        create: estabelecimentoCreate,
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+
+    const prisma = {
+      $transaction: jest.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+      tentativaLogin: { create: tentativaLoginCreate },
+    } as unknown as PrismaService;
+
+    const jwtService = { sign: jest.fn().mockReturnValue('token-fake') };
+    const estabelecimentos = {
+      porSlug: jest.fn(),
+    } as unknown as EstabelecimentosService;
+    const envioEmail = {
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn(),
+    } as unknown as EnvioEmailService;
+
+    service = new AuthService(
+      prisma,
+      jwtService as never,
+      estabelecimentos,
+      envioEmail,
+    );
+  }
+
+  it('permite o primeiro cadastro (bootstrap vazio)', async () => {
+    criarService(false);
+
+    const resposta = await service.registrar(
+      'Pizzaria Nova',
+      'Pizzaria Nova',
+      'dono@nova.com',
+      'senhaForte123',
+      'senhaForte123',
+      null,
+      '127.0.0.1',
+    );
+
+    expect(estabelecimentoCreate).toHaveBeenCalledTimes(1);
+    expect(usuarioCreate).toHaveBeenCalledTimes(1);
+    expect(resposta.token).toBe('token-fake');
+    expect(resposta.usuario.email).toBe('dono@nova.com');
+  });
+
+  it('bloqueia com 409 quando já existe pelo menos um usuário', async () => {
+    criarService(true);
+
+    await expect(
+      service.registrar(
+        'Outra Casa',
+        'Outra Casa',
+        'atacante@evil.com',
+        'senhaForte123',
+        'senhaForte123',
+        null,
+        '127.0.0.1',
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    // Nada foi escrito: nem estabelecimento, nem usuário
+    expect(estabelecimentoCreate).not.toHaveBeenCalled();
+    expect(usuarioCreate).not.toHaveBeenCalled();
+  });
+
+  it('recusa senhas que não conferem antes de consultar o banco', async () => {
+    criarService(false);
+
+    await expect(
+      service.registrar(
+        'Pizzaria',
+        'Pizzaria',
+        'dono@pizzaria.com',
+        'senhaA',
+        'senhaB',
+        null,
+        '127.0.0.1',
+      ),
+    ).rejects.toThrow('As senhas não conferem.');
+
+    expect(usuarioFindFirst).not.toHaveBeenCalled();
   });
 });

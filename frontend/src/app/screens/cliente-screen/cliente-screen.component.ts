@@ -7,6 +7,7 @@ import { ProdutoCardComponent } from '../../components/produto-card/produto-card
 import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrinho-drawer.component';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
+import { CartService } from '../../services/cart.service';
 
 @Component({
   selector: 'app-cliente-screen',
@@ -21,6 +22,13 @@ import { EstabelecimentoContextoService } from '../../services/estabelecimento-c
     <section class="cardapio">
       @if (produtoService.carregandoProdutos()) {
         <p>Carregando produtos...</p>
+      } @else if (produtoService.erroCardapio()) {
+        <p class="erro">
+          {{ produtoService.erroCardapio() }}
+          <button type="button" class="btn-tentar" (click)="tentarDeNovo()">
+            Tentar novamente
+          </button>
+        </p>
       } @else if (produtosFiltrados().length === 0) {
         <p>Nenhum produto encontrado.</p>
       } @else {
@@ -57,6 +65,22 @@ import { EstabelecimentoContextoService } from '../../services/estabelecimento-c
         box-shadow: var(--shadow-sm);
         line-height: 1.6;
       }
+      .cardapio > p.erro {
+        color: var(--danger, #c0392b);
+        border-color: var(--danger, #c0392b);
+      }
+      .cardapio .btn-tentar {
+        display: block;
+        margin: 16px auto 0;
+        padding: 10px 22px;
+        font: inherit;
+        font-weight: 600;
+        color: var(--text, #fff);
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+      }
     `,
   ],
 })
@@ -65,6 +89,7 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
   private readonly configuracoes = inject(ConfiguracoesService);
   private readonly contexto = inject(EstabelecimentoContextoService);
   private readonly route = inject(ActivatedRoute);
+  private readonly cart = inject(CartService);
 
   categoriaFiltro = signal<string>('todas');
   buscaFiltro = signal<string>('');
@@ -82,6 +107,10 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
       const slug = params.get('slug');
       if (!slug) return;
       this.contexto.definirSlugPublico(slug);
+      this.produtoService.erroCardapio.set(null);
+      // Isola o carrinho por casa: os itens de /cardapio/a não podem
+      // aparecer em /cardapio/b nem ser enviados no pedido de lá.
+      this.cart.definirEstabelecimento(slug);
       this.produtoService.loadCategoriasVisiveis(slug);
       this.produtoService.loadProdutos(false, slug);
     });
@@ -121,5 +150,13 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
   onFiltroChange(filtro: { categoria: string; busca: string }): void {
     this.categoriaFiltro.set(filtro.categoria);
     this.buscaFiltro.set(filtro.busca);
+  }
+
+  // Recarrega o cardápio após um erro de conexão, sem depender do cache
+  // antigo (que pode estar vazio justamente porque a carga falhou).
+  tentarDeNovo(): void {
+    const slug = this.contexto.slugAtual();
+    if (!slug) return;
+    this.produtoService.tentarNovamenteCardapio(slug);
   }
 }

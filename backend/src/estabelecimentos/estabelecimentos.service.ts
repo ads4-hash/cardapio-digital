@@ -20,12 +20,17 @@ export interface EstabelecimentoPublico {
 export class EstabelecimentosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async porSlug(slug: string): Promise<EstabelecimentoPublico> {
-    if (!slug || !slug.trim()) {
+  // O `slug` vem de `@Query`, que devolve array quando o parâmetro repete na
+  // URL (`?slug=a&slug=b`) e string quando vem único. Sem este filtro,
+  // `slug.trim` estourava com 500 para o array; agora os dois casos viram o
+  // mesmo caminho normalizado.
+  async porSlug(slug: string | string[]): Promise<EstabelecimentoPublico> {
+    const normalizado = (Array.isArray(slug) ? slug[0] : slug)?.trim();
+    if (!normalizado) {
       throw new BadRequestException('Slug do estabelecimento é obrigatório.');
     }
     const estabelecimento = await this.prisma.estabelecimento.findUnique({
-      where: { slug },
+      where: { slug: normalizado },
       select: { id: true, nome: true, slug: true, telefone: true },
     });
     if (!estabelecimento) {

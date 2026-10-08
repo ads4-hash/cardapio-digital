@@ -135,6 +135,12 @@ export class ProdutoService {
   // Sinais de carregamento compartilhados
   carregandoProdutos = signal(false);
 
+  // Erro na carga do cardápio público: a tela mostra uma mensagem com botão de
+  // "tentar novamente" em vez de um branco silencioso.
+  erroCardapio = signal<string | null>(null);
+  readonly MENSAGEM_ERRO_CARDAPIO =
+    'Não foi possível carregar o cardápio. Verifique sua conexão e tente novamente.';
+
   // Caches por slug (o catálogo de cada estabelecimento é independente)
   private produtosPorSlug = new Map<string, Produto[]>();
   private categoriasPorSlug = new Map<string, Categoria[]>();
@@ -181,12 +187,16 @@ export class ProdutoService {
 
     this.carregando.add(`p:${slug}`);
     this.carregandoProdutos.set(true);
+    this.erroCardapio.set(null);
     this.listar(slug).subscribe({
       next: (dados) => {
         this.produtosPorSlug.set(slug, dados);
         this.produtos.set(dados);
       },
-      error: (err) => console.error('Erro ao carregar produtos:', err),
+      error: (err) => {
+        console.error('Erro ao carregar produtos:', err);
+        this.erroCardapio.set(this.MENSAGEM_ERRO_CARDAPIO);
+      },
       complete: () => {
         this.carregando.delete(`p:${slug}`);
         this.carregandoProdutos.set(false);
@@ -230,7 +240,9 @@ export class ProdutoService {
     return this.categoriasVisiveis();
   }
 
-  // Carrega as categorias visíveis ao cliente (GET /categorias?slug=:slug&somenteVisiveis=true)
+  // Carrega as categorias visíveis ao cliente (GET /categorias?slug=:slug).
+  // O servidor já filtra a visibilidade para quem não é o admin do próprio
+  // estabelecimento: não há parâmetro extra a enviar.
   loadCategoriasVisiveis(slug = this.defaultSlug() ?? ''): void {
     if (isPlatformServer(this.platformId) || !slug) return;
 
@@ -240,15 +252,30 @@ export class ProdutoService {
     }
     if (this.carregando.has(`cv:${slug}`)) return;
     this.carregando.add(`cv:${slug}`);
+    this.erroCardapio.set(null);
 
-    this.listarCategoriasVisiveis(slug).subscribe({
+    this.listarCategorias(slug).subscribe({
       next: (dados) => {
         this.categoriasVisiveisPorSlug.set(slug, dados);
         this.categoriasVisiveis.set(dados);
       },
-      error: (err) => console.error('Erro ao carregar categorias visíveis:', err),
+      error: (err) => {
+        console.error('Erro ao carregar categorias visíveis:', err);
+        this.erroCardapio.set(this.MENSAGEM_ERRO_CARDAPIO);
+      },
       complete: () => this.carregando.delete(`cv:${slug}`),
     });
+  }
+
+  // Tentar de novo após erro: limpa o estado, derruba o cache do slug e
+  // recarrega produtos e categorias visíveis.
+  tentarNovamenteCardapio(slug = this.defaultSlug() ?? ''): void {
+    if (!slug) return;
+    this.erroCardapio.set(null);
+    this.produtosPorSlug.delete(slug);
+    this.categoriasVisiveisPorSlug.delete(slug);
+    this.loadProdutos(true, slug);
+    this.loadCategoriasVisiveis(slug);
   }
 
   // Buscar todos os produtos (GET /produtos?slug=:slug)
@@ -261,13 +288,6 @@ export class ProdutoService {
     slug = this.defaultSlug() ?? '',
   ): Observable<Categoria[]> {
     return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}`);
-  }
-
-  // Buscar apenas categorias visíveis para o cliente (GET /categorias?slug=:slug&somenteVisiveis=true)
-  private listarCategoriasVisiveis(
-    slug = this.defaultSlug() ?? '',
-  ): Observable<Categoria[]> {
-    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}&somenteVisiveis=true`);
   }
 
   // Criar categoria (POST /categorias)

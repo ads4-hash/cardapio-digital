@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -65,8 +69,22 @@ export class CategoriasService {
   async remove(estabelecimentoId: string, id: string) {
     await this.findOne(estabelecimentoId, id);
 
-    return this.prisma.categoria.delete({
-      where: { id },
-    });
+    // O cascade Categoria → Produto esbarra no RESTRICT de ItemPedido quando
+    // algum produto da categoria já aparece em um pedido; sem isto, o Prisma
+    // devolveria `P2003` e o filtro global traduziria para 500.
+    return this.prisma.categoria
+      .delete({ where: { id } })
+      .catch((erro) => this.tratarRestricao(erro));
+  }
+
+  // `P2003` = violação de chave estrangeira (RESTRICT) vinda do cascade
+  private tratarRestricao(erro: unknown): never {
+    const prismaErro = erro as { code?: string };
+    if (prismaErro?.code === 'P2003') {
+      throw new ConflictException(
+        'Não é possível excluir a categoria: existem pedidos com os produtos dela. Remova ou mova esses produtos primeiro.',
+      );
+    }
+    throw erro;
   }
 }

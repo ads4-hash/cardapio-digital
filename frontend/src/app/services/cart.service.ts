@@ -25,11 +25,28 @@ export interface CartItem {
 })
 export class CartService {
   private readonly _items = signal<CartItem[]>([]);
-  private readonly CHAVE_STORAGE = 'cart_items';
+  // Chave usada antes do isolamento por estabelecimento; mantida só para
+  // não perder um carrinho salvo na versão antiga.
+  private readonly CHAVE_LEGADA = 'cart_items';
+  private slugAtual: string | null = null;
 
   constructor() {
     // Recupera o carrinho salvo no navegador (persistência entre recarregamentos)
     this._items.set(this.carregarDoStorage());
+  }
+
+  // Troca o estabelecimento ativo: o carrinho passa a ler e escrever na
+  // chave do slug atual. Sem isso, um item adicionado em /cardapio/a
+  // aparecia em /cardapio/b e o checkout enviaria produtos de uma casa
+  // pedindo para outra.
+  definirEstabelecimento(slug: string | null): void {
+    if (this.slugAtual === slug) return;
+    this.slugAtual = slug;
+    this._items.set(this.carregarDoStorage());
+  }
+
+  private get chaveStorage(): string {
+    return this.slugAtual ? `cart_items_${this.slugAtual}` : this.CHAVE_LEGADA;
   }
 
   // Lista de itens no carrinho
@@ -185,7 +202,7 @@ export class CartService {
   private carregarDoStorage(): CartItem[] {
     if (typeof window === 'undefined') return [];
     try {
-      const bruto = window.localStorage.getItem(this.CHAVE_STORAGE);
+      const bruto = window.localStorage.getItem(this.chaveStorage);
       if (!bruto) return [];
       const dados = JSON.parse(bruto);
       return Array.isArray(dados) ? dados : [];
@@ -198,7 +215,7 @@ export class CartService {
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(
-        this.CHAVE_STORAGE,
+        this.chaveStorage,
         JSON.stringify(this._items()),
       );
     } catch {}

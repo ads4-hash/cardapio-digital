@@ -5,6 +5,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import { decimaisParaNumero } from '../common/decimais';
 import { origensCors } from '../cors';
 
 /** Eventos emitidos quando um pedido muda, para atualizar o painel admin em tempo real */
@@ -52,13 +53,15 @@ export class PedidosGateway implements OnGatewayConnection {
   emitirPedidoCriado(estabelecimentoId: string, pedido: unknown): void {
     this.server
       .to(roomDe(estabelecimentoId))
-      .emit(EVENTO_PEDIDO_CRIADO, pedido);
+      // Mesma normalização do HTTP: sem ela o socket ia mandar preco/total
+      // como string ("25.9") e o painel somaria errado.
+      .emit(EVENTO_PEDIDO_CRIADO, decimaisParaNumero(pedido));
   }
 
   emitirPedidoAtualizado(estabelecimentoId: string, pedido: unknown): void {
     this.server
       .to(roomDe(estabelecimentoId))
-      .emit(EVENTO_PEDIDO_ATUALIZADO, pedido);
+      .emit(EVENTO_PEDIDO_ATUALIZADO, decimaisParaNumero(pedido));
   }
 
   emitirPedidoRemovido(estabelecimentoId: string, id: string): void {

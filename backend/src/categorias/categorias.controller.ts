@@ -7,8 +7,10 @@ import {
   Param,
   Delete,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -21,6 +23,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { CategoriasService } from './categorias.service';
 import { CreateCategoriaDto } from './dto/create-categoria.dto';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto';
@@ -37,15 +40,21 @@ export class CategoriasController {
   constructor(
     private readonly categoriasService: CategoriasService,
     private readonly estabelecimentos: EstabelecimentosService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  // ?somenteVisiveis=true retorna apenas as categorias visíveis p/ o cliente.
-  // O slug identifica o estabelecimento (URL pública /cardapio/:slug).
+  // Público: retorna as categorias do estabelecimento (?slug=). Sem um token
+  // válido do próprio estabelecimento, devolve apenas as visíveis — igual a
+  // GET /produtos, para que o cardápio público não exponha categorias que o
+  // admin escondeu só porque o cliente esqueceu o parâmetro.
   @Get()
   @ApiOperation({
-    summary: 'Lista as categorias (público)',
-    description:
-      'Com `somenteVisiveis=true`, usada pelo cardápio público para não expor categorias ocultas. Sem o filtro, devolve todas.',
+    summary: 'Lista as categorias (público, com filtro por visibilidade)',
+    description: [
+      'Alimenta o cardápio público. Sem `Authorization`, a listagem vem **filtrada**:',
+      'categorias ocultas (`visivel=false`) não aparecem. Com um token do **próprio**',
+      'estabelecimento, tudo volta. O token de outro estabelecimento é ignorado.',
+    ].join('\n'),
   })
   @ApiQuery({
     name: 'slug',
@@ -53,27 +62,35 @@ export class CategoriasController {
     description: 'Slug do estabelecimento.',
     example: 'pizzaria-do-ze',
   })
-  @ApiQuery({
-    name: 'somenteVisiveis',
-    required: false,
-    description: '`true` devolve apenas as categorias visíveis ao cliente.',
-    example: 'true',
-  })
   @ApiOkResponse({ type: [CategoriaDto] })
   @ApiNotFoundResponse({
     type: RespostaErroDto,
     description: 'Slug não informado ou desconhecido.',
   })
-  async findAll(
-    @Query('slug') slug: string,
-    @Query('somenteVisiveis') somenteVisiveis?: string,
-  ) {
+  async findAll(@Query('slug') slug: string, @Req() request?: Request) {
     const estabelecimento = await this.estabelecimentos.porSlug(slug);
-    const filtro = somenteVisiveis === 'true';
+    const ehAdmin = (await this.tenantDoToken(request)) === estabelecimento.id;
     return this.categoriasService.findAll(
       estabelecimento.id,
-      filtro ? true : undefined,
+      ehAdmin ? undefined : true,
     );
+  }
+
+  // Só trata como admin quem apresenta um JWT válido **e** do mesmo
+  // estabelecimento resolvido pelo slug — validar o token sem comparar o
+  // `estabelecimentoId` deixaria um admin de outro tenant enxergar a
+  // listagem sem filtro de visibilidade (mesmo critério de GET /produtos).
+  private async tenantDoToken(request?: Request): Promise<string | null> {
+    const [tipo, token] = request?.headers.authorization?.split(' ') ?? [];
+    if (tipo !== 'Bearer' || !token) return null;
+    try {
+      const payload = await this.jwtService.verifyAsync<{
+        estabelecimentoId?: string;
+      }>(token);
+      return payload.estabelecimentoId ?? null;
+    } catch {
+      return null;
+    }
   }
 
   @UseGuards(AuthGuard)

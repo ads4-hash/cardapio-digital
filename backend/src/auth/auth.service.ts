@@ -85,6 +85,18 @@ export class AuthService {
     // falhar (ex.: e-mail duplicado) nada fica órfão no banco.
     const usuario = await this.prisma
       .$transaction(async (tx) => {
+        // O cadastro é só do bootstrap: o primeiro usuário vira o
+        // administrador e, depois dele, o endpoint responde 409 (como
+        // documentado no README e no Swagger). A conferência roda dentro da
+        // transação para encurtar a janela de dois cadastros simultâneos
+        // passarem juntos.
+        const jaExiste = await tx.usuario.findFirst({ select: { id: true } });
+        if (jaExiste) {
+          throw new ConflictException(
+            'O cadastro de administradores está encerrado. Entre em contato com o suporte para obter um acesso.',
+          );
+        }
+
         const estabelecimento = await tx.estabelecimento.create({
           data: {
             nome: nomeEstabelecimento.trim(),
@@ -147,9 +159,11 @@ export class AuthService {
         },
       },
     });
-    const senhaConfere = usuario
-      ? await compare(senha, usuario.senhaHash)
-      : false;
+    // O `compare` roda SEMPRE, mesmo quando a conta não existe (hash fictício
+    // de custo idêntico): sem isto, um e-mail não cadastrado respondia mais
+    // rápido e permitia descobrir quais contas existem pelo tempo da resposta.
+    const hashDeReferencia = usuario?.senhaHash ?? (await this.hashFicticio());
+    const senhaConfere = await compare(senha, hashDeReferencia);
 
     if (!usuario || !senhaConfere) {
       await this.registrarTentativa(ip, emailHash, false);
@@ -166,6 +180,8 @@ export class AuthService {
       where: { emailHash, sucesso: false, criadoEm: { gte: desde } },
     });
     await this.registrarTentativa(ip, emailHash, true);
+    // Fora do caminho crítico: só evita que as tabelas cresçam sem limite
+    void this.limparRegistrosAntigos().catch(() => undefined);
 
     return this.emitirTokenAcesso({
       id: usuario.id,
@@ -569,9 +585,39 @@ export class AuthService {
     });
   }
 
+  // Remove o que já não influencia mais nenhuma decisão: tentativas de login
+  // mais antigas que a janela de lockout (não são contadas nas consultas) e
+  // códigos de recuperação consumidos ou expirados. Sem isto, as duas tabelas
+  // crescem para sempre e as queries de bloqueio ficam cada vez mais caras.
+  private async limparRegistrosAntigos(): Promise<void> {
+    const agora = new Date();
+    const corteJanela = new Date(agora.getTime() - JANELA_FALHAS_MS);
+    await this.prisma.tentativaLogin.deleteMany({
+      where: { criadoEm: { lt: corteJanela } },
+    });
+    await this.prisma.recuperacaoSenha.deleteMany({
+      where: {
+        OR: [{ usadoEm: { not: null } }, { expiraEm: { lt: agora } }],
+      },
+    });
+  }
+
   // Nunca armazena o IP em texto puro: grava apenas o hash HMAC-SHA256
   private hashIp(ip: string): string {
     return this.hashSiglao(ip);
+  }
+
+  private hashFicticioCache: string | null = null;
+
+  // Hash bcrypt válido (custo idêntico ao real) de uma senha descartável:
+  // só existe para gastar o mesmo tempo de CPU de um `compare` de verdade
+  // quando a conta consultada não existe.
+  private async hashFicticio(): Promise<string> {
+    this.hashFicticioCache ??= await hash(
+      'conta-inexistente',
+      CUSTO_HASH_BCRYPT,
+    );
+    return this.hashFicticioCache;
   }
 
   // Mesmo tratamento do IP: o e-mail também só é gravado como hash
