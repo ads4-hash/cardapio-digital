@@ -11,9 +11,13 @@ import type {
 
 function vinculo(nome: string, precoAdicional: number): ProdutoIngrediente {
   return {
+    id: `vi-${nome}`,
     precoAdicional,
+    produtoId: 'p1',
     ingredienteId: `ing-${nome}`,
+    grupoId: null,
     ingrediente: { id: `ing-${nome}`, nome, disponivel: true } as never,
+    grupo: null,
   };
 }
 
@@ -38,10 +42,13 @@ function vinculoNoGrupo(
   grupoId: string,
 ): ProdutoIngrediente {
   return {
+    id: `vi-${nome}`,
     precoAdicional,
+    produtoId: 'p1',
     ingredienteId: `ing-${nome}`,
     ingrediente: { id: `ing-${nome}`, nome, disponivel: true } as never,
     grupoId,
+    grupo: null,
   };
 }
 
@@ -291,6 +298,7 @@ describe('PersonalizacaoProdutoComponent - stepper de ingredientes', () => {
       ordem: 0,
       maximoEscolhas,
       minimoEscolhas,
+      produtoId: 'p1',
     });
 
     it('bloqueia o carrinho enquanto o grupo obrigatório não atinge o mínimo', () => {

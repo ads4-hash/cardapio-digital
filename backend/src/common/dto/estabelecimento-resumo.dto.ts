@@ -1,10 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { EstabelecimentoResumo } from '@projetinho/contratos';
 
 /**
  * Estabelecimento (tenant) como aparece dentro das respostas de `auth`:
  * sem timestamps e sem as coleções de produtos/pedidos.
+ *
+ * `implements EstabelecimentoResumo` garante em tempo de compilação que o DTO
+ * continua compatível com o contrato consumido pelo frontend.
  */
-export class EstabelecimentoResumoDto {
+export class EstabelecimentoResumoDto implements EstabelecimentoResumo {
   @ApiProperty({
     description: 'UUID do estabelecimento.',
     example: '8f2c1a90-4b3e-4c7d-9e11-2a5b6c7d8e90',

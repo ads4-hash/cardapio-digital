@@ -1,0 +1,7 @@
+{
+  "name": "@projetinho/contratos",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Contratos de tipos compartilhados entre o backend (NestJS) e o frontend (Angular)",
+  "types": "./src/index.d.ts"
+}

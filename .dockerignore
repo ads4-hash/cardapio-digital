@@ -1,0 +1,22 @@
+# Contexto de build = raiz do repositório (workspace npm).
+# Estas regras valem para os dois Dockerfiles (backend e frontend).
+**/node_modules
+**/dist
+**/.angular
+**/*.tsbuildinfo
+
+# Ambiente
+**/.env
+**/.env.*
+!**/.env.example
+
+# Artefatos locais
+**/uploads
+**/prisma/*.db
+**/prisma/*.db-journal
+*.log
+
+# Metadados do repositório
+.git
+.github
+.vscode

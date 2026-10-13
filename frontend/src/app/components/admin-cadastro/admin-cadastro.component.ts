@@ -48,7 +48,7 @@ export class AdminCadastroComponent implements OnInit {
 
   readonly TIPO = { PADRAO: 'PADRAO', MARMITA: 'MARMITA' } as const;
 
-  novoProduto = signal<Produto>({
+  novoProduto = signal<ProdutoParaSalvar>({
     nome: '',
     descricao: '',
     preco: 0,

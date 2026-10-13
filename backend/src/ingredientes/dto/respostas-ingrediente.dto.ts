@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { Ingrediente } from '@projetinho/contratos';
 
 /** Ingrediente disponível para personalização dos produtos. */
-export class IngredienteDto {
+export class IngredienteDto implements Ingrediente {
   @ApiProperty({ example: 'd1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f' })
   id: string;
 

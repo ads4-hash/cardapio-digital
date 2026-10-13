@@ -1,4 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type {
+  Produto as ProdutoContrato,
+  ProdutoGrupo as ProdutoGrupoContrato,
+  ProdutoIngrediente as ProdutoIngredienteContrato,
+  TipoProduto,
+} from '@projetinho/contratos';
 import { CategoriaDto } from '../../categorias/dto/respostas-categoria.dto';
 import { IngredienteDto } from '../../ingredientes/dto/respostas-ingrediente.dto';
 
@@ -10,7 +16,7 @@ import { IngredienteDto } from '../../ingredientes/dto/respostas-ingrediente.dto
  * `maximoEscolhas` e `minimoEscolhas`, e o `id` não faz sentido no payload de
  * criação.
  */
-export class ProdutoGrupoRespostaDto {
+export class ProdutoGrupoRespostaDto implements ProdutoGrupoContrato {
   @ApiProperty({ example: 'b8a7c6d5-e4f3-4a2b-9c1d-0e9f8a7b6c5d' })
   id: string;
 
@@ -49,7 +55,7 @@ export class ProdutoGrupoRespostaDto {
  * `ingredienteId`, `precoAdicional` e `grupo`; nomes iguais se sobrescrevem no
  * índice de schemas do Swagger.
  */
-export class ProdutoIngredienteRespostaDto {
+export class ProdutoIngredienteRespostaDto implements ProdutoIngredienteContrato {
   @ApiProperty({ example: 'e2f3a4b5-c6d7-4e8f-9a01-2b3c4d5e6f70' })
   id: string;
 
@@ -66,6 +72,15 @@ export class ProdutoIngredienteRespostaDto {
   @ApiProperty({ example: 'd1e2f3a4-b5c6-4d7e-8f90-1a2b3c4d5e6f' })
   ingredienteId: string;
 
+  @ApiProperty({
+    example: 'b8a7c6d5-e4f3-4a2b-9c1d-0e9f8a7b6c5d',
+    nullable: true,
+    type: String,
+    description:
+      'Id do grupo de escolha ao qual o ingrediente pertence (coluna escalar do vínculo). Nulo quando o ingrediente é solto.',
+  })
+  grupoId: string | null;
+
   @ApiProperty({ type: IngredienteDto })
   ingrediente: IngredienteDto;
 
@@ -79,7 +94,7 @@ export class ProdutoIngredienteRespostaDto {
 }
 
 /** Produto do cardápio, com a categoria e os ingredientes personalizáveis. */
-export class ProdutoDto {
+export class ProdutoDto implements ProdutoContrato {
   @ApiProperty({ example: 'f3a4b5c6-d7e8-4f90-a012-3c4d5e6f7081' })
   id: string;
 
@@ -111,7 +126,7 @@ export class ProdutoDto {
     enum: ['PADRAO', 'MARMITA'],
     example: 'PADRAO',
   })
-  tipo: string;
+  tipo: TipoProduto;
 
   @ApiProperty({ example: 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f' })
   categoriaId: string;

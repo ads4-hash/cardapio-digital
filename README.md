@@ -15,19 +15,31 @@ acompanha e atualiza o status instantaneamente.
 ## Estrutura
 
 ```
-backend/   API REST + WebSocket (porta 3000)
-frontend/  Aplicação Angular com SSR (porta 4200 em dev, 4000 em produção)
+backend/            API REST + WebSocket (porta 3000)
+frontend/           Aplicação Angular com SSR (porta 4200 em dev, 4000 em produção)
+packages/contratos/ Tipos compartilhados entre backend e frontend (@projetinho/contratos)
 docker-compose.yml  Subida do projeto completo
 ```
 
+O repositório é um **workspace npm** (uma única instalação na raiz e um único
+`package-lock.json`). O pacote `@projetinho/contratos` concentra os tipos das
+respostas/payloads da API, consumidos pelos dois lados via `import type`; os DTOs
+de resposta do backend usam `implements` para garantir, em tempo de compilação,
+que continuam compatíveis com o contrato.
+
 ## Rodando em desenvolvimento
+
+Instale as dependências **uma vez, na raiz** (workspace npm):
+
+```bash
+npm install
+```
 
 ### Backend
 
 ```bash
 cd backend
 cp .env.example .env   # preencha o JWT_SECRET com um valor longo e aleatório
-npm install
 npx prisma migrate deploy
 npx prisma db seed      # opcional: popula categorias/produtos/ingredientes
 npm run start:dev       # http://localhost:3000
@@ -37,7 +49,6 @@ npm run start:dev       # http://localhost:3000
 
 ```bash
 cd frontend
-npm install
 npm start               # http://localhost:4200
 ```
 
@@ -108,15 +119,17 @@ PUBLIC_API_URL=https://api.seudominio.com ALLOWED_HOSTS=seudominio.com docker co
 ## Testes e checagens
 
 ```bash
-# Backend: build + lint
-cd backend
-npm run build
-npm run lint
+# Instale as dependências na raiz (workspace) antes de tudo
+npm install
+
+# Backend: build + lint + testes
+npm run build --workspace backend
+npm run lint --workspace backend
+npm test --workspace backend
 
 # Frontend: build + testes
-cd frontend
-npm run build
-npm test        # ng test (Vitest, sem watch)
+npm run build --workspace frontend
+npm test --workspace frontend   # ng test (Vitest, sem watch)
 ```
 
 ## Rotas principais da API

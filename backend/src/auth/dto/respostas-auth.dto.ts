@@ -1,8 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type {
+  InfoCardapio,
+  Mensagem,
+  PerfilAtualizado,
+  RecuperacaoResposta,
+  RespostaAuth,
+  UsuarioPublico,
+} from '@projetinho/contratos';
 import { EstabelecimentoResumoDto } from '../../common/dto/estabelecimento-resumo.dto';
 
 /** Usuário logado, sem o hash da senha. */
-export class UsuarioPublicoDto {
+export class UsuarioPublicoDto implements UsuarioPublico {
   @ApiProperty({ example: 'b1a2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d' })
   id: string;
 
@@ -24,7 +32,7 @@ export class UsuarioPublicoDto {
 }
 
 /** Resposta de `POST /auth/registrar`, `POST /auth/login` e `POST /auth/refresh`. */
-export class RespostaAuthDto {
+export class RespostaAuthDto implements RespostaAuth {
   @ApiProperty({
     description:
       'Access token JWT, curto (15 min). Enviar como "Authorization: Bearer <token>".',
@@ -44,7 +52,10 @@ export class RespostaAuthDto {
 }
 
 /** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, tokens novos. */
-export class PerfilAtualizadoDto extends UsuarioPublicoDto {
+export class PerfilAtualizadoDto
+  extends UsuarioPublicoDto
+  implements PerfilAtualizado
+{
   @ApiProperty({
     required: false,
     description:
@@ -61,7 +72,7 @@ export class PerfilAtualizadoDto extends UsuarioPublicoDto {
 }
 
 /** Resposta de `GET /auth/cardapio` — nome e contato, para telas públicas. */
-export class InfoCardapioDto {
+export class InfoCardapioDto implements InfoCardapio {
   @ApiProperty({ example: 'Pizzaria do Zé' })
   nome: string;
 
@@ -74,7 +85,7 @@ export class InfoCardapioDto {
 }
 
 /** Resposta de `POST /auth/recuperar-senha`. */
-export class RecuperacaoRespostaDto {
+export class RecuperacaoRespostaDto implements RecuperacaoResposta {
   @ApiProperty({
     description:
       'true quando o código foi enviado por e-mail (SMTP configurado).',
@@ -107,7 +118,7 @@ export class RecuperacaoRespostaDto {
 }
 
 /** Resposta de `POST /auth/redefinir-senha` e `PATCH /auth/me`. */
-export class MensagemDto {
+export class MensagemDto implements Mensagem {
   @ApiProperty({
     description:
       'Confirmação em texto, já pronta para exibir na tela. Endpoints que não têm payload próprio devolvem só isto.',

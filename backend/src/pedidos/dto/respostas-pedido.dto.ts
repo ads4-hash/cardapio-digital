@@ -1,4 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import type {
+  FormaPagamento,
+  ItemPedido,
+  ItemPedidoRastreio,
+  Pedido,
+  PedidoRastreio,
+  PedidoStatus,
+  TipoEntrega,
+} from '@projetinho/contratos';
 import { ProdutoDto } from '../../produtos/dto/respostas-produto.dto';
 
 /**
@@ -10,7 +19,7 @@ import { ProdutoDto } from '../../produtos/dto/respostas-produto.dto';
  * (`ItemPedidoDto` em `create-pedido.dto.ts`) já existe, e o Swagger
  * indexa os schemas pelo nome da classe — nomes iguais se sobrescrevem.
  */
-export class ItemPedidoRespostaDto {
+export class ItemPedidoRespostaDto implements ItemPedido {
   @ApiProperty({ example: 'a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d' })
   id: string;
 
@@ -46,7 +55,7 @@ export class ItemPedidoRespostaDto {
 }
 
 /** Pedido no painel do admin. */
-export class PedidoDto {
+export class PedidoDto implements Pedido {
   @ApiProperty({
     description:
       'UUID do pedido. É o que o cliente acompanha em /pedido/:id — não é adivinhável.',
@@ -62,7 +71,7 @@ export class PedidoDto {
     enum: ['RETIRADA', 'ENTREGA'],
     example: 'ENTREGA',
   })
-  tipoEntrega: string;
+  tipoEntrega: TipoEntrega;
 
   @ApiProperty({
     example: 'Rua das Flores, 120 - Centro',
@@ -90,7 +99,7 @@ export class PedidoDto {
     ],
     example: 'EM_PREPARO',
   })
-  status: string;
+  status: PedidoStatus;
 
   @ApiProperty({ description: 'Total do pedido, em reais.', example: 104.8 })
   total: number;
@@ -100,7 +109,7 @@ export class PedidoDto {
     enum: ['DINHEIRO', 'PIX', 'CARTAO'],
     example: 'PIX',
   })
-  formaPagamento: string;
+  formaPagamento: FormaPagamento;
 
   @ApiProperty({
     description:
@@ -131,7 +140,7 @@ export class PedidoDto {
  * Declarado antes de `PedidoRastreioDto` porque o decorator `@ApiProperty`
  * é avaliado na definição da classe.
  */
-export class ItemPedidoRastreioDto {
+export class ItemPedidoRastreioDto implements ItemPedidoRastreio {
   @ApiProperty({
     description: 'Nome do produto, já copiado do produto (o ID não é exposto).',
     example: 'Pizza Margherita',
@@ -168,7 +177,7 @@ export class ItemPedidoRastreioDto {
  * o produto inteiro e com `criadoEm`. Inclui o slug do estabelecimento para o
  * cliente carregar a identidade visual do cardápio certo.
  */
-export class PedidoRastreioDto {
+export class PedidoRastreioDto implements PedidoRastreio {
   @ApiProperty({ example: 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e' })
   id: string;
 
@@ -190,13 +199,13 @@ export class PedidoRastreioDto {
     ],
     example: 'PRONTO',
   })
-  status: string;
+  status: PedidoStatus;
 
   @ApiProperty({ example: 'João da Silva' })
   cliente: string;
 
   @ApiProperty({ enum: ['RETIRADA', 'ENTREGA'], example: 'RETIRADA' })
-  tipoEntrega: string;
+  tipoEntrega: TipoEntrega;
 
   @ApiPropertyOptional({
     example: 'Rua das Flores, 120 - Centro',
@@ -219,7 +228,7 @@ export class PedidoRastreioDto {
   total: number;
 
   @ApiProperty({ enum: ['DINHEIRO', 'PIX', 'CARTAO'], example: 'DINHEIRO' })
-  formaPagamento: string;
+  formaPagamento: FormaPagamento;
 
   @ApiPropertyOptional({ example: 150, nullable: true, type: Number })
   trocoPara?: number | null;

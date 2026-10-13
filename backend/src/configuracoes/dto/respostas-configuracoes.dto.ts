@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type {
+  AceitandoPedidos,
+  TaxaEntrega,
+  VisualCardapio,
+} from '@projetinho/contratos';
 
 /** `GET`/`PATCH /configuracoes/aceitando-pedidos` */
-export class AceitandoPedidosDto {
+export class AceitandoPedidosDto implements AceitandoPedidos {
   @ApiProperty({
     description:
       'Quando false, o cardápio público fica bloqueado para novos pedidos.',
@@ -11,7 +16,7 @@ export class AceitandoPedidosDto {
 }
 
 /** `GET`/`PATCH /configuracoes/taxa-entrega` */
-export class TaxaEntregaDto {
+export class TaxaEntregaDto implements TaxaEntrega {
   @ApiProperty({
     description:
       'Taxa cobrada em entregas, em reais. 0 significa entrega grátis.',
@@ -21,7 +26,7 @@ export class TaxaEntregaDto {
 }
 
 /** `GET`/`PATCH /configuracoes/cardapio` — identidade visual do cardápio */
-export class VisualCardapioDto {
+export class VisualCardapioDto implements VisualCardapio {
   @ApiProperty({
     description: 'Cor principal da marca, em hexadecimal.',
     example: '#f43f5e',

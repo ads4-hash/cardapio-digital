@@ -7,7 +7,9 @@ import { ProdutoService } from '../../services/produto.service';
 import type { Ingrediente } from '../../models/produto.model';
 
 function lista(...nomes: string[]): Ingrediente[] {
-  return nomes.map((nome) => ({ id: `ing-${nome}`, nome }));
+  return nomes.map(
+    (nome) => ({ id: `ing-${nome}`, nome }) as unknown as Ingrediente,
+  );
 }
 
 function montar(ingredientes: Ingrediente[]) {

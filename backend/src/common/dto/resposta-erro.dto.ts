@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { RespostaErro } from '@projetinho/contratos';
 
 /**
  * Corpo de TODAS as respostas de erro da API, produzido pelo
  * `ErrosGlobaisFilter`. Vale para 400/401/403/404/413/429/500.
  */
-export class RespostaErroDto {
+export class RespostaErroDto implements RespostaErro {
   @ApiProperty({
     description: 'Código HTTP da resposta.',
     example: 400,

@@ -1,32 +1,14 @@
-export interface EstabelecimentoUsuario {
-  id: string;
-  nome: string;
-  slug: string;
-  telefone?: string | null;
-}
+// Contratos de autenticação vêm do pacote compartilhado @projetinho/contratos.
+import type { UsuarioPublico } from '@projetinho/contratos';
 
-export interface UsuarioLogado {
-  id: string;
-  nome: string;
-  email: string;
-  estabelecimento?: EstabelecimentoUsuario;
-  telefone?: string | null;
-}
+export type {
+  EstabelecimentoResumo as EstabelecimentoUsuario,
+  UsuarioPublico as UsuarioLogado,
+  RespostaAuth as AuthResponse,
+  RecuperacaoResposta as RecuperacaoResponse,
+} from '@projetinho/contratos';
 
-export interface AuthResponse {
-  token: string;
-  refreshToken: string;
-  usuario: UsuarioLogado;
-}
-
-export type UsuarioLogadoComTokens = UsuarioLogado & {
+export type UsuarioLogadoComTokens = UsuarioPublico & {
   token?: string;
   refreshToken?: string;
 };
-
-export interface RecuperacaoResponse {
-  enviadoPorEmail: boolean;
-  mensagem: string;
-  token?: string;
-  expiraEm?: string;
-}

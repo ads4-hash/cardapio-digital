@@ -1,6 +1,2 @@
-export interface VisualCardapio {
-  cor: string | null;
-  logoUrl: string | null;
-  capaUrl: string | null;
-  tema: 'claro' | 'escuro' | 'auto';
-}
+// Contrato de configuração visual vindo do pacote compartilhado.
+export type { VisualCardapio } from '@projetinho/contratos';
