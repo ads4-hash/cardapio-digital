@@ -634,13 +634,19 @@ export class AdminCadastroComponent implements OnInit {
     return id in this.ingredientesSelecionados();
   }
 
-  // Ingredientes filtrados pelo termo de busca (na tela de cadastro de produto)
+  // Ingredientes filtrados pelo termo de busca (na tela de cadastro de produto).
+  // Os já selecionados aparecem no topo para facilitar a remoção.
   ingredientesFiltrados(): Ingrediente[] {
     const termo = this.buscaIngrediente().trim().toLowerCase();
-    if (!termo) return this.ingredientesDisponiveis();
-    return this.ingredientesDisponiveis().filter((ing) =>
-      ing.nome.toLowerCase().includes(termo),
-    );
+    const lista = termo
+      ? this.ingredientesDisponiveis().filter((ing) =>
+          ing.nome.toLowerCase().includes(termo),
+        )
+      : this.ingredientesDisponiveis();
+    return [
+      ...lista.filter((ing) => this.ingredienteIncluso(ing.id)),
+      ...lista.filter((ing) => !this.ingredienteIncluso(ing.id)),
+    ];
   }
 
   // Ingredientes selecionados (objetos completos) na ordem cadastrada
