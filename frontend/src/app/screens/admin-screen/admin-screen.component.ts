@@ -153,7 +153,7 @@ export class AdminScreenComponent implements OnInit {
 
   ngOnInit(): void {
     this.produtoService.loadCategorias();
-    this.produtoService.loadProdutos();
+    this.produtoService.loadProdutos(true);
     this.notificacoes.iniciar();
   }
 

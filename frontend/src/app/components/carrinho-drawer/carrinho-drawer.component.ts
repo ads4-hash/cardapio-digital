@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CartService, CartItem, ItemIngrediente } from '../../services/cart.service';
@@ -703,12 +704,24 @@ export class CarrinhoDrawerComponent {
           this.enviando.set(false);
           this.etapa.set('sucesso');
         },
-        error: (err) => {
+        error: (err: HttpErrorResponse) => {
           console.error('Erro ao gravar pedido:', err);
           this.enviando.set(false);
-          this.erro.set('Não foi possível enviar o pedido. Tente novamente.');
+          // Mostra o motivo real do servidor (ex.: grupo que exige escolha) em
+          // vez de um texto genérico que o cliente não entende.
+          this.erro.set(
+            this.mensagemDoBackend(err) ??
+              'Não foi possível enviar o pedido. Tente novamente.',
+          );
         },
       });
+  }
+
+  // Extrai a mensagem do backend, que vem como string ou array (validação).
+  private mensagemDoBackend(erro: HttpErrorResponse): string | null {
+    const mensagem = erro?.error?.message;
+    if (Array.isArray(mensagem)) return mensagem.join(' ');
+    return typeof mensagem === 'string' && mensagem ? mensagem : null;
   }
 
   fechar(): void {

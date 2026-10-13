@@ -55,9 +55,16 @@ interface EstadoIngrediente {
               <section class="grupo">
                 <header class="grupo-header">
                   <h4>{{ grupo.nome }}</h4>
-                  <span class="grupo-contador" [class.cheio]="grupoCheio(grupo)">
+                  <span
+                    class="grupo-contador"
+                    [class.cheio]="grupoCheio(grupo)"
+                    [class.faltando]="grupoAbaixoDoMinimo(grupo)"
+                  >
                     {{ escolhidosNoGrupo(grupo) }} de {{ grupo.maximoEscolhas }}
                     {{ grupo.maximoEscolhas === 1 ? 'porção' : 'porções' }}
+                    @if (grupo.minimoEscolhas > 0) {
+                      · mín. {{ grupo.minimoEscolhas }}
+                    }
                   </span>
                 </header>
                 <ul class="ingredientes">
@@ -106,7 +113,14 @@ interface EstadoIngrediente {
               <strong>{{ precoTotal() * quantidade() | currency:'BRL' }}</strong>
             </p>
           </div>
-          <button class="btn-adicionar" (click)="adicionar()">
+          @if (mensagemFaltando(); as aviso) {
+            <p class="erro-escolhas" role="alert">{{ aviso }}</p>
+          }
+          <button
+            class="btn-adicionar"
+            [disabled]="!podeAdicionar()"
+            (click)="adicionar()"
+          >
             @if (editando()) {
               Salvar correções
             } @else {
@@ -223,6 +237,7 @@ interface EstadoIngrediente {
       font-variant-numeric: tabular-nums;
     }
     .grupo-contador.cheio { color: var(--primary); }
+    .grupo-contador.faltando { color: var(--danger); }
     .grupo-contador.livre { font-weight: 600; }
     .ingredientes { list-style: none; margin: 0; padding: 0; }
     .linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 2px; border-bottom: 1px solid var(--border); }
@@ -307,6 +322,24 @@ interface EstadoIngrediente {
     }
     .btn-adicionar:hover { filter: brightness(1.05); box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 40%, transparent); }
     .btn-adicionar:active { transform: scale(0.98); }
+    .btn-adicionar:disabled {
+      background: var(--surface-hover);
+      color: var(--text-muted);
+      box-shadow: none;
+      cursor: not-allowed;
+      filter: none;
+    }
+    .btn-adicionar:disabled:active { transform: none; }
+    .erro-escolhas {
+      margin: 0 0 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--danger-light);
+      color: var(--danger);
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.4;
+    }
   `],
 })
 export class PersonalizacaoProdutoComponent {
@@ -400,6 +433,39 @@ export class PersonalizacaoProdutoComponent {
     return this.escolhidosNoGrupo(grupo) >= grupo.maximoEscolhas;
   }
 
+  // Grupo obrigatório (minimoEscolhas > 0) que ainda não atingiu o piso.
+  grupoAbaixoDoMinimo(grupo: ProdutoGrupo): boolean {
+    return (
+      grupo.minimoEscolhas > 0 &&
+      this.escolhidosNoGrupo(grupo) < grupo.minimoEscolhas
+    );
+  }
+
+  // Grupos que ainda precisam de escolha. Enquanto houver algum, o item não
+  // pode ir para o carrinho: o servidor recusaria o pedido no checkout.
+  private gruposFaltando(): ProdutoGrupo[] {
+    return this.gruposDoProduto().filter((g) => this.grupoAbaixoDoMinimo(g));
+  }
+
+  podeAdicionar(): boolean {
+    return this.gruposFaltando().length === 0;
+  }
+
+  // Explica o que falta para o cliente poder adicionar (ex.: "escolha 1 porção
+  // em \"Sabores\""), em vez de só desabilitar o botão sem motivo.
+  mensagemFaltando(): string | null {
+    const faltando = this.gruposFaltando();
+    if (faltando.length === 0) return null;
+
+    const partes = faltando.map((g) => {
+      const restam = g.minimoEscolhas - this.escolhidosNoGrupo(g);
+      const unidade = restam === 1 ? 'porção' : 'porções';
+      return `${restam} ${unidade} em "${g.nome}"`;
+    });
+
+    return `Antes de adicionar, escolha ${partes.join(' e ')}.`;
+  }
+
   // Teto do grupo, sem contar o próprio ingrediente que se quer somar: assim dá
   // para desmarcar a última porção já escolhida.
   estourouGrupo(ing: EstadoIngrediente): boolean {
@@ -491,6 +557,11 @@ export class PersonalizacaoProdutoComponent {
   adicionar(): void {
     const produto = this.produto();
     if (!produto) return;
+
+    // Rede de segurança: se algum grupo obrigatório ficou incompleto, não deixa
+    // o item entrar no carrinho (o botão já fica desabilitado, mas o Enter ou um
+    // clique programático não podem furar a regra).
+    if (!this.podeAdicionar()) return;
 
     // "Sem": ingredientes base removidos (quantidade zerada). Não existe em
     // montagem — lá o cliente apenas escolhe o que quer, sem remover.

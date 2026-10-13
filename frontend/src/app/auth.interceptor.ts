@@ -4,12 +4,13 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 
 import { AuthService } from './services/auth.service';
+import { REQUISICAO_PUBLICA } from './http-publico';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  const token = auth.getToken();
+  const token = req.context.get(REQUISICAO_PUBLICA) ? null : auth.getToken();
   const requisicao = token
     ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
     : req;

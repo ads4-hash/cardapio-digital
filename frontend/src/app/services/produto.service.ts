@@ -1,9 +1,10 @@
 import { Injectable, inject, signal, PLATFORM_ID } from '@angular/core';
 import { isPlatformServer } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, firstValueFrom } from 'rxjs';
 
 import { environment } from '../environment';
+import { REQUISICAO_PUBLICA } from '../http-publico';
 import { EstabelecimentoContextoService } from './estabelecimento-contexto.service';
 
 // Interface representando a entidade do Categoria
@@ -25,11 +26,14 @@ export type TipoProduto = 'PADRAO' | 'MARMITA';
 // Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
 // maximoEscolhas limita quantas porções o cliente pode somar no grupo, contando
 // repetição: 2 permite escolher a mesma proteína duas vezes.
+// minimoEscolhas é o piso: com 1 o cliente é obrigado a escolher no grupo antes
+// de mandar o pedido. Nunca passa do maximoEscolhas.
 export interface ProdutoGrupo {
   id?: string;
   nome: string;
   ordem?: number;
   maximoEscolhas: number;
+  minimoEscolhas: number;
 }
 
 // Interface representando o vínculo de um ingrediente a um produto
@@ -76,7 +80,7 @@ export interface ProdutoParaSalvar {
   imagemUrl?: string | null;
   categoriaId: string;
   tipo?: TipoProduto;
-  grupos?: { nome: string; maximoEscolhas: number }[];
+  grupos?: { nome: string; maximoEscolhas: number; minimoEscolhas: number }[];
   ingredientes?: {
     ingredienteId: string;
     precoAdicional: number;
@@ -176,7 +180,7 @@ export class ProdutoService {
   }
 
   // Carrega produtos do estabelecimento; se já carregados, reutiliza o cache
-  loadProdutos(force = false, slug = this.defaultSlug() ?? ''): void {
+  loadProdutos(force = false, slug = this.defaultSlug() ?? '', publico = false): void {
     if (isPlatformServer(this.platformId) || !slug) return;
     const emVoo = this.carregando.has(`p:${slug}`);
     if (emVoo) return;
@@ -188,7 +192,7 @@ export class ProdutoService {
     this.carregando.add(`p:${slug}`);
     this.carregandoProdutos.set(true);
     this.erroCardapio.set(null);
-    this.listar(slug).subscribe({
+    this.listar(slug, publico).subscribe({
       next: (dados) => {
         this.produtosPorSlug.set(slug, dados);
         this.produtos.set(dados);
@@ -217,7 +221,7 @@ export class ProdutoService {
     if (isPlatformServer(this.platformId)) return this.produtos();
     if (!slug) return this.produtos();
     try {
-      const dados = await firstValueFrom(this.listar(slug));
+      const dados = await firstValueFrom(this.listar(slug, true));
       this.produtosPorSlug.set(slug, dados);
       this.produtos.set(dados);
       return dados;
@@ -254,7 +258,7 @@ export class ProdutoService {
     this.carregando.add(`cv:${slug}`);
     this.erroCardapio.set(null);
 
-    this.listarCategorias(slug).subscribe({
+    this.listarCategorias(slug, true).subscribe({
       next: (dados) => {
         this.categoriasVisiveisPorSlug.set(slug, dados);
         this.categoriasVisiveis.set(dados);
@@ -274,20 +278,27 @@ export class ProdutoService {
     this.erroCardapio.set(null);
     this.produtosPorSlug.delete(slug);
     this.categoriasVisiveisPorSlug.delete(slug);
-    this.loadProdutos(true, slug);
+    this.loadProdutos(true, slug, true);
     this.loadCategoriasVisiveis(slug);
   }
 
   // Buscar todos os produtos (GET /produtos?slug=:slug)
-  listar(slug = this.defaultSlug() ?? ''): Observable<Produto[]> {
-    return this.http.get<Produto[]>(`${this.API_URL}?slug=${encodeURIComponent(slug)}`);
+  listar(slug = this.defaultSlug() ?? '', publico = false): Observable<Produto[]> {
+    return this.http.get<Produto[]>(
+      `${this.API_URL}?slug=${encodeURIComponent(slug)}`,
+      { context: new HttpContext().set(REQUISICAO_PUBLICA, publico) },
+    );
   }
 
   // Buscar todas as categorias (GET /categorias?slug=:slug)
   private listarCategorias(
     slug = this.defaultSlug() ?? '',
+    publico = false,
   ): Observable<Categoria[]> {
-    return this.http.get<Categoria[]>(`${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}`);
+    return this.http.get<Categoria[]>(
+      `${this.CATEGORIAS_URL}?slug=${encodeURIComponent(slug)}`,
+      { context: new HttpContext().set(REQUISICAO_PUBLICA, publico) },
+    );
   }
 
   // Criar categoria (POST /categorias)

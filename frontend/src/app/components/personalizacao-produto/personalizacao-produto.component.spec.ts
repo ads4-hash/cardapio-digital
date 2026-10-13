@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { PersonalizacaoProdutoComponent } from './personalizacao-produto.component';
 import { CartItem, CartService } from '../../services/cart.service';
-import type { Produto, ProdutoIngrediente } from '../../services/produto.service';
+import type {
+  Produto,
+  ProdutoGrupo,
+  ProdutoIngrediente,
+} from '../../services/produto.service';
 
 function vinculo(nome: string, precoAdicional: number): ProdutoIngrediente {
   return {
@@ -23,6 +27,37 @@ function produtoCom(
     imagemUrl: null,
     categoriaId: 'c1',
     categoria: { id: 'c1', nome: 'Pizzas' },
+    ingredientes,
+  } as unknown as Produto;
+}
+
+function vinculoNoGrupo(
+  nome: string,
+  precoAdicional: number,
+  grupoId: string,
+): ProdutoIngrediente {
+  return {
+    precoAdicional,
+    ingredienteId: `ing-${nome}`,
+    ingrediente: { id: `ing-${nome}`, nome, disponivel: true } as never,
+    grupoId,
+  };
+}
+
+function produtoMontagem(
+  grupos: ProdutoGrupo[],
+  ...ingredientes: ProdutoIngrediente[]
+): Produto {
+  return {
+    id: 'p1',
+    nome: 'Marmita',
+    preco: 30,
+    descricao: null,
+    imagemUrl: null,
+    categoriaId: 'c1',
+    categoria: { id: 'c1', nome: 'Marmitas' },
+    tipo: 'MARMITA',
+    grupos,
     ingredientes,
   } as unknown as Produto;
 }
@@ -241,6 +276,70 @@ describe('PersonalizacaoProdutoComponent - stepper de ingredientes', () => {
       expect(removidos).toEqual([
         { ingredienteId: 'ing-Cebola', nome: 'Cebola', preco: 0 },
       ]);
+    });
+  });
+
+  describe('grupos com mínimo de escolhas', () => {
+    const grupo = (
+      nome: string,
+      minimoEscolhas: number,
+      maximoEscolhas: number,
+    ): ProdutoGrupo => ({
+      id: `g-${nome}`,
+      nome,
+      ordem: 0,
+      maximoEscolhas,
+      minimoEscolhas,
+    });
+
+    it('bloqueia o carrinho enquanto o grupo obrigatório não atinge o mínimo', () => {
+      const c = montar(
+        produtoMontagem(
+          [grupo('Sabores', 2, 2)],
+          vinculoNoGrupo('Calabresa', 0, 'g-Sabores'),
+          vinculoNoGrupo('Frango', 0, 'g-Sabores'),
+        ),
+      );
+
+      expect(c.podeAdicionar()).toBe(false);
+      expect(c.mensagemFaltando()).toContain('2 porções em "Sabores"');
+
+      c.adicionar();
+      expect(TestBed.inject(CartService).addPersonalizado).not.toHaveBeenCalled();
+    });
+
+    it('libera quando o cliente atinge o mínimo', () => {
+      const c = montar(
+        produtoMontagem(
+          [grupo('Sabores', 2, 2)],
+          vinculoNoGrupo('Calabresa', 0, 'g-Sabores'),
+          vinculoNoGrupo('Frango', 0, 'g-Sabores'),
+        ),
+      );
+
+      // Repetição conta: a mesma porção duas vezes satisfaz o mínimo.
+      c.aumentar(estado(c, 'ing-Calabresa'));
+      c.aumentar(estado(c, 'ing-Calabresa'));
+
+      expect(c.podeAdicionar()).toBe(true);
+      expect(c.mensagemFaltando()).toBeNull();
+
+      c.adicionar();
+      expect(
+        TestBed.inject(CartService).addPersonalizado,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('não bloqueia grupo opcional (mínimo 0)', () => {
+      const c = montar(
+        produtoMontagem(
+          [grupo('Extras', 0, 3)],
+          vinculoNoGrupo('Ovo', 2, 'g-Extras'),
+        ),
+      );
+
+      expect(c.podeAdicionar()).toBe(true);
+      expect(c.mensagemFaltando()).toBeNull();
     });
   });
 });

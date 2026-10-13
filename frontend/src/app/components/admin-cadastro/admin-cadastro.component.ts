@@ -152,8 +152,9 @@ import {
             <label>Grupos de escolha</label>
             <p class="ingredientes-ajuda">
               Seções do cardápio com limite de porções. Repetição conta: com limite 2 o
-              cliente pode pedir a mesma proteína duas vezes. Um grupo sem ingrediente
-              ligado é descartado.
+              cliente pode pedir a mesma proteína duas vezes. O "Mín." obriga a escolher
+              (ex.: 2 sabores): o pedido só passa se o cliente atingir o mínimo do grupo.
+              Um grupo sem ingrediente ligado é descartado.
             </p>
             @if (grupos().length === 0) {
               <p class="img-status">Nenhum grupo ainda.</p>
@@ -170,6 +171,19 @@ import {
                       placeholder="Ex: Proteínas"
                       maxlength="60"
                     />
+                    <label class="grupo-max">
+                      Mín.
+                      <input
+                        type="number"
+                        class="grupo-max-input"
+                        name="grupoMin{{ i }}"
+                        min="0"
+                        max="99"
+                        step="1"
+                        [ngModel]="grupo.minimoEscolhas"
+                        (ngModelChange)="definirMinimoGrupo(i, $event)"
+                      />
+                    </label>
                     <label class="grupo-max">
                       Máx.
                       <input
@@ -402,7 +416,9 @@ export class AdminCadastroComponent implements OnInit {
   buscaIngrediente = signal<string>('');
 
   tipoProduto = signal<TipoProduto>('PADRAO');
-  grupos = signal<{ nome: string; maximoEscolhas: number }[]>([]);
+  grupos = signal<
+    { nome: string; maximoEscolhas: number; minimoEscolhas: number }[]
+  >([]);
   novoGrupoNome = signal<string>('');
 
   ngOnInit(): void {
@@ -460,7 +476,11 @@ export class AdminCadastroComponent implements OnInit {
     this.grupos.set(
       [...(produto.grupos ?? [])]
         .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
-        .map((g) => ({ nome: g.nome, maximoEscolhas: g.maximoEscolhas })),
+        .map((g) => ({
+          nome: g.nome,
+          maximoEscolhas: g.maximoEscolhas,
+          minimoEscolhas: g.minimoEscolhas ?? 0,
+        })),
     );
     this.novoGrupoNome.set('');
   }
@@ -509,7 +529,7 @@ export class AdminCadastroComponent implements OnInit {
     if (!this.podeAdicionarGrupo()) return;
     this.grupos.update((lista) => [
       ...lista,
-      { nome, maximoEscolhas: 2 },
+      { nome, maximoEscolhas: 2, minimoEscolhas: 0 },
     ]);
     this.novoGrupoNome.set('');
   }
@@ -525,7 +545,29 @@ export class AdminCadastroComponent implements OnInit {
     // Espelha o limite do DTO: inteiro entre 1 e 99.
     const maximoEscolhas = Number.isFinite(n) ? Math.min(99, Math.max(1, n)) : 1;
     this.grupos.update((lista) =>
-      lista.map((g, i) => (i === indice ? { ...g, maximoEscolhas } : g)),
+      lista.map((g, i) =>
+        i === indice
+          ? {
+              ...g,
+              maximoEscolhas,
+              // O piso nunca pode passar do teto.
+              minimoEscolhas: Math.min(g.minimoEscolhas, maximoEscolhas),
+            }
+          : g,
+      ),
+    );
+  }
+
+  definirMinimoGrupo(indice: number, valor: unknown): void {
+    const n = Math.trunc(Number(valor));
+    // Espelha o piso do DTO: inteiro entre 0 e o teto do grupo.
+    const base = Number.isFinite(n) ? Math.max(0, n) : 0;
+    this.grupos.update((lista) =>
+      lista.map((g, i) =>
+        i === indice
+          ? { ...g, minimoEscolhas: Math.min(base, g.maximoEscolhas) }
+          : g,
+      ),
     );
   }
 
@@ -662,13 +704,19 @@ export class AdminCadastroComponent implements OnInit {
 
   // Grupo só vale para produto de montagem: em produto comum o servidor ignora,
   // e mandar mesmo assim deixaria vínculo órfão no formulário.
-  gruposParaSalvar(): { nome: string; maximoEscolhas: number }[] | undefined {
+  gruposParaSalvar():
+    | { nome: string; maximoEscolhas: number; minimoEscolhas: number }[]
+    | undefined {
     if (!this.ehMarmita()) return undefined;
     const usados = new Set(
       Object.values(this.gruposDosIngredientes()).filter(Boolean),
     );
     return this.grupos()
-      .map((g) => ({ nome: g.nome.trim(), maximoEscolhas: g.maximoEscolhas }))
+      .map((g) => ({
+        nome: g.nome.trim(),
+        maximoEscolhas: g.maximoEscolhas,
+        minimoEscolhas: g.minimoEscolhas,
+      }))
       .filter((g) => g.nome !== '' && usados.has(g.nome));
   }
 

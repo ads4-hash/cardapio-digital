@@ -106,7 +106,7 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
       // aparecer em /cardapio/b nem ser enviados no pedido de lá.
       this.cart.definirEstabelecimento(slug);
       this.produtoService.loadCategoriasVisiveis(slug);
-      this.produtoService.loadProdutos(false, slug);
+      this.produtoService.loadProdutos(false, slug, true);
     });
   }
 
