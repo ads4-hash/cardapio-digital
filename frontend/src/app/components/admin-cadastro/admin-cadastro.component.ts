@@ -10,12 +10,14 @@ import {
 import { FormsModule } from '@angular/forms';
 import {
   ProdutoService,
+  resolverImagemUrl,
+} from '../../services/produto.service';
+import type {
   Produto,
   Ingrediente,
   ProdutoParaSalvar,
   TipoProduto,
-  resolverImagemUrl,
-} from '../../services/produto.service';
+} from '../../models/produto.model';
 
 // Formulário de cadastro/edição de produto com vínculo de ingredientes e upload de imagem
 @Component({

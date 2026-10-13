@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { PersonalizacaoProdutoComponent } from './personalizacao-produto.component';
-import { CartItem, CartService } from '../../services/cart.service';
+import { CartService } from '../../services/cart.service';
+import type { CartItem } from '../../models/cart.model';
 import type {
   Produto,
   ProdutoGrupo,
   ProdutoIngrediente,
-} from '../../services/produto.service';
+} from '../../models/produto.model';
 
 function vinculo(nome: string, precoAdicional: number): ProdutoIngrediente {
   return {

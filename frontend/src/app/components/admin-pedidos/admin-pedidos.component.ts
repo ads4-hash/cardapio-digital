@@ -8,7 +8,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
-import { PedidoService, Pedido, PedidoStatus, FormaPagamento, FORMA_PAGAMENTO_LABEL, formatarTelefone as formatarTelefoneBr } from '../../services/pedidos.service';
+import { PedidoService, FORMA_PAGAMENTO_LABEL, formatarTelefone as formatarTelefoneBr } from '../../services/pedidos.service';
+import type { Pedido, PedidoStatus, FormaPagamento } from '../../models/pedido.model';
 import { RealtimeService } from '../../services/realtime.service';
 
 const STATUS_CORES: Record<PedidoStatus, string> = {

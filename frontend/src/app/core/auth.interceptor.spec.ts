@@ -11,7 +11,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { authInterceptor } from './auth.interceptor';
-import { AuthService } from './services/auth.service';
+import { AuthService } from '../services/auth.service';
 import { REQUISICAO_PUBLICA } from './http-publico';
 
 describe('authInterceptor', () => {

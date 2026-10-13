@@ -2,7 +2,7 @@ import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Observable, Subject } from 'rxjs';
 import { environment } from '../environment';
-import type { Pedido } from './pedidos.service';
+import type { Pedido } from '../models/pedido.model';
 import { AuthService } from './auth.service';
 
 const EVENTO_CRIADO = 'pedido.criado';

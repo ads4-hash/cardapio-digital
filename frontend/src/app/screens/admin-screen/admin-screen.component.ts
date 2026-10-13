@@ -1,7 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Produto, ProdutoService } from '../../services/produto.service';
-import type { Pedido } from '../../services/pedidos.service';
+import { ProdutoService } from '../../services/produto.service';
+import type { Produto } from '../../models/produto.model';
+import type { Pedido } from '../../models/pedido.model';
 import { AdminNotificacoesService } from '../../services/admin-notificacoes.service';
 import { AdminHomeComponent, SecaoAdmin } from '../../components/admin-home/admin-home.component';
 import { AdminCadastroComponent } from '../../components/admin-cadastro/admin-cadastro.component';

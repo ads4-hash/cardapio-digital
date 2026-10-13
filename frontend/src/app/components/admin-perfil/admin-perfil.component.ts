@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuthService, UsuarioLogado } from '../../services/auth.service';
+import { AuthService } from '../../services/auth.service';
+import type { UsuarioLogado } from '../../models/auth.model';
 
 // Edição dos dados do usuário logado (mesmos campos do cadastro)
 @Component({

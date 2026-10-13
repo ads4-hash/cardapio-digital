@@ -1,6 +1,7 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ProdutoService, Categoria } from '../../services/produto.service';
+import { ProdutoService } from '../../services/produto.service';
+import type { Categoria } from '../../models/produto.model';
 
 @Component({
   selector: 'app-categorias-tabs',

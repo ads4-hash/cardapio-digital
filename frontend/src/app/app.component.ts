@@ -18,10 +18,10 @@ import { EstabelecimentoContextoService } from './services/estabelecimento-conte
     RouterOutlet,
     NavbarComponent,
   ],
-  templateUrl: './app.html',
-  styleUrl: './app.css'
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.css'
 })
-export class App {
+export class AppComponent {
   private readonly configuracoes = inject(ConfiguracoesService);
   private readonly contexto = inject(EstabelecimentoContextoService);
   private readonly platformId = inject(PLATFORM_ID);

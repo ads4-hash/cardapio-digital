@@ -1,7 +1,7 @@
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RealtimeService } from './realtime.service';
-import type { Pedido } from './pedidos.service';
+import type { Pedido } from '../models/pedido.model';
 
 // Notifica o admin quando um novo pedido chega, mesmo fora da seção de pedidos:
 // badge/toast na tela, som e notificação do navegador (quando permitida).

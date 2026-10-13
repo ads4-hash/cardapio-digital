@@ -1,9 +1,9 @@
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import {
   ProdutoService,
-  Produto,
   filtrarProdutos,
 } from '../../services/produto.service';
+import type { Produto } from '../../models/produto.model';
 import { CategoriasTabsComponent } from '../categorias-tabs/categorias-tabs.component';
 import { ProdutoCardComponent } from '../produto-card/produto-card.component';
 

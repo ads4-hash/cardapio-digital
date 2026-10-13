@@ -3,14 +3,13 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { CartService, CartItem, ItemIngrediente } from '../../services/cart.service';
-import {
-  PedidoService,
-  TipoEntrega,
-  FormaPagamento,
-} from '../../services/pedidos.service';
+import { CartService } from '../../services/cart.service';
+import type { CartItem, ItemIngrediente } from '../../models/cart.model';
+import { PedidoService } from '../../services/pedidos.service';
+import type { TipoEntrega, FormaPagamento } from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
-import { ProdutoService, Produto } from '../../services/produto.service';
+import { ProdutoService } from '../../services/produto.service';
+import type { Produto } from '../../models/produto.model';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';
 

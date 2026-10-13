@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { lastValueFrom } from 'rxjs';
 
-import { AuthService } from './services/auth.service';
+import { AuthService } from '../services/auth.service';
 
 // Impede acesso ao /admin sem sessão válida
 export const authGuard: CanActivateFn = async () => {

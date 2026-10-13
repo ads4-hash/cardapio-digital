@@ -1,24 +1,10 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Produto } from './produto.service';
-
-export interface ItemIngrediente {
-  ingredienteId: string;
-  nome: string;
-  preco: number;
-}
-
-interface CartItemPersonalizacao {
-  removidos: ItemIngrediente[];
-  adicionados: ItemIngrediente[];
-}
-
-export interface CartItem {
-  uid: string;
-  produto: Produto;
-  quantidade: number;
-  precoUnitario: number;
-  personalizacao: CartItemPersonalizacao;
-}
+import type { Produto } from '../models/produto.model';
+import type {
+  CartItem,
+  CartItemPersonalizacao,
+  ItemIngrediente,
+} from '../models/cart.model';
 
 @Injectable({
   providedIn: 'root',

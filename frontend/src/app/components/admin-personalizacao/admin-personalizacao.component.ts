@@ -1,9 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  ConfiguracoesService,
-  VisualCardapio,
-} from '../../services/configuracoes.service';
+import { ConfiguracoesService } from '../../services/configuracoes.service';
+import type { VisualCardapio } from '../../models/configuracao.model';
 import {
   ProdutoService,
   resolverImagemUrl,

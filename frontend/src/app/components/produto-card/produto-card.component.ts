@@ -1,6 +1,7 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Produto, resolverImagemUrl } from '../../services/produto.service';
+import { resolverImagemUrl } from '../../services/produto.service';
+import type { Produto } from '../../models/produto.model';
 import { CartService } from '../../services/cart.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';

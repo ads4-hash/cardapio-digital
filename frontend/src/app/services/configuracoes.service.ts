@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../environment';
 import { EstabelecimentoContextoService } from './estabelecimento-contexto.service';
+import type { VisualCardapio } from '../models/configuracao.model';
 
 interface AceitandoPedidos {
   aceitandoPedidos: boolean;
@@ -16,13 +17,6 @@ interface TaxaEntrega {
 interface InfoCardapio {
   nome: string | null;
   telefone: string | null;
-}
-
-export interface VisualCardapio {
-  cor: string | null;
-  logoUrl: string | null;
-  capaUrl: string | null;
-  tema: 'claro' | 'escuro' | 'auto';
 }
 
 const PREFIXO_CACHE = 'estab';

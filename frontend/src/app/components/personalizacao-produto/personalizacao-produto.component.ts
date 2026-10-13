@@ -7,13 +7,14 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
+import { ehMontagem } from '../../services/produto.service';
+import type {
   Produto,
   ProdutoIngrediente,
   ProdutoGrupo,
-  ehMontagem,
-} from '../../services/produto.service';
-import { CartItem, CartService } from '../../services/cart.service';
+} from '../../models/produto.model';
+import { CartService } from '../../services/cart.service';
+import type { CartItem } from '../../models/cart.model';
 
 interface EstadoIngrediente {
   vinculo: ProdutoIngrediente;

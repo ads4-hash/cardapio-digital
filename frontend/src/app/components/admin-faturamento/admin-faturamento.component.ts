@@ -2,10 +2,12 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   PedidoService,
-  Pedido,
-  FormaPagamento,
   FORMA_PAGAMENTO_LABEL,
 } from '../../services/pedidos.service';
+import type {
+  Pedido,
+  FormaPagamento,
+} from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 
 type Periodo = 'hoje' | 'semana' | 'mes' | 'todos';

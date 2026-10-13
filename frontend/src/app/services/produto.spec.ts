@@ -4,7 +4,7 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { ProdutoService } from './produto.service';
-import { REQUISICAO_PUBLICA } from '../http-publico';
+import { REQUISICAO_PUBLICA } from '../core/http-publico';
 
 describe('ProdutoService', () => {
   let service: ProdutoService;

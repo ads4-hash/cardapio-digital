@@ -1,7 +1,8 @@
 import { Component, inject, OnDestroy, OnInit, effect, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
-import { ProdutoService, Produto, filtrarProdutos } from '../../services/produto.service';
+import { ProdutoService, filtrarProdutos } from '../../services/produto.service';
+import type { Produto } from '../../models/produto.model';
 import { CategoriasTabsComponent } from '../../components/categorias-tabs/categorias-tabs.component';
 import { ProdutoCardComponent } from '../../components/produto-card/produto-card.component';
 import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrinho-drawer.component';

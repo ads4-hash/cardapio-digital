@@ -11,12 +11,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, switchMap, timer } from 'rxjs';
 import {
   PedidoService,
-  PedidoRastreio,
-  PedidoStatus,
-  FormaPagamento,
   FORMA_PAGAMENTO_LABEL,
   formatarTelefone as formatarTelefoneBr,
 } from '../../services/pedidos.service';
+import type {
+  PedidoRastreio,
+  PedidoStatus,
+  FormaPagamento,
+} from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 

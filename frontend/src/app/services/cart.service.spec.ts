@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { CartService } from './cart.service';
-import type { Produto } from './produto.service';
+import type { Produto } from '../models/produto.model';
 
 function produto(preco: number, id = 'p1'): Produto {
   return { id, nome: 'Pizza', preco } as unknown as Produto;

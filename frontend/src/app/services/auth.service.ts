@@ -4,39 +4,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, finalize, shareReplay, tap } from 'rxjs';
 
 import { environment } from '../environment';
-
-interface EstabelecimentoUsuario {
-  id: string;
-  nome: string;
-  slug: string;
-  telefone?: string | null;
-}
-
-export interface UsuarioLogado {
-  id: string;
-  nome: string;
-  email: string;
-  estabelecimento?: EstabelecimentoUsuario;
-  telefone?: string | null;
-}
-
-interface AuthResponse {
-  token: string;
-  refreshToken: string;
-  usuario: UsuarioLogado;
-}
-
-type UsuarioLogadoComTokens = UsuarioLogado & {
-  token?: string;
-  refreshToken?: string;
-};
-
-interface RecuperacaoResponse {
-  enviadoPorEmail: boolean;
-  mensagem: string;
-  token?: string;
-  expiraEm?: string;
-}
+import type {
+  AuthResponse,
+  RecuperacaoResponse,
+  UsuarioLogado,
+  UsuarioLogadoComTokens,
+} from '../models/auth.model';
 
 const CHAVE_TOKEN = 'auth_token';
 const CHAVE_REFRESH = 'auth_refresh_token';

@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { AdminCadastroComponent } from './admin-cadastro.component';
-import { Ingrediente, ProdutoService } from '../../services/produto.service';
+import { ProdutoService } from '../../services/produto.service';
+import type { Ingrediente } from '../../models/produto.model';
 
 function lista(...nomes: string[]): Ingrediente[] {
   return nomes.map((nome) => ({ id: `ing-${nome}`, nome }));

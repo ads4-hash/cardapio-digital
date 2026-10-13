@@ -3,7 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { environment } from '../environment';
-import { Produto } from './produto.service';
+import type {
+  CreatePedido,
+  FormaPagamento,
+  Pedido,
+  PedidoRastreio,
+  PedidoStatus,
+} from '../models/pedido.model';
 
 // Formata telefones brasileiros: (85) 9 9988-4433
 export function formatarTelefone(valor: string | null | undefined): string {
@@ -18,88 +24,11 @@ export function formatarTelefone(valor: string | null | undefined): string {
   return valor;
 }
 
-export type PedidoStatus =
-  | 'PENDENTE'
-  | 'EM_PREPARO'
-  | 'EM_ROTA'
-  | 'PRONTO'
-  | 'CONCLUIDO'
-  | 'CANCELADO';
-
-interface ItemPedido {
-  id: string;
-  quantidade: number;
-  preco: number;
-  removidos: string;
-  adicionados: string;
-  produtoId: string;
-  produto: Produto;
-}
-
-export type TipoEntrega = 'RETIRADA' | 'ENTREGA';
-
-export type FormaPagamento = 'DINHEIRO' | 'PIX' | 'CARTAO';
-
 export const FORMA_PAGAMENTO_LABEL: Record<FormaPagamento, string> = {
   DINHEIRO: 'Dinheiro',
   PIX: 'Pix',
   CARTAO: 'Cartão',
 };
-
-export interface Pedido {
-  id: string;
-  cliente: string;
-  tipoEntrega: TipoEntrega;
-  endereco?: string | null;
-  telefone?: string | null;
-  taxaEntrega: number;
-  status: PedidoStatus;
-  total: number;
-  formaPagamento: FormaPagamento;
-  trocoPara: number | null;
-  createdAt: string;
-  updatedAt: string;
-  itens: ItemPedido[];
-}
-
-interface CreatePedido {
-  slug: string;
-  cliente: string;
-  tipoEntrega: TipoEntrega;
-  telefone: string;
-  endereco?: string;
-  formaPagamento: FormaPagamento;
-  trocoPara?: number;
-  itens: {
-    produtoId: string;
-    quantidade: number;
-    removidos?: string[];
-    adicionados?: string[];
-  }[];
-}
-
-// Retorno do rastreio público (dados mínimos, sem produtos completos)
-export interface PedidoRastreio {
-  id: string;
-  slug: string;
-  status: PedidoStatus;
-  cliente: string;
-  tipoEntrega: TipoEntrega;
-  endereco?: string | null;
-  telefone?: string | null;
-  taxaEntrega: number;
-  total: number;
-  formaPagamento: FormaPagamento;
-  trocoPara: number | null;
-  criadoEm: string;
-  itens: {
-    nome: string;
-    quantidade: number;
-    preco: number;
-    removidos: string[];
-    adicionados: string[];
-  }[];
-}
 
 @Injectable({
   providedIn: 'root',
