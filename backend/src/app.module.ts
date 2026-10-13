@@ -11,6 +11,7 @@ import { UploadModule } from './upload/upload.module';
 import { IngredientesModule } from './ingredientes/ingredientes.module';
 import { ConfiguracoesModule } from './configuracoes/configuracoes.module';
 import { EnvioEmailModule } from './envio-email/envio-email.module';
+import { SaudeModule } from './saude/saude.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EnvioEmailModule } from './envio-email/envio-email.module';
     UploadModule,
     IngredientesModule,
     ConfiguracoesModule,
+    SaudeModule,
     // Rate-limit global: 100 requisições/min por cliente IP (evita abuso/DoS)
     ThrottlerModule.forRoot([
       {

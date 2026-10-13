@@ -4,8 +4,8 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  MinLength,
 } from 'class-validator';
+import { SenhaForte } from '../../common/senha';
 
 export class RegistrarUsuarioDto {
   /**
@@ -45,11 +45,11 @@ export class RegistrarUsuarioDto {
   telefone?: string;
 
   /**
-   * Senha de acesso, mínimo de 6 caracteres.
+   * Senha de acesso, mínimo de 6 caracteres com letras e números.
    * @example senha123
    */
   @IsString()
-  @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres.' })
+  @SenhaForte()
   senha: string;
 
   /**

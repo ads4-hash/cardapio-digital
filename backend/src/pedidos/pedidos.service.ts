@@ -13,6 +13,7 @@ import {
 import { PedidosGateway } from './pedidos.gateway';
 import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
 import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
+import { deCentavos, paraCentavos } from '../common/dinheiro';
 
 @Injectable()
 export class PedidosService {
@@ -125,15 +126,18 @@ export class PedidosService {
 
     const produtosMap = new Map(produtos.map((p) => [p.id, p]));
 
-    let total = 0;
+    // Toda a aritmética monetária roda em centavos inteiros e só vira o
+    // `number` de 2 casas na hora de gravar: somar em ponto flutuante acumula
+    // erro binário (0.1 + 0.2) e gravaria um `total` errado no `Decimal`.
+    let totalCentavos = 0;
     const itensParaCriar = data.itens.map((item) => {
       const produto = produtosMap.get(item.produtoId)!;
-      const precoBase = Number(produto.preco);
+      const precoBase = paraCentavos(produto.preco);
       const montagem = produto.tipo === 'MARMITA';
 
       // Soma o preço de cada ingrediente adicionado como extra
       const adicionadosNomes: string[] = [];
-      let adicionalTotal = 0;
+      let adicionalCentavos = 0;
 
       for (const id of item.adicionados ?? []) {
         const vinculo = produto.ingredientes.find(
@@ -147,7 +151,7 @@ export class PedidosService {
           );
         }
         adicionadosNomes.push(vinculo.ingrediente.nome);
-        adicionalTotal += Number(vinculo.precoAdicional ?? 0);
+        adicionalCentavos += paraCentavos(vinculo.precoAdicional ?? 0);
       }
 
       if (montagem) {
@@ -170,38 +174,42 @@ export class PedidosService {
         }
       }
 
-      const precoUnitario = precoBase + adicionalTotal;
+      const precoUnitarioCentavos = precoBase + adicionalCentavos;
 
-      total += precoUnitario * Number(item.quantidade);
+      totalCentavos += precoUnitarioCentavos * Number(item.quantidade);
 
       return {
         produtoId: item.produtoId,
         quantidade: Number(item.quantidade),
-        preco: precoUnitario,
+        preco: deCentavos(precoUnitarioCentavos),
         removidos: JSON.stringify(removidosNomes),
         adicionados: JSON.stringify(adicionadosNomes),
       };
     });
 
     // Pedidos de entrega somam a taxa definida pelo admin no Faturamento
-    let taxaEntrega = 0;
+    let taxaEntregaCentavos = 0;
     if (tipoEntrega === TipoEntrega.ENTREGA) {
       const config = await this.configuracoes.obterTaxaEntrega(
         estabelecimento.id,
       );
-      taxaEntrega = config.taxaEntrega;
-      total += taxaEntrega;
+      taxaEntregaCentavos = paraCentavos(config.taxaEntrega);
+      totalCentavos += taxaEntregaCentavos;
     }
 
     // Forma de pagamento e troco (apenas válidos para dinheiro)
     const formaPagamento = data.formaPagamento ?? FormaPagamento.DINHEIRO;
-    const trocoPara: number | null = data.trocoPara ?? null;
-    if (trocoPara !== null && formaPagamento !== FormaPagamento.DINHEIRO) {
+    const trocoParaCentavos =
+      data.trocoPara !== undefined ? paraCentavos(data.trocoPara) : null;
+    if (
+      trocoParaCentavos !== null &&
+      formaPagamento !== FormaPagamento.DINHEIRO
+    ) {
       throw new BadRequestException(
         'Troco só é aceito para pagamento em dinheiro.',
       );
     }
-    if (trocoPara !== null && trocoPara < total) {
+    if (trocoParaCentavos !== null && trocoParaCentavos < totalCentavos) {
       throw new BadRequestException(
         'O valor informado para troco é menor que o total do pedido.',
       );
@@ -214,10 +222,11 @@ export class PedidosService {
         tipoEntrega,
         endereco: data.endereco,
         telefone: data.telefone,
-        taxaEntrega,
-        total,
+        taxaEntrega: deCentavos(taxaEntregaCentavos),
+        total: deCentavos(totalCentavos),
         formaPagamento,
-        trocoPara,
+        trocoPara:
+          trocoParaCentavos === null ? null : deCentavos(trocoParaCentavos),
         estabelecimentoId: estabelecimento.id,
         itens: {
           create: itensParaCriar,

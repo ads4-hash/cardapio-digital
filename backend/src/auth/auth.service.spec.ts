@@ -10,12 +10,26 @@ import { AuthService } from './auth.service';
 // carregamos um stub no lugar do módulo real.
 jest.mock('@nestjs/jwt', () => ({ JwtService: class {} }));
 
+// Login/refresh/recuperação hasheiam IPs e tokens com o segredo (obterSegredo)
+// para derivar a chave HMAC. Sem a env, `obterSegredo()` lança — definimos
+// valores explícitos de teste para a suíte rodar em qualquer ambiente (inclusive
+// CI, onde o .env nem existe).
+process.env.JWT_SECRET = 'segredo-de-teste';
+process.env.HASH_SECRET = 'hash-de-teste';
+
 // Custo de bcrypt baixo: os testes criam senha de verdade, e o custo padrão
 // (10) tornaria a suíte lenta sem acrescentar cobertura.
 const CUSTO_TESTE = 4;
 const ID_USUARIO = 'usr-1';
 const ID_ESTABELECIMENTO = 'est-1';
 const EMAIL_ATUAL = 'dono@pizzaria.com.br';
+
+// `expect.objectContaining` devolve `any`; quando usado como VALOR de uma
+// propriedade (ex.: `data:` dentro de outro objetoContaining) o eslint acusa
+// atribuição insegura. Este helper mantém o matcher e devolve um tipo seguro.
+function contendo(esperado: unknown): Record<string, unknown> {
+  return expect.objectContaining(esperado) as Record<string, unknown>;
+}
 
 /**
  * Cobre a reautenticação de `atualizarPerfil`: trocar e-mail ou senha só passa
@@ -65,6 +79,7 @@ describe('AuthService.atualizarPerfil', () => {
       Promise.resolve({
         id: ID_USUARIO,
         estabelecimentoId: ID_ESTABELECIMENTO,
+        tokenVersao: 1,
         ...data,
         estabelecimento: {
           id: ID_ESTABELECIMENTO,
@@ -88,15 +103,25 @@ describe('AuthService.atualizarPerfil', () => {
 
     estabelecimentoUpdate = jest.fn().mockResolvedValue({});
 
+    const refreshToken = {
+      create: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue(null),
+    };
+
     const prisma = {
       usuario: {
         findUnique: usuarioFindUnique,
         update: usuarioUpdate,
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ tokenVersao: 1 }),
       },
       estabelecimento: {
         findUnique: estabelecimentoFindUnique,
         update: estabelecimentoUpdate,
       },
+      refreshToken,
+      $transaction: jest.fn((arg: unknown[]) => Promise.all(arg)),
     } as unknown as PrismaService;
 
     const envioEmail = {
@@ -186,7 +211,7 @@ describe('AuthService.atualizarPerfil', () => {
     });
 
     it('aceita com a senha atual correta', async () => {
-      await service.atualizarPerfil(
+      const resposta = await service.atualizarPerfil(
         ID_USUARIO,
         'Pizzaria do Zé',
         'NOVO@atacante.com',
@@ -196,8 +221,13 @@ describe('AuthService.atualizarPerfil', () => {
         'senhaAntiga123',
       );
 
-      expect(usuarioUpdate).toHaveBeenCalledTimes(1);
+      // Uma chamada grava o e-mail; a outra (encerrarTodasAsSessoes) incrementa
+      // a versão do token para derrubar as sessões antigas.
+      expect(usuarioUpdate).toHaveBeenCalledTimes(2);
       expect(dadosDoUpdate().email).toBe('novo@atacante.com');
+      // Troca de credencial devolve tokens novos para manter este dispositivo.
+      expect(resposta.token).toBe('token-fake');
+      expect(typeof resposta.refreshToken).toBe('string');
     });
   });
 
@@ -311,6 +341,7 @@ describe('AuthService.registrar', () => {
     const prisma = {
       $transaction: jest.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
       tentativaLogin: { create: tentativaLoginCreate },
+      refreshToken: { create: jest.fn().mockResolvedValue({}) },
     } as unknown as PrismaService;
 
     const jwtService = { sign: jest.fn().mockReturnValue('token-fake') };
@@ -385,5 +416,394 @@ describe('AuthService.registrar', () => {
     ).rejects.toThrow('As senhas não conferem.');
 
     expect(usuarioFindFirst).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Cobre o fluxo de login: lockout por IP/e-mail, limpeza do histórico em caso
+ * de sucesso e emissão do par access + refresh.
+ */
+describe('AuthService.login', () => {
+  let service: AuthService;
+  let tentativaLoginCount: jest.Mock;
+  let tentativaLoginCreate: jest.Mock;
+  let tentativaLoginDeleteMany: jest.Mock;
+  let usuarioFindUnique: jest.Mock;
+  let refreshTokenCreate: jest.Mock;
+  let jwtSign: jest.Mock;
+
+  const SENHA_CORRETA = 'senhaCorreta123';
+
+  async function construir(
+    opcoes: {
+      bloqueioIp?: number;
+      bloqueioEmail?: number;
+      usuario?: unknown;
+    } = {},
+  ) {
+    const senhaHash = await hash(SENHA_CORRETA, CUSTO_TESTE);
+    const usuarioPadrao = {
+      id: ID_USUARIO,
+      nome: 'Pizzaria do Zé',
+      email: EMAIL_ATUAL,
+      tokenVersao: 2,
+      senhaHash,
+      estabelecimento: {
+        id: ID_ESTABELECIMENTO,
+        nome: 'Pizzaria do Zé',
+        slug: 'pizzaria-do-ze',
+        telefone: null,
+      },
+    };
+
+    tentativaLoginCount = jest
+      .fn()
+      .mockResolvedValueOnce(opcoes.bloqueioIp ?? 0)
+      .mockResolvedValueOnce(opcoes.bloqueioEmail ?? 0);
+    tentativaLoginCreate = jest.fn().mockResolvedValue({});
+    tentativaLoginDeleteMany = jest.fn().mockResolvedValue({ count: 1 });
+    refreshTokenCreate = jest.fn().mockResolvedValue({});
+    usuarioFindUnique = jest
+      .fn()
+      .mockResolvedValue(opcoes.usuario ?? usuarioPadrao);
+
+    // O token carrega a versão atual: `tv = 2` vira "token-2".
+    jwtSign = jest
+      .fn()
+      .mockImplementation(
+        (payload: { tv?: number }) => `token-${payload.tv ?? 0}`,
+      );
+
+    const prisma = {
+      tentativaLogin: {
+        count: tentativaLoginCount,
+        create: tentativaLoginCreate,
+        deleteMany: tentativaLoginDeleteMany,
+      },
+      usuario: { findUnique: usuarioFindUnique },
+      refreshToken: {
+        create: refreshTokenCreate,
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      recuperacaoSenha: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      $transaction: jest.fn((arg: unknown[]) => Promise.all(arg)),
+    } as unknown as PrismaService;
+
+    const estabelecimentos = {
+      porSlug: jest.fn(),
+    } as unknown as EstabelecimentosService;
+    const envioEmail = {
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn(),
+    } as unknown as EnvioEmailService;
+
+    service = new AuthService(
+      prisma,
+      { sign: jwtSign } as never,
+      estabelecimentos,
+      envioEmail,
+    );
+  }
+
+  it('emite o par de tokens e limpa o histórico de falhas no sucesso', async () => {
+    await construir();
+    const resposta = await service.login(EMAIL_ATUAL, SENHA_CORRETA, '1.1.1.1');
+
+    expect(resposta.token).toBe('token-2');
+    expect(typeof resposta.refreshToken).toBe('string');
+    expect(resposta.usuario.id).toBe(ID_USUARIO);
+    // Limpa as falhas do IP e do e-mail registradas na janela
+    expect(tentativaLoginDeleteMany.mock.calls.length).toBeGreaterThanOrEqual(
+      2,
+    );
+    expect(tentativaLoginCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: contendo({ sucesso: true }),
+      }),
+    );
+  });
+
+  it('rejeita com 429 após 5 falhas do mesmo IP', async () => {
+    await construir({ bloqueioIp: 5 });
+    await expect(
+      service.login('quem@e.com', 'x', '1.1.1.1'),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(usuarioFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('rejeita com 429 após 10 falhas do mesmo e-mail', async () => {
+    await construir({ bloqueioEmail: 10 });
+    await expect(
+      service.login(EMAIL_ATUAL, 'x', '2.2.2.2'),
+    ).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('responde 401 e registra a falha quando a senha está errada', async () => {
+    await construir();
+    await expect(
+      service.login(EMAIL_ATUAL, 'senhaErrada', '3.3.3.3'),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(tentativaLoginCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: contendo({ sucesso: false }),
+      }),
+    );
+  });
+});
+
+/**
+ * Cobre o refresh token (rotação, expiração, reuso revogado) e o logout.
+ */
+describe('AuthService.renovarTokens', () => {
+  let service: AuthService;
+  let refreshTokenFindUnique: jest.Mock;
+  let refreshTokenCreate: jest.Mock;
+  let refreshTokenUpdate: jest.Mock;
+  let refreshTokenUpdateMany: jest.Mock;
+  let usuarioUpdate: jest.Mock;
+  let $transaction: jest.Mock;
+
+  const USUARIO = {
+    id: ID_USUARIO,
+    nome: 'Pizzaria do Zé',
+    email: EMAIL_ATUAL,
+    tokenVersao: 3,
+    estabelecimento: {
+      id: ID_ESTABELECIMENTO,
+      nome: 'Pizzaria do Zé',
+      slug: 'pizzaria-do-ze',
+      telefone: null,
+    },
+  };
+
+  function registroValido() {
+    return {
+      id: 'rf-1',
+      usuarioId: ID_USUARIO,
+      tokenHash: 'hash',
+      expiraEm: new Date(Date.now() + 60 * 60 * 1000),
+      revogadoEm: null as Date | null,
+      usuario: USUARIO,
+    };
+  }
+
+  function construir(registro: unknown): void {
+    refreshTokenFindUnique = jest.fn().mockResolvedValue(registro);
+    refreshTokenCreate = jest.fn().mockResolvedValue({});
+    refreshTokenUpdate = jest.fn().mockResolvedValue({});
+    refreshTokenUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    usuarioUpdate = jest.fn().mockResolvedValue({});
+    $transaction = jest.fn((arg: unknown[]) => Promise.all(arg));
+
+    const prisma = {
+      refreshToken: {
+        findUnique: refreshTokenFindUnique,
+        create: refreshTokenCreate,
+        update: refreshTokenUpdate,
+        updateMany: refreshTokenUpdateMany,
+      },
+      usuario: { update: usuarioUpdate },
+      $transaction,
+    } as unknown as PrismaService;
+
+    const jwtSign = jest
+      .fn()
+      .mockImplementation(
+        (payload: { tv?: number }) => `token-${payload.tv ?? 0}`,
+      );
+    const estabelecimentos = {
+      porSlug: jest.fn(),
+    } as unknown as EstabelecimentosService;
+    const envioEmail = {
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn(),
+    } as unknown as EnvioEmailService;
+
+    service = new AuthService(
+      prisma,
+      { sign: jwtSign } as never,
+      estabelecimentos,
+      envioEmail,
+    );
+  }
+
+  it('rotaciona o token: revoga o antigo e cria um novo par', async () => {
+    construir(registroValido());
+    const resposta = await service.renovarTokens('token-antigo');
+
+    expect(refreshTokenUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'rf-1' } }),
+    );
+    expect(refreshTokenCreate).toHaveBeenCalled();
+    expect($transaction).toHaveBeenCalledWith(expect.any(Array));
+    expect(resposta.token).toBe('token-3');
+    expect(resposta.usuario.id).toBe(ID_USUARIO);
+  });
+
+  it('rejeita token desconhecido sem tocar em nada', async () => {
+    construir(null);
+    await expect(service.renovarTokens('suposto')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect($transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejeita token expirado', async () => {
+    construir({ ...registroValido(), expiraEm: new Date(Date.now() - 1000) });
+    await expect(service.renovarTokens('expirado')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect($transaction).not.toHaveBeenCalled();
+  });
+
+  it('reutilizar um token revogado encerra TODAS as sessões (roubo)', async () => {
+    construir({ ...registroValido(), revogadoEm: new Date() });
+    await expect(service.renovarTokens('usado')).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(usuarioUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ID_USUARIO },
+        data: { tokenVersao: { increment: 1 } },
+      }),
+    );
+    expect(refreshTokenUpdateMany).toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.logout', () => {
+  let service: AuthService;
+  let refreshTokenUpdateMany: jest.Mock;
+
+  function construir(): void {
+    refreshTokenUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      refreshToken: {
+        updateMany: refreshTokenUpdateMany,
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn((arg: unknown[]) => Promise.all(arg)),
+    } as unknown as PrismaService;
+    const jwtSign = jest.fn().mockReturnValue('token');
+    const estabelecimentos = {
+      porSlug: jest.fn(),
+    } as unknown as EstabelecimentosService;
+    const envioEmail = {
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn(),
+    } as unknown as EnvioEmailService;
+
+    service = new AuthService(
+      prisma,
+      jwtSign as never,
+      estabelecimentos,
+      envioEmail,
+    );
+  }
+
+  it('revoga o refresh token deste dispositivo', async () => {
+    construir();
+    await service.logout('token-do-app', ID_USUARIO);
+    expect(refreshTokenUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: contendo({
+          usuarioId: ID_USUARIO,
+          revogadoEm: null,
+        }),
+        data: contendo({ revogadoEm: expect.any(Date) as unknown }),
+      }),
+    );
+  });
+
+  it('é idempotente para token já revogado ou desconhecido', async () => {
+    construir();
+    refreshTokenUpdateMany.mockResolvedValue({ count: 0 });
+    const resposta = await service.logout('qualquer', ID_USUARIO);
+    expect(resposta.mensagem).toBe('Sessão encerrada.');
+  });
+});
+
+/**
+ * Redefinir a senha agora encerra todas as sessões: bump da tokenVersao
+ * (mata os access tokens) + revoga os refresh tokens ativos.
+ */
+describe('AuthService.redefinirSenha', () => {
+  let service: AuthService;
+  let recuperacaoFindFirst: jest.Mock;
+  let usuarioUpdate: jest.Mock;
+  let recuperacaoUpdateMany: jest.Mock;
+  let refreshTokenUpdateMany: jest.Mock;
+
+  function construir(): void {
+    recuperacaoFindFirst = jest.fn().mockResolvedValue({
+      id: 'rec-1',
+      usuarioId: ID_USUARIO,
+      tokenHash: 'hash',
+      expiraEm: new Date(Date.now() + 60_000),
+      usadoEm: null,
+    });
+    usuarioUpdate = jest.fn().mockResolvedValue({});
+    recuperacaoUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    refreshTokenUpdateMany = jest.fn().mockResolvedValue({ count: 2 });
+
+    const prisma = {
+      recuperacaoSenha: {
+        findFirst: recuperacaoFindFirst,
+        updateMany: recuperacaoUpdateMany,
+      },
+      usuario: { update: usuarioUpdate },
+      refreshToken: { updateMany: refreshTokenUpdateMany },
+      $transaction: jest.fn((arg: unknown[]) => Promise.all(arg)),
+    } as unknown as PrismaService;
+
+    const jwtSign = jest.fn().mockReturnValue('token');
+    const estabelecimentos = {
+      porSlug: jest.fn(),
+    } as unknown as EstabelecimentosService;
+    const envioEmail = {
+      configurado: jest.fn().mockReturnValue(false),
+      enviarEmail: jest.fn(),
+    } as unknown as EnvioEmailService;
+
+    service = new AuthService(
+      prisma,
+      jwtSign as never,
+      estabelecimentos,
+      envioEmail,
+    );
+  }
+
+  it('troca a senha, consome o código e encerra todas as sessões', async () => {
+    construir();
+    await service.redefinirSenha('codigo', 'senhaNova123', 'senhaNova123');
+
+    expect(usuarioUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ID_USUARIO },
+        data: contendo({ tokenVersao: { increment: 1 } }),
+      }),
+    );
+    expect(refreshTokenUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: contendo({
+          usuarioId: ID_USUARIO,
+          revogadoEm: null,
+        }),
+      }),
+    );
+    expect(recuperacaoUpdateMany).toHaveBeenCalled();
+  });
+
+  it('rejeita código inválido ou já consumido', async () => {
+    construir();
+    recuperacaoFindFirst.mockResolvedValue(null);
+    await expect(
+      service.redefinirSenha('x', 'senhaNova123', 'senhaNova123'),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(usuarioUpdate).not.toHaveBeenCalled();
   });
 });

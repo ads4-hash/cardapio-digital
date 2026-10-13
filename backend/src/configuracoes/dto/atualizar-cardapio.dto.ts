@@ -3,8 +3,10 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
+import { URL_IMAGEM_MENSAGEM, URL_IMAGEM_REGEX } from '../../common/imagem';
 
 // Personalização visual do cardápio público (todos os campos são opcionais)
 export class AtualizarCardapioDto {
@@ -34,6 +36,7 @@ export class AtualizarCardapioDto {
    */
   @IsOptional()
   @IsString({ message: 'Informe uma URL de logo válida.' })
+  @Matches(URL_IMAGEM_REGEX, { message: URL_IMAGEM_MENSAGEM })
   @MaxLength(300, { message: 'A URL da logo é muito longa.' })
   logoUrl?: string | null;
 
@@ -44,6 +47,7 @@ export class AtualizarCardapioDto {
    */
   @IsOptional()
   @IsString({ message: 'Informe uma URL de capa válida.' })
+  @Matches(URL_IMAGEM_REGEX, { message: URL_IMAGEM_MENSAGEM })
   @MaxLength(300, { message: 'A URL da capa é muito longa.' })
   capaUrl?: string | null;
 }

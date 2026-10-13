@@ -8,7 +8,7 @@ import { CreatePedidoDto, ItemPedidoDto } from './create-pedido.dto';
 function chaves(erro: ValidationError): string[] {
   return [
     ...Object.keys(erro.constraints ?? {}),
-    ...erro.children.flatMap((filho) => chaves(filho)),
+    ...(erro.children ?? []).flatMap((filho) => chaves(filho)),
   ];
 }
 
@@ -75,7 +75,7 @@ describe('CreatePedidoDto', () => {
 
     expect(erros).toHaveLength(1);
     // itens -> índice do item -> campos inválidos
-    const campos = erros[0].children[0].children;
+    const campos = erros[0].children?.[0]?.children ?? [];
     expect(campos.map((campo) => campo.property)).toEqual(['removidos']);
     expect(chaves(campos[0])).toContain('maxLength');
   });

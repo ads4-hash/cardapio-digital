@@ -3,8 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { unlinkSync } from 'fs';
-import { join } from 'path';
+import { resolve, sep } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -66,10 +67,13 @@ export class ProdutosService {
 
   // Liga cada ingrediente ao grupo pelo nome. Ingredientes cujo grupo não
   // exista no payload ficam soltos.
+  // `db` aceita o cliente da transação em andamento para que a vinculação dos
+  // grupos faça parte da mesma transação do create/update do produto.
   private async vincularGrupos(
     produtoId: string,
     grupos: { id: string; nome: string }[],
     ingredientes: { ingredienteId: string; grupo?: string }[],
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<void> {
     const porNome = new Map(grupos.map((g) => [g.nome, g.id]));
 
@@ -80,7 +84,7 @@ export class ProdutosService {
 
       if (ids.length === 0) continue;
 
-      await this.prisma.produtoIngrediente.updateMany({
+      await db.produtoIngrediente.updateMany({
         where: { produtoId, ingredienteId: { in: ids } },
         data: { grupoId },
       });
@@ -165,40 +169,47 @@ export class ProdutosService {
 
     const grupos = this.normalizarGrupos(data.grupos, ingredientes);
 
-    const criado = await this.prisma.produto.create({
-      data: {
-        nome: data.nome,
-        descricao: data.descricao,
-        preco: Number(data.preco),
-        imagemUrl: data.imagemUrl,
-        categoriaId: data.categoriaId,
-        tipo: data.tipo ?? 'PADRAO',
-        estabelecimentoId,
-        grupos: grupos.length
-          ? {
-              create: grupos.map((g, indice) => ({
-                nome: g.nome,
-                maximoEscolhas: g.maximoEscolhas,
-                minimoEscolhas: g.minimoEscolhas,
-                ordem: indice,
-              })),
-            }
-          : undefined,
-        ingredientes: ingredientes
-          ? {
-              create: ingredientes.map((i) => ({
-                ingredienteId: i.ingredienteId,
-                precoAdicional: Number(i.precoAdicional ?? 0),
-              })),
-            }
-          : undefined,
-      },
-      include: { grupos: true },
-    });
+    // Produto e vínculos de grupo (que dependem do id recém-criado) vão na
+    // mesma transação: se a vinculação falhar, o produto não fica salvo pela
+    // metade.
+    const criado = await this.prisma.$transaction(async (tx) => {
+      const produto = await tx.produto.create({
+        data: {
+          nome: data.nome,
+          descricao: data.descricao,
+          preco: Number(data.preco),
+          imagemUrl: data.imagemUrl,
+          categoriaId: data.categoriaId,
+          tipo: data.tipo ?? 'PADRAO',
+          estabelecimentoId,
+          grupos: grupos.length
+            ? {
+                create: grupos.map((g, indice) => ({
+                  nome: g.nome,
+                  maximoEscolhas: g.maximoEscolhas,
+                  minimoEscolhas: g.minimoEscolhas,
+                  ordem: indice,
+                })),
+              }
+            : undefined,
+          ingredientes: ingredientes
+            ? {
+                create: ingredientes.map((i) => ({
+                  ingredienteId: i.ingredienteId,
+                  precoAdicional: Number(i.precoAdicional ?? 0),
+                })),
+              }
+            : undefined,
+        },
+        include: { grupos: true },
+      });
 
-    if (ingredientes?.length) {
-      await this.vincularGrupos(criado.id, criado.grupos, ingredientes);
-    }
+      if (ingredientes?.length) {
+        await this.vincularGrupos(produto.id, produto.grupos, ingredientes, tx);
+      }
+
+      return produto;
+    });
 
     return this.findOne(estabelecimentoId, criado.id);
   }
@@ -234,10 +245,11 @@ export class ProdutosService {
     }
     await this.validarIngredientes(estabelecimentoId, ingredientes);
 
-    // Se a imagem foi trocada, remove o arquivo antigo do disco
-    if (data.imagemUrl !== undefined && data.imagemUrl !== atual.imagemUrl) {
-      this.removerImagemDoDisco(atual.imagemUrl);
-    }
+    // A imagem antiga só sai do disco DEPOIS do commit: apagar antes podia
+    // deixar o banco apontando para um arquivo que sumiu caso o `update`
+    // falhasse em seguida.
+    const trocouImagem =
+      data.imagemUrl !== undefined && data.imagemUrl !== atual.imagemUrl;
 
     // Só recria os grupos quando o payload trouxe `grupos` de propósito.
     // Antes, `ingredientes !== undefined` também marcava a recriação, e
@@ -255,47 +267,52 @@ export class ProdutosService {
         )
       : [];
 
-    const atualizado = await this.prisma.produto.update({
-      where: { id },
-      data: {
-        nome: data.nome,
-        descricao: data.descricao,
-        preco: data.preco !== undefined ? Number(data.preco) : undefined,
-        imagemUrl: data.imagemUrl,
-        categoriaId: data.categoriaId,
-        tipo: data.tipo,
-        grupos: recriarGrupos
-          ? {
-              deleteMany: {},
-              create: grupos.map((g, indice) => ({
-                nome: g.nome,
-                maximoEscolhas: g.maximoEscolhas,
-                minimoEscolhas: g.minimoEscolhas,
-                ordem: indice,
-              })),
-            }
-          : undefined,
-        ingredientes: ingredientes
-          ? {
-              deleteMany: {},
-              create: ingredientes.map((i) => ({
-                ingredienteId: i.ingredienteId,
-                precoAdicional: Number(i.precoAdicional ?? 0),
-              })),
-            }
-          : undefined,
-      },
-      include: { grupos: true },
+    // `update` + reinterpretação dos vínculos de grupo na mesma transação.
+    await this.prisma.$transaction(async (tx) => {
+      const produto = await tx.produto.update({
+        where: { id },
+        data: {
+          nome: data.nome,
+          descricao: data.descricao,
+          preco: data.preco !== undefined ? Number(data.preco) : undefined,
+          imagemUrl: data.imagemUrl,
+          categoriaId: data.categoriaId,
+          tipo: data.tipo,
+          grupos: recriarGrupos
+            ? {
+                deleteMany: {},
+                create: grupos.map((g, indice) => ({
+                  nome: g.nome,
+                  maximoEscolhas: g.maximoEscolhas,
+                  minimoEscolhas: g.minimoEscolhas,
+                  ordem: indice,
+                })),
+              }
+            : undefined,
+          ingredientes: ingredientes
+            ? {
+                deleteMany: {},
+                create: ingredientes.map((i) => ({
+                  ingredienteId: i.ingredienteId,
+                  precoAdicional: Number(i.precoAdicional ?? 0),
+                })),
+              }
+            : undefined,
+        },
+        include: { grupos: true },
+      });
+
+      // Liga os ingredientes aos grupos pelo nome: usa os grupos recém-criados
+      // quando veio `grupos` no payload, ou os já existentes quando só os
+      // ingredientes mudaram (os nomes batem com o estado atual do produto).
+      if (ingredientes?.length) {
+        const gruposParaVinculo = recriarGrupos ? produto.grupos : atual.grupos;
+        await this.vincularGrupos(id, gruposParaVinculo, ingredientes, tx);
+      }
     });
 
-    // Liga os ingredientes aos grupos pelo nome: usa os grupos recém-criados
-    // quando veio `grupos` no payload, ou os já existentes quando só os
-    // ingredientes mudaram (os nomes batem com o estado atual do produto).
-    if (ingredientes?.length) {
-      const gruposParaVinculo = recriarGrupos
-        ? atualizado.grupos
-        : atual.grupos;
-      await this.vincularGrupos(id, gruposParaVinculo, ingredientes);
+    if (trocouImagem) {
+      this.removerImagemDoDisco(estabelecimentoId, atual.imagemUrl);
     }
 
     return this.findOne(estabelecimentoId, id);
@@ -313,7 +330,7 @@ export class ProdutosService {
       .delete({ where: { id } })
       .catch((erro) => this.tratarRestricao(erro, 'este produto'));
 
-    this.removerImagemDoDisco(produto.imagemUrl);
+    this.removerImagemDoDisco(estabelecimentoId, produto.imagemUrl);
     return removido;
   }
 
@@ -366,11 +383,21 @@ export class ProdutosService {
     }
   }
 
-  // Apaga do disco imagens locais (/uploads/...) que ficaram órfãs
-  private removerImagemDoDisco(imagemUrl?: string | null): void {
-    if (!imagemUrl || !imagemUrl.startsWith('/uploads/')) return;
+  // Apaga do disco a imagem do produto, confinada à pasta do PRÓPRIO tenant
+  // (uploads/<estabelecimentoId>/). Sem esse confinamento, um tenant poderia
+  // apontar `imagemUrl` para o arquivo de outro estabelecimento e apagá-lo.
+  private removerImagemDoDisco(
+    estabelecimentoId: string,
+    imagemUrl?: string | null,
+  ): void {
+    if (!imagemUrl) return;
+    const pastaDoTenant = resolve(process.cwd(), 'uploads', estabelecimentoId);
+    // resolve() normaliza '..' e '/': se o alvo tentar escapar da pasta do
+    // tenant, o startsWith abaixo falha e nada é apagado.
+    const alvo = resolve(process.cwd(), `.${imagemUrl}`);
+    if (!alvo.startsWith(pastaDoTenant + sep)) return;
     try {
-      unlinkSync(join(process.cwd(), imagemUrl));
+      unlinkSync(alvo);
     } catch {
       // arquivo já pode ter sido removido pelo próprio usuário
     }

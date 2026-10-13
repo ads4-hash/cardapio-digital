@@ -33,6 +33,7 @@ import { CurrentUser } from './current-user.decorator';
 import type { UsuarioAutenticado } from './current-user.decorator';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarUsuarioDto } from './dto/registrar-usuario.dto';
 import { SolicitarRecuperacaoDto } from './dto/solicitar-recuperacao.dto';
@@ -40,6 +41,7 @@ import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
 import {
   InfoCardapioDto,
   MensagemDto,
+  PerfilAtualizadoDto,
   RecuperacaoRespostaDto,
   RespostaAuthDto,
   UsuarioPublicoDto,
@@ -137,6 +139,49 @@ export class AuthController {
     return this.authService.login(dto.email, dto.senha, obterIpCliente(req));
   }
 
+  // Renova o access token a partir de um refresh token válido (rotação)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Renova o access token usando o refresh token',
+    description:
+      'O refresh token é rotacionado a cada uso: o enviado é revogado e um novo par é devolvido. Reutilizar um refresh token já usado encerra todas as sessões do usuário (proteção contra roubo).',
+  })
+  @ApiBody({ type: RefreshTokenDto })
+  @ApiOkResponse({ type: RespostaAuthDto })
+  @ApiUnauthorizedResponse({
+    type: RespostaErroDto,
+    description: 'Refresh token ausente, inválido, expirado ou reutilizado.',
+  })
+  renovar(@Body() dto: RefreshTokenDto) {
+    return this.authService.renovarTokens(dto.refreshToken);
+  }
+
+  // Encerra a sessão deste dispositivo revogando o refresh token
+  @UseGuards(AuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Encerra a sessão atual',
+    description:
+      'Revoga o refresh token enviado. O access token deixa de valer assim que expira (15 min); trocar a senha revoga todas as sessões.',
+  })
+  @ApiBody({ type: RefreshTokenDto })
+  @ApiOkResponse({ type: MensagemDto })
+  @ApiUnauthorizedResponse({
+    type: RespostaErroDto,
+    description: 'Token ausente, inválido ou expirado.',
+  })
+  logout(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @Body() dto: RefreshTokenDto,
+  ) {
+    return this.authService.logout(dto.refreshToken, usuario.id);
+  }
+
   // Solicita a recuperação de senha (código por e-mail ou exibido em dev)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('recuperar-senha')
@@ -170,7 +215,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Redefine a senha com o código de recuperação',
     description:
-      'Consome o código, de uso único. Atenção: o token JWT não carrega a senha, então sessões já abertas continuam válidas até expirar (7 dias).',
+      'Consome o código, de uso único. Trocar a senha encerra **todas** as sessões do usuário (access e refresh tokens).',
   })
   @ApiBody({ type: RedefinirSenhaDto })
   @ApiOkResponse({ type: MensagemDto })
@@ -211,7 +256,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Atualiza os dados do usuário logado',
     description: [
-      'Todos os campos são opcionais: envie só o que mudar.',
+      '`nome` e `email` são obrigatórios — envie sempre os dois, mesmo que só um',
+      'tenha mudado. Os demais campos só precisam vir quando forem alterados.',
       '',
       '**Trocar o e-mail ou a senha exige `senhaAtual`** — é o que impede quem',
       'roubasse o token de tomar a conta num único PATCH. Alterar apenas nome e',
@@ -219,7 +265,7 @@ export class AuthController {
     ].join('\n'),
   })
   @ApiBody({ type: AtualizarPerfilDto })
-  @ApiOkResponse({ type: UsuarioPublicoDto })
+  @ApiOkResponse({ type: PerfilAtualizadoDto })
   @ApiBadRequestResponse({
     type: RespostaErroDto,
     description:

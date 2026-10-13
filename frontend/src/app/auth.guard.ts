@@ -19,7 +19,7 @@ export const authGuard: CanActivateFn = async () => {
     auth.aplicarPerfil(usuario);
     return true;
   } catch {
-    auth.logout();
+    auth.limparSessao();
     return router.createUrlTree(['/']);
   }
 };

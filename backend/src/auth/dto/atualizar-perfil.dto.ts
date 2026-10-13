@@ -4,8 +4,8 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-  MinLength,
 } from 'class-validator';
+import { SenhaForte } from '../../common/senha';
 
 // Edição do perfil: nome, e-mail e (opcionalmente) nova senha. A senha só é
 // alterada quando informada; deixar em branco mantém a senha atual.
@@ -41,7 +41,7 @@ export class AtualizarPerfilDto {
    */
   @IsOptional()
   @IsString()
-  @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres.' })
+  @SenhaForte()
   senha?: string;
 
   /**

@@ -87,7 +87,7 @@ describe('ProdutosService', () => {
     // Por padrão o produto existe e pertence ao tenant certo
     produtoFindUnique.mockResolvedValue({ ...PRODUTO_ATUAL });
 
-    const prisma = {
+    const cliente = {
       produto: {
         findUnique: produtoFindUnique,
         findMany: produtoFindMany,
@@ -98,6 +98,16 @@ describe('ProdutosService', () => {
       categoria: { findUnique: categoriaFindUnique },
       ingrediente: { findMany: ingredienteFindMany },
       produtoIngrediente: { updateMany: produtoIngredienteUpdateMany },
+    };
+
+    // O serviço agora envolve create/update em `$transaction`; o mock apenas
+    // executa o callback com o mesmo cliente, sem transação real.
+    const prisma = {
+      ...cliente,
+      $transaction: jest.fn(
+        (callback: (tx: typeof cliente) => Promise<unknown>) =>
+          callback(cliente),
+      ),
     } as unknown as PrismaService;
 
     service = new ProdutosService(prisma);
@@ -189,7 +199,7 @@ describe('ProdutosService', () => {
     it('apaga a imagem do disco só depois do delete no banco', async () => {
       produtoFindUnique.mockResolvedValue({
         ...PRODUTO_ATUAL,
-        imagemUrl: '/uploads/foto.png',
+        imagemUrl: '/uploads/est-1/foto.png',
       });
 
       await service.remove('est-1', 'prod-1');
@@ -203,7 +213,7 @@ describe('ProdutosService', () => {
     it('converte FK RESTRICT (P2003) em 409 e preserva a imagem', async () => {
       produtoFindUnique.mockResolvedValue({
         ...PRODUTO_ATUAL,
-        imagemUrl: '/uploads/foto.png',
+        imagemUrl: '/uploads/est-1/foto.png',
       });
       produtoDelete.mockRejectedValue({ code: 'P2003' });
 

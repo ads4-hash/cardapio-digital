@@ -8,12 +8,14 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { URL_IMAGEM_REGEX } from '../../common/imagem';
 
 /**
  * Modo de montagem do produto.
@@ -72,6 +74,7 @@ export class ProdutoIngredienteDto {
    */
   @IsString()
   @IsNotEmpty({ message: 'O id do ingrediente é obrigatório.' })
+  @IsUUID('4', { message: 'Identificador de ingrediente inválido.' })
   ingredienteId: string;
 
   /**
@@ -139,7 +142,7 @@ export class CreateProdutoDto {
    */
   @IsOptional()
   @IsString()
-  @Matches(/^\/uploads\/[a-zA-Z0-9._-]+$/, {
+  @Matches(URL_IMAGEM_REGEX, {
     message: 'A imagem deve ser um caminho relativo em /uploads/.',
   })
   imagemUrl?: string;
@@ -151,6 +154,7 @@ export class CreateProdutoDto {
    */
   @IsString()
   @IsNotEmpty({ message: 'A categoria é obrigatória.' })
+  @IsUUID('4', { message: 'Identificador de categoria inválido.' })
   categoriaId: string;
 
   /**

@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { SenhaForte } from '../../common/senha';
 
 export class RedefinirSenhaDto {
   /**
@@ -11,11 +12,11 @@ export class RedefinirSenhaDto {
   token: string;
 
   /**
-   * Nova senha, mínimo de 6 caracteres.
+   * Nova senha, mínimo de 6 caracteres com letras e números.
    * @example novaSenha123
    */
   @IsString()
-  @MinLength(6, { message: 'A nova senha deve ter pelo menos 6 caracteres.' })
+  @SenhaForte()
   novaSenha: string;
 
   /**

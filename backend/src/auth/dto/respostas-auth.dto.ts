@@ -23,17 +23,41 @@ export class UsuarioPublicoDto {
   estabelecimento: EstabelecimentoResumoDto;
 }
 
-/** Resposta de `POST /auth/registrar`, `POST /auth/login` e `PATCH /auth/me`. */
+/** Resposta de `POST /auth/registrar`, `POST /auth/login` e `POST /auth/refresh`. */
 export class RespostaAuthDto {
   @ApiProperty({
     description:
-      'Token JWT de acesso. Enviar como "Authorization: Bearer <token>".',
+      'Access token JWT, curto (15 min). Enviar como "Authorization: Bearer <token>".',
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   token: string;
 
+  @ApiProperty({
+    description:
+      'Refresh token opaco (30 dias), rotacionado a cada uso. Enviar em `POST /auth/refresh` para renovar o access token sem novo login.',
+    example: 'G7hN4u8y0p...',
+  })
+  refreshToken: string;
+
   @ApiProperty({ type: UsuarioPublicoDto })
   usuario: UsuarioPublicoDto;
+}
+
+/** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, tokens novos. */
+export class PerfilAtualizadoDto extends UsuarioPublicoDto {
+  @ApiProperty({
+    required: false,
+    description:
+      'Novo access token. Só vem quando o e-mail/senha mudam (as sessões antigas são encerradas).',
+  })
+  token?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Novo refresh token. Só vem quando o e-mail/senha mudam (as sessões antigas são encerradas).',
+  })
+  refreshToken?: string;
 }
 
 /** Resposta de `GET /auth/cardapio` — nome e contato, para telas públicas. */

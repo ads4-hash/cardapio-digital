@@ -24,7 +24,7 @@ npm run lint        # ESLint
 
 ```bash
 npm test            # Jest (unit)
-npm run test:e2e    # e2e (supertest)
+npm run test:cov    # Jest com cobertura
 ```
 
 ## Documentação da API

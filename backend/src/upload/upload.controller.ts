@@ -20,9 +20,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
-import { unlinkSync } from 'fs';
-import { extname, resolve } from 'path';
+import { mkdirSync, unlinkSync } from 'fs';
+import { extname, join, resolve } from 'path';
+import type { Request } from 'express';
 import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { UsuarioAutenticado } from '../auth/current-user.decorator';
 import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
 import { UploadRespostaDto } from './dto/respostas-upload.dto';
 import {
@@ -89,7 +92,19 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads',
+        // Cada tenant grava na própria pasta (uploads/<estabelecimentoId>/),
+        // o que permite confinar a remoção de imagens ao dono do arquivo.
+        destination: (req, _file, cb) => {
+          const usuario = (req as Request & { user?: UsuarioAutenticado }).user;
+          const estabelecimentoId = usuario?.estabelecimentoId;
+          if (!estabelecimentoId) {
+            cb(new BadRequestException('Sessão inválida.'), '');
+            return;
+          }
+          const destino = join(process.cwd(), 'uploads', estabelecimentoId);
+          mkdirSync(destino, { recursive: true });
+          cb(null, destino);
+        },
         filename: (_req, file, cb) => {
           const ext = extensaoPermitida(extname(file.originalname))
             ? extname(file.originalname).toLowerCase()
@@ -119,7 +134,10 @@ export class UploadController {
       limits: { fileSize: MAX_SIZE },
     }),
   )
-  async upload(@UploadedFile() file?: Express.Multer.File) {
+  async upload(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo foi enviado.');
     }
@@ -138,6 +156,6 @@ export class UploadController {
       );
     }
 
-    return { url: `/uploads/${file.filename}` };
+    return { url: `/uploads/${usuario.estabelecimentoId}/${file.filename}` };
   }
 }

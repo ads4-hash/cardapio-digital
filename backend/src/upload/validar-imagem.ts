@@ -28,6 +28,19 @@ export async function validarConteudoImagem(
   caminho: string,
   mime: string,
 ): Promise<boolean> {
+  if (mime === 'image/webp') {
+    // WebP exige uma checagem própria (RIFF + 'WEBP'), então sai antes do
+    // mapa genérico de magic bytes, que não a conhece.
+    const buffer = await lerInicio(caminho);
+    if (buffer.length < 12) {
+      return false;
+    }
+    return (
+      buffer.toString('ascii', 0, 4) === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+
   if (!mime || !MAGIC_BYTES[mime]) {
     return false;
   }
@@ -39,25 +52,17 @@ export async function validarConteudoImagem(
     return false;
   }
 
-  const buffer = await new Promise<Buffer>((resolve, reject) => {
+  const buffer = await lerInicio(caminho);
+
+  return firmasEsperadas.every((byte, indice) => buffer[indice] === byte);
+}
+
+async function lerInicio(caminho: string, qtdBytes = 12): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const stream = createReadStream(caminho, { start: 0, end: 11 });
+    const stream = createReadStream(caminho, { start: 0, end: qtdBytes - 1 });
     stream.on('data', (chunk) => chunks.push(chunk as Buffer));
     stream.on('end', () => resolve(Buffer.concat(chunks)));
     stream.on('error', reject);
   });
-
-  const linha =
-    buffer.length >= 8 ? buffer.subarray(8, 12).toString('ascii') : '';
-
-  if (mime === 'image/webp') {
-    // RIFF (4 primeiros bytes) + tamanho (4) + 'WEBP'
-    return (
-      buffer.length >= 12 &&
-      buffer.toString('ascii', 0, 4) === 'RIFF' &&
-      linha === 'WEBP'
-    );
-  }
-
-  return firmasEsperadas.every((byte, indice) => buffer[indice] === byte);
 }

@@ -15,7 +15,7 @@ import type { Request } from 'express';
 import { EnvioEmailService } from '../envio-email/envio-email.service';
 import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { obterSegredo } from './segredo';
+import { obterSegredoHash } from './segredo';
 import { gerarSlug } from './slug';
 
 const CUSTO_HASH_BCRYPT = 10;
@@ -38,6 +38,10 @@ const VALIDADE_RECUPERACAO_MS = 30 * 60 * 1000;
 const REUSO_MINIMO_MS = 2 * 60 * 1000;
 /** Alfabeto sem caracteres ambíguos (0/O/1/I) usado no código de recuperação */
 const ALFABETO_CODIGO = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+/** Validade do access token: curta, porque o refresh renova sem novo login */
+const VALIDADE_ACESSO = '15m';
+/** Validade do refresh token (30 dias) */
+const VALIDADE_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface EstabelecimentoDoUsuario {
   id: string;
@@ -51,6 +55,18 @@ export interface UsuarioPublico {
   nome: string;
   email: string;
   estabelecimento: EstabelecimentoDoUsuario;
+}
+
+/** Perfil do usuário; carrega tokens novos quando a credencial muda. */
+export interface UsuarioPublicoComTokens extends UsuarioPublico {
+  token?: string;
+  refreshToken?: string;
+}
+
+export interface RespostaTokens {
+  token: string;
+  refreshToken: string;
+  usuario: UsuarioPublico;
 }
 
 @Injectable()
@@ -72,7 +88,7 @@ export class AuthService {
     confirmarSenha: string,
     telefone: string | null | undefined,
     ip: string,
-  ): Promise<{ token: string; usuario: UsuarioPublico }> {
+  ): Promise<RespostaTokens> {
     if (senha !== confirmarSenha) {
       throw new BadRequestException('As senhas não conferem.');
     }
@@ -116,6 +132,7 @@ export class AuthService {
             id: true,
             nome: true,
             email: true,
+            tokenVersao: true,
             estabelecimento: {
               select: { id: true, nome: true, slug: true, telefone: true },
             },
@@ -125,14 +142,14 @@ export class AuthService {
       .catch((erro) => this.tratarP2002(erro));
 
     await this.registrarTentativa(ip, this.hashEmail(emailNormalizado), true);
-    return this.emitirTokenAcesso(usuario);
+    return this.emitirTokens(usuario);
   }
 
   async login(
     email: string,
     senha: string,
     ip: string,
-  ): Promise<{ token: string; usuario: UsuarioPublico }> {
+  ): Promise<RespostaTokens> {
     const ipHash = this.hashIp(ip);
     // Haspa o e-mail ANTES de consultar o usuário, e registra a tentativa mesmo
     // quando a conta não existe. Assim a contagem é idêntica para e-mails
@@ -183,10 +200,11 @@ export class AuthService {
     // Fora do caminho crítico: só evita que as tabelas cresçam sem limite
     void this.limparRegistrosAntigos().catch(() => undefined);
 
-    return this.emitirTokenAcesso({
+    return this.emitirTokens({
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
+      tokenVersao: usuario.tokenVersao,
       estabelecimento: {
         id: usuario.estabelecimento.id,
         nome: usuario.estabelecimento.nome,
@@ -324,8 +342,8 @@ export class AuthService {
   }
 
   // Redefine a senha usando o código de recuperação (único e com validade).
-  // Todas as sessões ativas do usuário são mantidas, mas códigos anteriores
-  // são invalidados para impedir reutilização.
+  // Trocar a senha encerra TODAS as sessões (access e refresh tokens) e
+  // invalida códigos anteriores, para impedir reutilização.
   async redefinirSenha(
     token: string,
     novaSenha: string,
@@ -351,14 +369,20 @@ export class AuthService {
 
     const senhaHash = await hash(novaSenha, CUSTO_HASH_BCRYPT);
     await this.prisma.$transaction([
+      // Incrementar `tokenVersao` mata imediatamente os access tokens já
+      // emitidos; revogar os refresh tokens impede que eles sejam renovados.
       this.prisma.usuario.update({
         where: { id: registro.usuarioId },
-        data: { senhaHash },
+        data: { senhaHash, tokenVersao: { increment: 1 } },
       }),
       // Consome este código e invalida qualquer outro ainda ativo
       this.prisma.recuperacaoSenha.updateMany({
         where: { usuarioId: registro.usuarioId, usadoEm: null },
         data: { usadoEm: new Date() },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { usuarioId: registro.usuarioId, revogadoEm: null },
+        data: { revogadoEm: new Date() },
       }),
     ]);
 
@@ -406,7 +430,7 @@ export class AuthService {
     confirmarSenha?: string,
     telefone?: string | null,
     senhaAtual?: string,
-  ): Promise<UsuarioPublico> {
+  ): Promise<UsuarioPublicoComTokens> {
     if (senha) {
       if (senha !== confirmarSenha) {
         throw new BadRequestException('As senhas não conferem.');
@@ -490,6 +514,23 @@ export class AuthService {
       });
     }
 
+    // Trocar e-mail/senha encerra as outras sessões (bump da versão + revoga
+    // refresh tokens). Emitimos um par novo para este dispositivo continuar
+    // logado com o token recém-assinado.
+    if (trocaCredencial) {
+      await this.encerrarTodasAsSessoes(id);
+      const perfil = await this.me(id);
+      const { tokenVersao } = await this.prisma.usuario.findUniqueOrThrow({
+        where: { id },
+        select: { tokenVersao: true },
+      });
+      return {
+        ...perfil,
+        token: this.assinarAcesso({ ...perfil, tokenVersao }),
+        refreshToken: await this.criarRefreshToken(id),
+      };
+    }
+
     return this.me(id);
   }
 
@@ -539,19 +580,165 @@ export class AuthService {
     throw erro;
   }
 
-  private emitirTokenAcesso(usuario: {
+  // Emite o par access + refresh e devolve também o usuário público.
+  private async emitirTokens(usuario: {
     id: string;
     nome: string;
     email: string;
+    tokenVersao: number;
     estabelecimento: EstabelecimentoDoUsuario;
-  }) {
-    const token = this.jwtService.sign({
-      sub: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      estabelecimentoId: usuario.estabelecimento.id,
+  }): Promise<RespostaTokens> {
+    return {
+      token: this.assinarAcesso(usuario),
+      refreshToken: await this.criarRefreshToken(usuario.id),
+      usuario: {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        estabelecimento: usuario.estabelecimento,
+      },
+    };
+  }
+
+  // Assina o access token; `tv` vai no payload e é conferido pelo AuthGuard
+  // contra a versão atual no banco (é o que permite revogar tokens na hora).
+  private assinarAcesso(usuario: {
+    id: string;
+    nome: string;
+    email: string;
+    tokenVersao: number;
+    estabelecimento: EstabelecimentoDoUsuario;
+  }): string {
+    return this.jwtService.sign(
+      {
+        sub: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        estabelecimentoId: usuario.estabelecimento.id,
+        tv: usuario.tokenVersao,
+      },
+      { expiresIn: VALIDADE_ACESSO },
+    );
+  }
+
+  // Cria um refresh token opaco e guarda só o hash. O valor em claro só existe
+  // na resposta (como nos códigos de recuperação).
+  private async criarRefreshToken(
+    usuarioId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
+    const token = randomBytes(48).toString('base64url');
+    await db.refreshToken.create({
+      data: {
+        usuarioId,
+        tokenHash: this.hashRefresh(token),
+        expiraEm: new Date(Date.now() + VALIDADE_REFRESH_MS),
+      },
     });
-    return { token, usuario };
+    return token;
+  }
+
+  // Troca um refresh token válido por um par novo (rotação). O token usado é
+  // revogado; reutilizar um já revogado é tratado como roubo e derruba todas as
+  // sessões do usuário.
+  async renovarTokens(refreshToken: string): Promise<RespostaTokens> {
+    const registro = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: this.hashRefresh(refreshToken) },
+      include: {
+        usuario: {
+          include: {
+            estabelecimento: {
+              select: { id: true, nome: true, slug: true, telefone: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!registro || registro.expiraEm.getTime() <= Date.now()) {
+      throw new UnauthorizedException('Sessão expirada. Faça login novamente.');
+    }
+
+    if (registro.revogadoEm) {
+      await this.encerrarTodasAsSessoes(registro.usuarioId);
+      throw new UnauthorizedException('Sessão expirada. Faça login novamente.');
+    }
+
+    const usuario = registro.usuario;
+    const novoRefresh = randomBytes(48).toString('base64url');
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.update({
+        where: { id: registro.id },
+        data: { revogadoEm: new Date() },
+      }),
+      this.prisma.refreshToken.create({
+        data: {
+          usuarioId: usuario.id,
+          tokenHash: this.hashRefresh(novoRefresh),
+          expiraEm: new Date(Date.now() + VALIDADE_REFRESH_MS),
+        },
+      }),
+    ]);
+
+    return {
+      token: this.assinarAcesso({
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        tokenVersao: usuario.tokenVersao,
+        estabelecimento: {
+          id: usuario.estabelecimento.id,
+          nome: usuario.estabelecimento.nome,
+          slug: usuario.estabelecimento.slug,
+          telefone: usuario.estabelecimento.telefone,
+        },
+      }),
+      refreshToken: novoRefresh,
+      usuario: {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        estabelecimento: {
+          id: usuario.estabelecimento.id,
+          nome: usuario.estabelecimento.nome,
+          slug: usuario.estabelecimento.slug,
+          telefone: usuario.estabelecimento.telefone,
+        },
+      },
+    };
+  }
+
+  // Logout: revoga o refresh token deste dispositivo. Idempotente — um token
+  // já revogado ou desconhecido também responde ok (não vaza se existia).
+  async logout(
+    refreshToken: string,
+    usuarioId: string,
+  ): Promise<{ mensagem: string }> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash: this.hashRefresh(refreshToken),
+        usuarioId,
+        revogadoEm: null,
+      },
+      data: { revogadoEm: new Date() },
+    });
+    return { mensagem: 'Sessão encerrada.' };
+  }
+
+  // Encerra todas as sessões: incrementa `tokenVersao` (mata os access tokens
+  // já emitidos) e revoga os refresh tokens ativos.
+  private async encerrarTodasAsSessoes(
+    usuarioId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<void> {
+    await db.usuario.update({
+      where: { id: usuarioId },
+      data: { tokenVersao: { increment: 1 } },
+    });
+    await db.refreshToken.updateMany({
+      where: { usuarioId, revogadoEm: null },
+      data: { revogadoEm: new Date() },
+    });
   }
 
   private async ipBloqueado(ipHash: string): Promise<boolean> {
@@ -600,6 +787,11 @@ export class AuthService {
         OR: [{ usadoEm: { not: null } }, { expiraEm: { lt: agora } }],
       },
     });
+    // Refresh tokens só saem quando expiram: os revogados permanecem até lá
+    // para que a reutilização continue sendo detectável.
+    await this.prisma.refreshToken.deleteMany({
+      where: { expiraEm: { lt: agora } },
+    });
   }
 
   // Nunca armazena o IP em texto puro: grava apenas o hash HMAC-SHA256
@@ -626,7 +818,7 @@ export class AuthService {
   }
 
   private hashSiglao(valor: string): string {
-    return createHmac('sha256', obterSegredo()).update(valor).digest('hex');
+    return createHmac('sha256', obterSegredoHash()).update(valor).digest('hex');
   }
 
   // Código de recuperação curto (8 caracteres) manualmente digitável
@@ -641,7 +833,12 @@ export class AuthService {
 
   // Armazena apenas o hash do código (nunca o valor em si)
   private hashRecuperacao(token: string): string {
-    return createHmac('sha256', obterSegredo()).update(token).digest('hex');
+    return createHmac('sha256', obterSegredoHash()).update(token).digest('hex');
+  }
+
+  // Mesmo tratamento: só o hash do refresh token é persistido
+  private hashRefresh(token: string): string {
+    return createHmac('sha256', obterSegredoHash()).update(token).digest('hex');
   }
 }
 
