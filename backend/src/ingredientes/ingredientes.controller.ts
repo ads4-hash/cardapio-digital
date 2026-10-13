@@ -12,6 +12,7 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -75,6 +76,10 @@ export class IngredientesController {
   @ApiBody({ type: CreateIngredienteDto })
   @ApiCreatedResponse({ type: IngredienteDto })
   @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiConflictResponse({
+    type: RespostaErroDto,
+    description: 'Já existe um ingrediente com esse nome.',
+  })
   create(
     @CurrentUser() usuario: UsuarioAutenticado,
     @Body() dto: CreateIngredienteDto,
@@ -90,6 +95,10 @@ export class IngredientesController {
   @ApiBody({ type: UpdateIngredienteDto })
   @ApiOkResponse({ type: IngredienteDto })
   @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  @ApiConflictResponse({
+    type: RespostaErroDto,
+    description: 'Já existe outro ingrediente com esse nome.',
+  })
   @ApiNotFoundResponse({ type: RespostaErroDto })
   update(
     @CurrentUser() usuario: UsuarioAutenticado,

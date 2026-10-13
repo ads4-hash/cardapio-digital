@@ -21,7 +21,7 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       <div class="card-body">
         <h3>{{ produto().nome }}</h3>
         <p class="desc">{{ produto().descricao || ' ' }}</p>
-        <div class="card-footer">
+        <div class="card-footer" [class.admin-footer]="modo() === 'admin'">
           @if (modo() === 'admin') {
             <span class="price">{{ produto().preco | currency:'BRL' }}</span>
             <div class="admin-actions">
@@ -130,9 +130,17 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      flex-wrap: wrap;
+      row-gap: 10px;
     }
-    .price { font-weight: 800; font-size: 1.05rem; color: var(--accent-dark); }
-    .admin-actions { display: flex; gap: 6px; }
+    .card-footer.admin-footer {
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-footer.admin-footer .admin-actions { margin-left: 0; }
+    .price { font-weight: 800; font-size: 1.05rem; color: var(--accent-dark); white-space: nowrap; }
+    .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
     .btn-add, .btn-edit, .btn-remove {
       border: none;
       border-radius: 10px;
@@ -140,9 +148,11 @@ import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/person
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
+      flex: 0 0 auto;
       transition: transform var(--transition), box-shadow var(--transition), filter var(--transition);
     }
-    .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: var(--on-accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
+    .btn-add { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: var(--on-accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); margin-left: auto; }
     .btn-add.disabled { background: var(--surface-hover); color: var(--text-muted); box-shadow: none; cursor: not-allowed; }
     .btn-edit { background: var(--info); color: var(--on-accent); }
     .btn-remove { background: var(--danger); color: var(--on-accent); }
