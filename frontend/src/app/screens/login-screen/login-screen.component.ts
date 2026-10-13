@@ -431,10 +431,16 @@ export class LoginScreenComponent {
         this.enviando.set(false);
         const status = erro?.status;
         if (status === 409) {
-          this.erro.set(
-            'Já existe uma conta com este e-mail. Faça login normalmente.',
-          );
-          this.modo.set('login');
+          const mensagem =
+            typeof erro?.error?.message === 'string'
+              ? erro.error.message
+              : 'Já existe uma conta com este e-mail. Faça login normalmente.';
+          this.erro.set(mensagem);
+          // Conflito de e-mail: faz sentido ir para o login. Conflito de nome de
+          // estabelecimento (slug) não, então só troca de modo no primeiro caso.
+          if (/e-mail/i.test(mensagem)) {
+            this.modo.set('login');
+          }
         } else if (status === 429) {
           this.erro.set(
             'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',

@@ -78,8 +78,8 @@ export class AuthService {
     private readonly envioEmail: EnvioEmailService,
   ) {}
 
-  // Cadastro público: cria o estabelecimento e o primeiro (único) administrador.
-  // Cada estabelecimento tem seu próprio slug (URL /cardapio/:slug).
+  // Cadastro público (self-service): cada signup cria um novo estabelecimento
+  // com seu próprio slug e o administrador dele. O e-mail é único globalmente.
   async registrar(
     nomeEstabelecimento: string,
     nome: string,
@@ -98,21 +98,9 @@ export class AuthService {
     const senhaHash = await hash(senha, CUSTO_HASH_BCRYPT);
 
     // Cria estabelecimento e usuário na mesma transação: se qualquer passo
-    // falhar (ex.: e-mail duplicado) nada fica órfão no banco.
+    // falhar (ex.: e-mail/slug duplicado) nada fica órfão no banco.
     const usuario = await this.prisma
       .$transaction(async (tx) => {
-        // O cadastro é só do bootstrap: o primeiro usuário vira o
-        // administrador e, depois dele, o endpoint responde 409 (como
-        // documentado no README e no Swagger). A conferência roda dentro da
-        // transação para encurtar a janela de dois cadastros simultâneos
-        // passarem juntos.
-        const jaExiste = await tx.usuario.findFirst({ select: { id: true } });
-        if (jaExiste) {
-          throw new ConflictException(
-            'O cadastro de administradores está encerrado. Entre em contato com o suporte para obter um acesso.',
-          );
-        }
-
         const estabelecimento = await tx.estabelecimento.create({
           data: {
             nome: nomeEstabelecimento.trim(),

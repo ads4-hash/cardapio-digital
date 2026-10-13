@@ -53,20 +53,20 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   // Cadastra um administrador e cria o estabelecimento dele (multi-tenant).
-  // Cada signup gera um novo estabelecimento com sua própria URL /cardapio/:slug.
-  // Limite rígido: cadastro é restrito a 5/min por IP para evitar abuso.
+  // Onboarding self-service: cada signup gera um novo estabelecimento com sua
+  // própria URL /cardapio/:slug. Limite rígido de 5/min por IP para evitar abuso.
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('registrar')
   @ApiOperation({
-    summary: 'Cadastra o administrador (somente o primeiro usuário)',
+    summary: 'Cadastra um administrador e o estabelecimento dele',
     description:
-      'Cria o usuário **e** o estabelecimento dele, que já nasce com um `slug` próprio para a URL pública do cardápio. É um bootstrap: depois do primeiro cadastro o endpoint responde 409 e novos administradores não podem ser criados por aqui.',
+      'Onboarding self-service: cria o usuário **e** o estabelecimento dele, que já nasce com um `slug` próprio para a URL pública do cardápio. Cada cadastro gera uma nova loja; o e-mail precisa ser único.',
   })
   @ApiBody({ type: RegistrarUsuarioDto })
   @ApiCreatedResponse({ type: RespostaAuthDto, description: 'Conta criada.' })
   @ApiConflictResponse({
     type: RespostaErroDto,
-    description: 'Já existe um administrador, ou o e-mail/slug já está em uso.',
+    description: 'E-mail ou slug já está em uso.',
   })
   @ApiTooManyRequestsResponse({
     type: RespostaErroDto,

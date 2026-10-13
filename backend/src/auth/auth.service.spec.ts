@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { compare, hash } from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { EnvioEmailService } from '../envio-email/envio-email.service';
@@ -298,22 +298,18 @@ describe('AuthService.atualizarPerfil', () => {
 });
 
 /**
- * Cobre o C1: o POST /auth/registrar é só do bootstrap — o primeiro usuário
- * vira administrador e, depois dele, o endpoint responde 409 (como o README e
- * o Swagger documentam). Sem isto, qualquer visitante criava tenants infinitos.
+ * Cobertura do onboarding self-service: cada POST /auth/registrar cria um
+ * estabelecimento novo (multi-tenant) e o administrador dele. O antigo bloqueio
+ * de "somente o primeiro usuário" foi removido.
  */
 describe('AuthService.registrar', () => {
   let service: AuthService;
 
-  let usuarioFindFirst: jest.Mock;
   let estabelecimentoCreate: jest.Mock;
   let usuarioCreate: jest.Mock;
   let tentativaLoginCreate: jest.Mock;
 
-  function criarService(temUsuarioExistente: boolean): void {
-    usuarioFindFirst = jest
-      .fn()
-      .mockResolvedValue(temUsuarioExistente ? { id: 'usr-antigo' } : null);
+  function criarService(): void {
     estabelecimentoCreate = jest.fn().mockResolvedValue({ id: 'est-novo' });
     usuarioCreate = jest.fn().mockResolvedValue({
       id: 'usr-novo',
@@ -331,7 +327,7 @@ describe('AuthService.registrar', () => {
     // `$transaction(cb)` executa o callback com um cliente fake; o `gerarSlugUnico`
     // também chama `findUnique`, que devolve null (slug livre).
     const tx = {
-      usuario: { findFirst: usuarioFindFirst, create: usuarioCreate },
+      usuario: { create: usuarioCreate },
       estabelecimento: {
         create: estabelecimentoCreate,
         findUnique: jest.fn().mockResolvedValue(null),
@@ -361,8 +357,8 @@ describe('AuthService.registrar', () => {
     );
   }
 
-  it('permite o primeiro cadastro (bootstrap vazio)', async () => {
-    criarService(false);
+  it('cria o estabelecimento e o administrador no cadastro', async () => {
+    criarService();
 
     const resposta = await service.registrar(
       'Pizzaria Nova',
@@ -380,28 +376,34 @@ describe('AuthService.registrar', () => {
     expect(resposta.usuario.email).toBe('dono@nova.com');
   });
 
-  it('bloqueia com 409 quando já existe pelo menos um usuário', async () => {
-    criarService(true);
+  it('permite vários cadastros: um estabelecimento por loja', async () => {
+    criarService();
 
-    await expect(
-      service.registrar(
-        'Outra Casa',
-        'Outra Casa',
-        'atacante@evil.com',
-        'senhaForte123',
-        'senhaForte123',
-        null,
-        '127.0.0.1',
-      ),
-    ).rejects.toThrow(ConflictException);
+    await service.registrar(
+      'Loja A',
+      'Loja A',
+      'a@exemplo.com',
+      'senhaForte123',
+      'senhaForte123',
+      null,
+      '127.0.0.1',
+    );
+    await service.registrar(
+      'Loja B',
+      'Loja B',
+      'b@exemplo.com',
+      'senhaForte123',
+      'senhaForte123',
+      null,
+      '127.0.0.1',
+    );
 
-    // Nada foi escrito: nem estabelecimento, nem usuário
-    expect(estabelecimentoCreate).not.toHaveBeenCalled();
-    expect(usuarioCreate).not.toHaveBeenCalled();
+    expect(estabelecimentoCreate).toHaveBeenCalledTimes(2);
+    expect(usuarioCreate).toHaveBeenCalledTimes(2);
   });
 
-  it('recusa senhas que não conferem antes de consultar o banco', async () => {
-    criarService(false);
+  it('recusa senhas que não conferem antes de escrever no banco', async () => {
+    criarService();
 
     await expect(
       service.registrar(
@@ -415,7 +417,8 @@ describe('AuthService.registrar', () => {
       ),
     ).rejects.toThrow('As senhas não conferem.');
 
-    expect(usuarioFindFirst).not.toHaveBeenCalled();
+    expect(estabelecimentoCreate).not.toHaveBeenCalled();
+    expect(usuarioCreate).not.toHaveBeenCalled();
   });
 });
 

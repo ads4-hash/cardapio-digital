@@ -57,11 +57,11 @@ O bundle do browser não tem `process.env`, então o servidor SSR publica `PUBLI
 em `/config.js`, carregado no `<head>` antes dos bundles. Como a rota é gerada por
 requisição, mudar a URL no `docker-compose` não exige rebuild.
 
-### Primeiro acesso ao painel
+### Criar conta (onboarding)
 
-O cadastro de usuário (`POST /auth/registrar`) só cria o **primeiro** usuário — que
-vira administrador. Depois dele, o endpoint é bloqueado e o acesso passa a ser
-apenas via login (`POST /auth/login`).
+Qualquer pessoa cria a própria loja pela tela **Criar conta** (`POST /auth/registrar`):
+cada cadastro gera um novo estabelecimento com `slug` próprio (URL `/cardapio/:slug`)
+e o administrador dele. O e-mail precisa ser único e o cadastro é limitado a 5/min por IP.
 
 ## Variáveis de ambiente (backend — `.env`)
 
@@ -102,8 +102,8 @@ PUBLIC_API_URL=https://api.seudominio.com ALLOWED_HOSTS=seudominio.com docker co
   categorias, upload de imagens, pedidos em tempo real via WebSocket e compartilhamento
   do cardápio público.
 - **Segurança**: senhas com bcrypt, JWT, rate limiting (login/registro e global),
-  validação de conteúdo de imagens (magic bytes), Helmet, bloqueio de segundo admin,
-  respostas de erro padronizadas em pt-BR.
+  validação de conteúdo de imagens (magic bytes), Helmet, respostas de erro
+  padronizadas em pt-BR.
 
 ## Testes e checagens
 
@@ -123,7 +123,7 @@ npm test        # ng test (Vitest, sem watch)
 
 | Método  | Rota                       | Acesso       | Descrição |
 |---------|----------------------------|--------------|-----------|
-| POST    | `/auth/registrar`          | público (1º usuário) | Cria o administrador |
+| POST    | `/auth/registrar`          | público      | Cria o estabelecimento + administrador (onboarding) |
 | POST    | `/auth/login`              | público      | Gera o token JWT |
 | GET     | `/categorias`, `/produtos`, `/ingredientes` | público leitura | Listagens (ocultas p/ não logados) |
 | GET     | `/pedidos`                   | admin        | Listagem do painel: aceita `?pagina=&tamanhoPagina=&status=` (sem parâmetros, devolve tudo) |
