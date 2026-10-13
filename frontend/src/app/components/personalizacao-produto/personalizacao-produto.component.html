@@ -1,0 +1,149 @@
+@if (produto()) {
+  <div class="overlay" (click)="fechar()"></div>
+  <div class="modal">
+    <div class="modal-header">
+      <h3>
+        @if (editando()) {
+          Corrigir {{ produto()!.nome }}
+        } @else {
+          {{ produto()!.nome }}
+        }
+      </h3>
+      <button (click)="fechar()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      @if (produto()!.descricao) {
+        <p class="desc">{{ produto()!.descricao }}</p>
+      }
+
+      @if (ingredientes().length === 0) {
+        <p class="sem-ingredientes">Este produto não possui ingredientes personalizáveis.</p>
+      } @else if (montagem()) {
+        <p class="desc montagem-ajuda">
+          Monte do zero. Cada seção tem um limite de porções.
+        </p>
+
+        @for (grupo of gruposDoProduto(); track grupo.nome) {
+          <section class="grupo">
+            <header class="grupo-header">
+              <h4>{{ grupo.nome }}</h4>
+              <span
+                class="grupo-contador"
+                [class.cheio]="grupoCheio(grupo)"
+                [class.faltando]="grupoAbaixoDoMinimo(grupo)"
+              >
+                {{ escolhidosNoGrupo(grupo) }} de {{ grupo.maximoEscolhas }}
+                {{ grupo.maximoEscolhas === 1 ? 'porção' : 'porções' }}
+                @if (grupo.minimoEscolhas > 0) {
+                  · mín. {{ grupo.minimoEscolhas }}
+                }
+              </span>
+            </header>
+            <ul class="ingredientes">
+              @for (ing of ingredientesDoGrupo(grupo); track ing.vinculo.ingredienteId) {
+                <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: true }" />
+              }
+            </ul>
+          </section>
+        }
+
+        @if (ingredientesSoltos().length > 0) {
+          <section class="grupo">
+            <header class="grupo-header">
+              <h4>Outros ingredientes</h4>
+              <span class="grupo-contador livre">sem limite</span>
+            </header>
+            <ul class="ingredientes">
+              @for (ing of ingredientesSoltos(); track ing.vinculo.ingredienteId) {
+                <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: true }" />
+              }
+            </ul>
+          </section>
+        }
+      } @else {
+        <h4>Personalize seus ingredientes</h4>
+        <ul class="ingredientes">
+          @for (ing of ingredientes(); track ing.vinculo.ingredienteId) {
+            <ng-container *ngTemplateOutlet="linha; context: { $implicit: ing, semRotulo: false }" />
+          }
+        </ul>
+      }
+    </div>
+
+    <div class="modal-footer">
+      <div class="rodape-linha">
+        <div class="quantidade">
+          <span class="qtd-label">Quantidade</span>
+          <div class="qtd-controles">
+            <button class="qtd-btn" (click)="diminuirQuantidade()" [disabled]="quantidade() <= 1">−</button>
+            <span class="qtd-valor">{{ quantidade() }}</span>
+            <button class="qtd-btn" (click)="aumentarQuantidade()">+</button>
+          </div>
+        </div>
+        <p class="preco">
+          Total:
+          <strong>{{ precoTotal() * quantidade() | currency:'BRL' }}</strong>
+        </p>
+      </div>
+      @if (mensagemFaltando(); as aviso) {
+        <p class="erro-escolhas" role="alert">{{ aviso }}</p>
+      }
+      <button
+        class="btn-adicionar"
+        [disabled]="!podeAdicionar()"
+        (click)="adicionar()"
+      >
+        @if (editando()) {
+          Salvar correções
+        } @else {
+          Adicionar {{ quantidade() > 1 ? quantidade() + 'x' : '' }} ao Carrinho
+        }
+      </button>
+    </div>
+  </div>
+}
+
+<ng-template #linha let-ing let-semRotulo="semRotulo">
+  <li class="linha" [class.fora]="removido(ing)">
+    <div class="info">
+      <span class="nome">{{ ing.vinculo.ingrediente!.nome }}</span>
+      @if (removido(ing)) {
+        <span class="extra sem">Sem este ingrediente</span>
+      } @else if (ing.vinculo.precoAdicional > 0) {
+        <span class="extra">
+          +{{ ing.vinculo.precoAdicional | currency:'BRL' }}
+          @if (copias(ing) > 1) {
+            <span class="extra-total">
+              × {{ copias(ing) }} = {{ ing.vinculo.precoAdicional * copias(ing) | currency:'BRL' }}
+            </span>
+          }
+        </span>
+      } @else if (semRotulo) {
+        <span class="extra incluso">incluso no preço</span>
+      } @else if (copias(ing) > 0) {
+        <span class="extra incluso">gratuito</span>
+      }
+    </div>
+    <div class="stepper">
+      <button
+        class="toggle"
+        [disabled]="ing.quantidade === 0"
+        (click)="diminuir(ing)"
+        [attr.aria-label]="'Diminuir ' + ing.vinculo.ingrediente!.nome"
+      >
+        −
+      </button>
+      <span class="qtd-extra">{{ ing.quantidade }}</span>
+      <button
+        class="toggle"
+        [disabled]="naoPodeSomar(ing)"
+        (click)="aumentar(ing)"
+        [attr.aria-label]="'Aumentar ' + ing.vinculo.ingrediente!.nome"
+      >
+        +
+      </button>
+    </div>
+  </li>
+</ng-template>
+

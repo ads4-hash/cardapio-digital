@@ -1,0 +1,216 @@
+<!-- Botão Flutuante -->
+<button class="cart-float-btn" (click)="abrirCarrinho()">
+  🛒 Ver Carrinho ({{ cartService.totalItems() }}) - {{ cartService.totalPrice() | currency:'BRL' }}
+</button>
+
+<!-- Painel Lateral (Drawer) -->
+@if (isOpen()) {
+  <div class="overlay" (click)="fechar()"></div>
+  <div class="drawer">
+    <div class="drawer-header">
+      <h2>{{ etapa() === 'sucesso' ? 'Pedido Confirmado' : 'Seu Pedido' }}</h2>
+      <button (click)="fechar()">✕</button>
+    </div>
+
+    @if (etapa() === 'sucesso') {
+      <div class="drawer-body success">
+        <p class="success-icon">✅</p>
+        <p><strong>Pedido recebido com sucesso!</strong></p>
+        <p>Muito obrigado! O número do seu pedido é <strong>#{{ pedidoSucesso() }}</strong>.</p>
+        <a class="btn-acompanhar" [routerLink]="['/pedido', pedidoId()]">Acompanhar pedido</a>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn-checkout" (click)="fechar()">Fechar</button>
+      </div>
+    } @else if (etapa() === 'checkout') {
+      <div class="drawer-body">
+        @if (erro()) {
+          <p class="erro">{{ erro() }}</p>
+        }
+        <label for="cliente">Seu nome <span class="req">*</span></label>
+        <input
+          id="cliente"
+          type="text"
+          [ngModel]="cliente()"
+          (ngModelChange)="cliente.set($event)"
+          placeholder="Ex: João"
+        />
+        <label for="telefone">Telefone de contato <span class="req">*</span></label>
+        <input
+          id="telefone"
+          type="tel"
+          [ngModel]="telefone()"
+          (ngModelChange)="telefone.set($event)"
+          placeholder="Ex: (11) 99999-9999"
+        />
+        @if (tipoEntrega() === 'ENTREGA') {
+          <label for="endereco">Endereço de entrega <span class="req">*</span></label>
+          <input
+            id="endereco"
+            type="text"
+            [ngModel]="endereco()"
+            (ngModelChange)="endereco.set($event)"
+            placeholder="Rua, número, bairro"
+          />
+        }
+
+        <p class="pag-titulo">Forma de pagamento <span class="req">*</span></p>
+        <div class="opcoes-pag">
+          @for (opcao of formasPagamento(); track opcao.valor) {
+            <label class="opcao" [class.selecionada]="formaPagamento() === opcao.valor">
+              <input
+                type="radio"
+                name="formaPagamento"
+                [checked]="formaPagamento() === opcao.valor"
+                (change)="selecionarPagamento(opcao.valor)"
+              />
+              <span class="opcao-info">
+                <strong>{{ opcao.rotulo }}</strong>
+              </span>
+            </label>
+          }
+        </div>
+
+        @if (formaPagamento() === 'DINHEIRO') {
+          <p class="troco-titulo">Precisa de troco?</p>
+          <div class="troco-opcoes">
+            <button
+              type="button"
+              class="troco-btn"
+              [class.ativo]="!desejaTroco()"
+              (click)="desejaTroco.set(false)"
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              class="troco-btn"
+              [class.ativo]="desejaTroco()"
+              (click)="desejaTroco.set(true)"
+            >
+              Sim
+            </button>
+          </div>
+          @if (desejaTroco()) {
+            <label for="trocoPara">Troco para quanto? <span class="opcional">(valor entregue)</span></label>
+            <input
+              id="trocoPara"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              [ngModel]="trocoPara()"
+              (ngModelChange)="trocoPara.set($event)"
+              placeholder="Ex: 50"
+            />
+          }
+        }
+      </div>
+      <div class="drawer-footer">
+        <p class="linha-total">Subtotal: {{ cartService.totalPrice() | currency:'BRL' }}</p>
+        @if (taxa() > 0) {
+          <p class="linha-total taxa">Taxa de entrega: {{ taxa() | currency:'BRL' }}</p>
+        }
+        <h3>Total: {{ totalComTaxa() | currency:'BRL' }}</h3>
+        @if (!configuracoes.aceitandoPedidos()) {
+          <p class="erro">A casa está offline no momento e não está recebendo pedidos.</p>
+        }
+        <button
+          class="btn-checkout"
+          [disabled]="enviando() || !configuracoes.aceitandoPedidos()"
+          (click)="confirmarPedido()"
+        >
+          {{ enviando() ? 'Enviando...' : 'Confirmar Pedido' }}
+        </button>
+        <button class="btn-cancel" (click)="voltarCheckout()">Voltar</button>
+      </div>
+    } @else {
+      <div class="drawer-body">
+        @if (erro()) {
+          <p class="erro">{{ erro() }}</p>
+        }
+        @if (cartService.items().length === 0) {
+          <p>Seu carrinho está vazio.</p>
+        } @else {
+          @for (item of cartService.items(); track item.uid) {
+            <div class="cart-item">
+              <div class="cart-item-info">
+                <strong>{{ item.produto.nome }}</strong>
+                <p class="item-preco">{{ item.precoUnitario | currency:'BRL' }}</p>
+                @if (item.personalizacao.removidos.length > 0) {
+                  <p class="pers removidos">
+                    Sem: {{ nomesIngredientes(item.personalizacao.removidos) }}
+                  </p>
+                }
+                @if (item.personalizacao.adicionados.length > 0) {
+                  <p class="pers extra">
+                    + {{ agruparAdicionados(item.personalizacao.adicionados) }}
+                  </p>
+                }
+                <button
+                  class="btn-corrigir"
+                  (click)="abrirEdicao(item)"
+                  [attr.aria-label]="'Corrigir ' + item.produto.nome"
+                >
+                  Corrigir
+                </button>
+              </div>
+              <div class="controls">
+                <button (click)="cartService.updateQuantity(item.uid, item.quantidade - 1)">-</button>
+                <span>{{ item.quantidade }}</span>
+                <button (click)="cartService.updateQuantity(item.uid, item.quantidade + 1)">+</button>
+              </div>
+            </div>
+          }
+          <div class="entrega">
+            <p class="entrega-titulo">Como deseja receber? <span class="req">*</span></p>
+            <div class="opcoes-entrega">
+              <label class="opcao" [class.selecionada]="tipoEntrega() === 'RETIRADA'">
+                <input
+                  type="radio"
+                  name="tipoEntrega"
+                [checked]="tipoEntrega() === 'RETIRADA'"
+                (change)="selecionarTipoEntrega('RETIRADA')"
+                />
+                <span class="opcao-info">
+                  <strong>🏪 Retirada</strong>
+                </span>
+              </label>
+              <label class="opcao" [class.selecionada]="tipoEntrega() === 'ENTREGA'">
+                <input
+                  type="radio"
+                  name="tipoEntrega"
+                [checked]="tipoEntrega() === 'ENTREGA'"
+                (change)="selecionarTipoEntrega('ENTREGA')"
+                />
+                <span class="opcao-info">
+                  <strong>🚚 Entrega</strong>
+                </span>
+              </label>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="drawer-footer">
+        <p class="linha-total">Subtotal: {{ cartService.totalPrice() | currency:'BRL' }}</p>
+        @if (taxa() > 0) {
+          <p class="linha-total taxa">Taxa de entrega: {{ taxa() | currency:'BRL' }}</p>
+        }
+        <h3>Total: {{ totalComTaxa() | currency:'BRL' }}</h3>
+        <button [disabled]="cartService.items().length === 0" class="btn-checkout" (click)="irParaCheckout()">
+          Continuar
+        </button>
+      </div>
+    }
+  </div>
+}
+
+@if (itemEmEdicao(); as item) {
+  <app-personalizacao-produto
+    [produto]="item.produto"
+    [itemEmEdicao]="item"
+    (fecharEvento)="fecharEdicao()"
+  ></app-personalizacao-produto>
+}
+

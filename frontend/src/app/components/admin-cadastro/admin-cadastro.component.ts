@@ -18,370 +18,19 @@ import type {
   ProdutoParaSalvar,
   TipoProduto,
 } from '../../models/produto.model';
+import {
+  formatarEntradaPreco,
+  precoFormatadoParaNumero,
+} from '../../utils/moeda';
+import { gruposOrdenados } from '../../utils/grupos';
 
 // Formulário de cadastro/edição de produto com vínculo de ingredientes e upload de imagem
 @Component({
   selector: 'app-admin-cadastro',
   standalone: true,
   imports: [FormsModule],
-  styleUrls: ['../../ui/upload.css'],
-  template: `
-    <section class="admin-form">
-      <h2>{{ emModoEdicao() ? 'Editar Produto' : 'Cadastrar Novo Produto' }}</h2>
-
-      <form (ngSubmit)="salvar()">
-        <div>
-          <label for="nome">Nome do Produto:</label>
-          <input
-            type="text"
-            id="nome"
-            name="nome"
-            [(ngModel)]="novoProduto().nome"
-            placeholder="Ex: X-Salada"
-            required
-          />
-        </div>
-
-        <div>
-          <label for="categoria">Categoria:</label>
-          <select
-            id="categoria"
-            name="categoria"
-            [(ngModel)]="novoProduto().categoriaId"
-            required
-          >
-            <option value="" disabled>Selecione uma categoria</option>
-            @for (cat of produtoService.categorias(); track cat.id) {
-              <option [value]="cat.id">{{ cat.nome }}</option>
-            }
-          </select>
-        </div>
-
-        <div>
-          <label for="descricao">Descrição:</label>
-          <textarea
-            id="descricao"
-            name="descricao"
-            [(ngModel)]="novoProduto().descricao"
-            placeholder="Ex: Pão, hambúrguer 180g, queijo, alface e tomate"
-            rows="3"
-          ></textarea>
-        </div>
-
-        <div>
-          <label for="preco">Preço (R$):</label>
-          <input
-            type="text"
-            id="preco"
-            name="preco"
-            inputmode="decimal"
-            placeholder="Ex: 25,90"
-            [ngModel]="precoFormatado()"
-            (ngModelChange)="onPrecoChange($event)"
-            required
-          />
-        </div>
-
-        <div>
-          <label for="imagem">Imagem do produto:</label>
-          <div class="arquivo-box">
-            @if (novoProduto().imagemUrl) {
-              <div class="arquivo-preview">
-                <img [src]="resolverImg(novoProduto().imagemUrl)" alt="Pré-visualização da imagem do produto" />
-              </div>
-            }
-            <label class="btn-arquivo" [class.enviando]="enviandoImagem()" for="imagem">
-              <input
-                type="file"
-                id="imagem"
-                name="imagem"
-                accept="image/*"
-                class="arquivo-input"
-                (change)="onImagemSelecionada($event)"
-                [disabled]="enviandoImagem()"
-                aria-label="Escolher imagem do produto"
-              />
-              @if (enviandoImagem()) {
-                <span class="btn-arquivo-spinner" aria-hidden="true"></span>
-                <span class="btn-arquivo-texto">
-                  <strong>Enviando imagem...</strong>
-                </span>
-              } @else {
-                <span class="btn-arquivo-icone" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
-                    <path d="M12 12v9"></path>
-                    <path d="m16 16-4-4-4 4"></path>
-                  </svg>
-                </span>
-                <span class="btn-arquivo-texto">
-                  <strong>{{ novoProduto().imagemUrl ? 'Trocar imagem' : 'Escolher imagem' }}</strong>
-                  <small>JPG, PNG, WEBP ou GIF · até 5 MB</small>
-                </span>
-              }
-            </label>
-            @if (novoProduto().imagemUrl && !enviandoImagem()) {
-              <button type="button" class="btn-remover" (click)="removerImagem()">
-                Remover imagem
-              </button>
-            }
-          </div>
-        </div>
-
-        <div>
-          <label for="tipo">Modo de montagem:</label>
-          <select
-            id="tipo"
-            name="tipo"
-            [ngModel]="tipoProduto()"
-            (ngModelChange)="definirTipo($event)"
-          >
-            <option [value]="TIPO.PADRAO">Já vem com tudo (padrão)</option>
-            <option [value]="TIPO.MARMITA">Cliente monta do zero</option>
-          </select>
-          <p class="ingredientes-ajuda">
-            @if (ehMarmita()) {
-              O cliente começa sem nada e escolhe cada porção. Abaixo, separe as
-              escolhas em grupos com limite.
-            } @else {
-              Todos os ingredientes vêm inclusos e o cliente pode remover ou acrescentar.
-            }
-          </p>
-        </div>
-
-        @if (ehMarmita()) {
-          <div class="grupos-form">
-            <label>Grupos de escolha</label>
-            <p class="ingredientes-ajuda">
-              Seções do cardápio com limite de porções. Repetição conta: com limite 2 o
-              cliente pode pedir a mesma proteína duas vezes. O "Mín." obriga a escolher
-              (ex.: 2 sabores): o pedido só passa se o cliente atingir o mínimo do grupo.
-              Um grupo sem ingrediente ligado é descartado.
-            </p>
-            @if (grupos().length === 0) {
-              <p class="img-status">Nenhum grupo ainda.</p>
-            } @else {
-              <ul class="grupos-lista">
-                @for (grupo of grupos(); track $index; let i = $index) {
-                  <li class="grupo-linha">
-                    <input
-                      type="text"
-                      class="grupo-nome"
-                      name="grupoNome{{ i }}"
-                      [ngModel]="grupo.nome"
-                      (ngModelChange)="definirNomeGrupo(i, $event)"
-                      placeholder="Ex: Proteínas"
-                      maxlength="60"
-                    />
-                    <label class="grupo-max">
-                      Mín.
-                      <input
-                        type="number"
-                        class="grupo-max-input"
-                        name="grupoMin{{ i }}"
-                        min="0"
-                        max="99"
-                        step="1"
-                        [ngModel]="grupo.minimoEscolhas"
-                        (ngModelChange)="definirMinimoGrupo(i, $event)"
-                      />
-                    </label>
-                    <label class="grupo-max">
-                      Máx.
-                      <input
-                        type="number"
-                        class="grupo-max-input"
-                        name="grupoMax{{ i }}"
-                        min="1"
-                        max="99"
-                        step="1"
-                        [ngModel]="grupo.maximoEscolhas"
-                        (ngModelChange)="definirMaximoGrupo(i, $event)"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      class="grupo-remover"
-                      (click)="removerGrupo(i)"
-                      [attr.aria-label]="'Remover grupo ' + grupo.nome"
-                    >
-                      Remover
-                    </button>
-                  </li>
-                }
-              </ul>
-            }
-            <div class="grupo-nova">
-              <input
-                type="text"
-                name="novoGrupo"
-                class="grupo-nova-nome"
-                [ngModel]="novoGrupoNome()"
-                (ngModelChange)="novoGrupoNome.set($event)"
-                (keydown.enter)="adicionarGrupo(); $event.preventDefault()"
-                placeholder="Nome do novo grupo"
-                maxlength="60"
-              />
-              <button
-                type="button"
-                class="btn-grupo"
-                (click)="adicionarGrupo()"
-                [disabled]="!podeAdicionarGrupo()"
-              >
-                Adicionar grupo
-              </button>
-            </div>
-          </div>
-        }
-
-        <div class="ingredientes-form">
-          <label>Ingredientes</label>
-          <p class="ingredientes-ajuda">
-            Clique nos ingredientes para incluir no produto. Deixe o Extra em 0 para o ingrediente ficar gratuito: o cliente escolhe quantas quiser. Informe um valor para cobrar a mais por porção.
-          </p>
-          @if (ingredientesDisponiveis().length === 0) {
-            <p class="img-status">Nenhum ingrediente cadastrado.</p>
-          } @else {
-            <input
-              type="text"
-              class="ing-busca"
-              name="buscaIngrediente"
-              [ngModel]="buscaIngrediente()"
-              (ngModelChange)="buscaIngrediente.set($event)"
-              placeholder="Buscar ingrediente..."
-            />
-            @if (ingredientesFiltrados().length === 0) {
-              <p class="img-status">Nenhum ingrediente encontrado para "{{ buscaIngrediente() }}".</p>
-            } @else {
-              <div class="ing-chips">
-                @for (ing of ingredientesFiltrados(); track ing.id) {
-                  <button
-                    type="button"
-                    class="chip-select"
-                    [class.selecionado]="ingredienteIncluso(ing.id)"
-                    (click)="alternarIngrediente(ing.id)"
-                  >
-                    {{ ing.nome }}
-                  </button>
-                }
-              </div>
-            }
-            @if (ingredientesDoProduto().length > 0) {
-              <div class="ing-adicionais">
-                <p class="ing-adicionais-titulo">Adicionais do produto</p>
-                @for (ing of ingredientesDoProduto(); track ing.id) {
-                  <div class="ing-adicional-linha">
-                    <span class="ing-adicional-nome">{{ ing.nome }}</span>
-                    <label class="ing-adicional-preco">
-                      Extra (R$)
-                      <input
-                        type="number"
-                        class="ing-preco"
-                        step="0.01"
-                        min="0"
-                        placeholder="0,00"
-                        [value]="ingredientePrecoExtra(ing.id)"
-                        (change)="definirPrecoIngrediente(ing.id, $event)"
-                      />
-                    </label>
-                    @if (ehMarmita()) {
-                      <label class="ing-adicional-grupo">
-                        Grupo
-                        <select
-                          class="ing-grupo"
-                          name="grupoIng{{ ing.id }}"
-                          [ngModel]="grupoDoIngrediente(ing.id)"
-                          (ngModelChange)="definirGrupoIngrediente(ing.id, $event)"
-                        >
-                          <option value="">Solto</option>
-                          @for (grupo of grupos(); track $index) {
-                            <option [value]="grupo.nome">{{ grupo.nome }}</option>
-                          }
-                        </select>
-                      </label>
-                    }
-                  </div>
-                }
-              </div>
-            }
-          }
-        </div>
-
-        <button type="submit" class="btn-submit" [disabled]="carregandoCadastro || enviandoImagem()">
-          {{ emModoEdicao() ? (carregandoCadastro ? 'Salvando...' : 'Salvar Alterações') : (carregandoCadastro ? 'Cadastrando...' : 'Cadastrar Produto') }}
-        </button>
-        @if (emModoEdicao()) {
-          <button type="button" class="btn-cancel" (click)="cancelar()">Cancelar</button>
-        }
-      </form>
-    </section>
-  `,
-  styles: [
-    `
-      .grupos-form { margin-bottom: 18px; }
-      .grupos-lista { list-style: none; margin: 0 0 10px; padding: 0; }
-      .grupo-linha {
-        display: flex;
-        align-items: flex-end;
-        gap: 8px;
-        padding: 9px;
-        margin-bottom: 7px;
-        border: 1px solid var(--border);
-        border-radius: 11px;
-        background: var(--surface-hover);
-      }
-      .grupo-nome { flex: 1; min-width: 0; }
-      .grupo-max {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: var(--text-muted);
-        flex-shrink: 0;
-      }
-      .grupo-max-input { width: 68px; }
-      .grupo-remover {
-        border: none;
-        background: transparent;
-        color: var(--danger);
-        font-size: 0.8rem;
-        font-weight: 600;
-        cursor: pointer;
-        padding: 8px 6px;
-        border-radius: 8px;
-        flex-shrink: 0;
-        transition: background var(--transition);
-      }
-      .grupo-remover:hover { background: var(--danger-light); }
-      .grupo-nova { display: flex; gap: 8px; align-items: center; }
-      .grupo-nova-nome { flex: 1; min-width: 0; }
-      .btn-grupo {
-        border: 1px solid var(--primary);
-        background: var(--primary-light);
-        color: var(--primary);
-        font-size: 0.85rem;
-        font-weight: 700;
-        cursor: pointer;
-        padding: 10px 14px;
-        border-radius: 10px;
-        white-space: nowrap;
-        transition: filter var(--transition), opacity var(--transition);
-      }
-      .btn-grupo:hover:not(:disabled) { filter: brightness(1.05); }
-      .btn-grupo:disabled { opacity: 0.5; cursor: not-allowed; }
-      .ing-adicional-linha { flex-wrap: wrap; }
-      .ing-adicional-grupo {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: var(--text-muted);
-      }
-      .ing-grupo { min-width: 130px; }
-    `,
-  ],
+  styleUrls: ['../../ui/upload.css', './admin-cadastro.component.css'],
+  templateUrl: './admin-cadastro.component.html',
 })
 export class AdminCadastroComponent implements OnInit {
   protected readonly produtoService = inject(ProdutoService);
@@ -476,13 +125,11 @@ export class AdminCadastroComponent implements OnInit {
     this.ingredientesSelecionados.set(selecao);
     this.gruposDosIngredientes.set(vinculos);
     this.grupos.set(
-      [...(produto.grupos ?? [])]
-        .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
-        .map((g) => ({
-          nome: g.nome,
-          maximoEscolhas: g.maximoEscolhas,
-          minimoEscolhas: g.minimoEscolhas ?? 0,
-        })),
+      gruposOrdenados(produto.grupos).map((g) => ({
+        nome: g.nome,
+        maximoEscolhas: g.maximoEscolhas,
+        minimoEscolhas: g.minimoEscolhas ?? 0,
+      })),
     );
     this.novoGrupoNome.set('');
   }
@@ -609,23 +256,11 @@ export class AdminCadastroComponent implements OnInit {
   }
 
   onPrecoChange(valor: string): void {
-    const digitos = valor.replace(/\D/g, '').slice(0, 10);
-    if (!digitos) {
-      this.precoFormatado.set('');
-      return;
-    }
-    // Interpreta os dígitos da direita (os últimos 2 são os centavos),
-    // sem forçar zeros desnecessários na parte inteira.
-    const pad = digitos.padStart(3, '0');
-    let reais = pad.slice(0, -2).replace(/^0+(?=\d)/, '');
-    const centavos = pad.slice(-2);
-    if (reais === '0' && digitos.length <= 2) reais = '';
-    const reaisGrupos = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    this.precoFormatado.set(`${reaisGrupos},${centavos}`);
+    this.precoFormatado.set(formatarEntradaPreco(valor));
   }
 
   precoParaNumero(): number {
-    return Number(this.precoFormatado().replace(/\./g, '').replace(',', '.'));
+    return precoFormatadoParaNumero(this.precoFormatado());
   }
 
   limparPrecoFormatado(): void {
