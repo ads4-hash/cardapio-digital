@@ -161,6 +161,11 @@ async function bootstrap() {
   // Documentação da API (depois dos pipes/filtros, para refleti-los)
   publicarDocumentacao(app);
 
+  // Ao receber SIGTERM/SIGINT (restart do container, Ctrl+C), o Nest chama os
+  // hooks de shutdown dos módulos: fecha o servidor HTTP/WebSocket e desconecta
+  // o Prisma, em vez de matar o processo abruptamente no meio de uma escrita.
+  app.enableShutdownHooks();
+
   await app.listen(process.env.PORT ?? 3000);
 }
 void bootstrap();
