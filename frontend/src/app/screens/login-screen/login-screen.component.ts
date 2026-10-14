@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { mensagemDoErro } from '../../core/mensagens-erro';
+import { SENHA_MENSAGEM, senhaForteValida } from '../../core/senha';
 
 type Modo = 'login' | 'cadastro';
 
@@ -151,7 +153,7 @@ type Modo = 'login' | 'cadastro';
         }
 
         @if (modo() === 'cadastro') {
-          <p class="ajuda">Cadastre o nome do seu estabelecimento, o e-mail e a senha (mínimo de 6 caracteres).</p>
+          <p class="ajuda">Cadastre o nome do seu estabelecimento, o e-mail e a senha (mínimo de 6 caracteres, com letras e números).</p>
         }
       </div>
     </div>
@@ -373,7 +375,7 @@ export class LoginScreenComponent {
             );
           } else {
             this.erroRecuperacao.set(
-              erro?.error?.message ??
+              mensagemDoErro(erro) ??
                 'Não foi possível enviar o código. Tente novamente.',
             );
           }
@@ -392,12 +394,12 @@ export class LoginScreenComponent {
       this.erro.set('Informe a senha.');
       return;
     }
-    if (this.senha.length < 6) {
-      this.erro.set('A senha precisa ter pelo menos 6 caracteres.');
-      return;
-    }
 
     if (this.modo() === 'cadastro') {
+      if (!senhaForteValida(this.senha)) {
+        this.erro.set(SENHA_MENSAGEM);
+        return;
+      }
       if (!this.nomeEstabelecimento.trim()) {
         this.erro.set('Informe o nome do estabelecimento.');
         return;
@@ -432,9 +434,8 @@ export class LoginScreenComponent {
         const status = erro?.status;
         if (status === 409) {
           const mensagem =
-            typeof erro?.error?.message === 'string'
-              ? erro.error.message
-              : 'Já existe uma conta com este e-mail. Faça login normalmente.';
+            mensagemDoErro(erro) ??
+            'Já existe uma conta com este e-mail. Faça login normalmente.';
           this.erro.set(mensagem);
           // Conflito de e-mail: faz sentido ir para o login. Conflito de nome de
           // estabelecimento (slug) não, então só troca de modo no primeiro caso.
@@ -448,13 +449,10 @@ export class LoginScreenComponent {
         } else if (status === 401) {
           this.erro.set('E-mail ou senha inválidos.');
         } else if (status === 400) {
-          const detalhes = Array.isArray(erro?.error?.message)
-            ? erro.error.message[0]
-            : erro?.error?.message;
-          this.erro.set(detalhes ?? 'Dados inválidos.');
+          this.erro.set(mensagemDoErro(erro) ?? 'Dados inválidos.');
         } else {
           this.erro.set(
-            erro?.error?.message ??
+            mensagemDoErro(erro) ??
               'Não foi possível concluir. Tente novamente.',
           );
         }

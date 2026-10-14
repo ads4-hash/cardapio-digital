@@ -8,6 +8,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../services/auth.service';
+import { mensagemDoErro } from '../../core/mensagens-erro';
+import { SENHA_MENSAGEM, senhaForteValida } from '../../core/senha';
 
 type Etapa = 'email' | 'senha' | 'concluido';
 
@@ -83,7 +85,7 @@ type Etapa = 'email' | 'senha' | 'concluido';
               type="password"
               autocomplete="new-password"
               [(ngModel)]="novaSenha"
-              placeholder="Mínimo de 6 caracteres"
+              placeholder="Mínimo de 6 caracteres, com letras e números"
               minlength="6"
               required
             />
@@ -281,8 +283,8 @@ export class RecuperarSenhaScreenComponent implements OnInit {
       this.erro.set('Informe o código de recuperação.');
       return;
     }
-    if (this.novaSenha.length < 6) {
-      this.erro.set('A nova senha precisa ter pelo menos 6 caracteres.');
+    if (!senhaForteValida(this.novaSenha)) {
+      this.erro.set(SENHA_MENSAGEM);
       return;
     }
     if (this.novaSenha !== this.confirmarSenha) {
@@ -327,13 +329,10 @@ export class RecuperarSenhaScreenComponent implements OnInit {
         'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
       );
     } else if (status === 400) {
-      const detalhes = Array.isArray(erro?.error?.message)
-        ? erro.error.message[0]
-        : erro?.error?.message;
-      this.erro.set(detalhes ?? 'Dados inválidos.');
+      this.erro.set(mensagemDoErro(erro) ?? 'Dados inválidos.');
     } else {
       this.erro.set(
-        erro?.error?.message ?? 'Não foi possível concluir. Tente novamente.',
+        mensagemDoErro(erro) ?? 'Não foi possível concluir. Tente novamente.',
       );
     }
     this.novaSenha = '';

@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ProdutoService } from '../../services/produto.service';
+import { mensagemDoErro } from '../../core/mensagens-erro';
 
 // Ordenação alfabética de verdade (pt-BR): ignora caixa e acentos, então
 // "azeitona" fica perto de "Azeitona" e "Queijo" depois de "Cebola" (o
@@ -138,7 +139,7 @@ export class AdminIngredientesComponent implements OnInit {
     acao: string,
   ): { titulo: string; detalhe: string } {
     const status = erro?.status ?? 0;
-    const mensagem = this.mensagemDoBackend(erro);
+    const mensagem = mensagemDoErro(erro);
 
     if (status === 409) {
       return {
@@ -183,13 +184,5 @@ export class AdminIngredientesComponent implements OnInit {
       titulo: 'Não foi possível concluir',
       detalhe: mensagem ?? `Não foi possível ${acao}. Tente novamente.`,
     };
-  }
-
-  // Extrai a mensagem do backend, que pode vir como string ou array
-  // (validação do class-validator).
-  private mensagemDoBackend(erro: HttpErrorResponse): string | null {
-    const mensagem = erro?.error?.message;
-    if (Array.isArray(mensagem)) return mensagem.join(' ');
-    return typeof mensagem === 'string' && mensagem ? mensagem : null;
   }
 }

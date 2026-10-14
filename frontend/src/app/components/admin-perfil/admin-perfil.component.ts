@@ -1,6 +1,8 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
+import { mensagemDoErro } from '../../core/mensagens-erro';
+import { SENHA_MENSAGEM, senhaForteValida } from '../../core/senha';
 import type { UsuarioLogado } from '../../models/auth.model';
 
 // Edição dos dados do usuário logado (mesmos campos do cadastro)
@@ -248,8 +250,8 @@ export class AdminPerfilComponent {
 
     // A senha é opcional: só é validada quando o usuário quer alterá-la
     if (senha) {
-      if (senha.length < 6) {
-        this.erro.set('A senha deve ter pelo menos 6 caracteres.');
+      if (!senhaForteValida(senha)) {
+        this.erro.set(SENHA_MENSAGEM);
         return;
       }
       if (senha !== confirmarSenha) {
@@ -303,26 +305,11 @@ export class AdminPerfilComponent {
         },
         error: (err) => {
           this.salvando.set(false);
-          this.erro.set(this.mensagemErro(err));
+          this.erro.set(
+            mensagemDoErro(err) ??
+              'Não foi possível salvar o perfil. Tente novamente.',
+          );
         },
       });
-  }
-
-  private mensagemErro(err: unknown): string {
-    if (err && typeof err === 'object') {
-      // A API padroniza os erros em `mensagem` (ver ErrosGlobaisFilter); um
-      // payload de validação do Nest traz `message` com a lista de problemas.
-      const corpo = (
-        err as { error?: { mensagem?: string | string[]; message?: string | string[] } }
-      ).error;
-      const mensagem = corpo?.mensagem ?? corpo?.message;
-      if (Array.isArray(mensagem)) {
-        return mensagem[0] ?? 'Não foi possível salvar o perfil.';
-      }
-      if (typeof mensagem === 'string') {
-        return mensagem;
-      }
-    }
-    return 'Não foi possível salvar o perfil. Tente novamente.';
   }
 }

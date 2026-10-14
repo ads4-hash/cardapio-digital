@@ -16,6 +16,7 @@ import {
   agruparAdicionados,
   nomesIngredientes,
 } from '../../utils/ingredientes';
+import { mensagemDoErro } from '../../core/mensagens-erro';
 
 type Etapa = 'carrinho' | 'checkout' | 'sucesso';
 
@@ -253,18 +254,11 @@ export class CarrinhoDrawerComponent {
           // Mostra o motivo real do servidor (ex.: grupo que exige escolha) em
           // vez de um texto genérico que o cliente não entende.
           this.erro.set(
-            this.mensagemDoBackend(err) ??
+            mensagemDoErro(err) ??
               'Não foi possível enviar o pedido. Tente novamente.',
           );
         },
       });
-  }
-
-  // Extrai a mensagem do backend, que vem como string ou array (validação).
-  private mensagemDoBackend(erro: HttpErrorResponse): string | null {
-    const mensagem = erro?.error?.message;
-    if (Array.isArray(mensagem)) return mensagem.join(' ');
-    return typeof mensagem === 'string' && mensagem ? mensagem : null;
   }
 
   fechar(): void {
