@@ -90,9 +90,8 @@ describe('AuthService.atualizarPerfil', () => {
       }),
     );
 
-    // Duas consultas diferentes chegam aqui: uma pelo id (para saber o nome
-    // atual) e outra pelo slug (para garantir slug único). A segunda precisa
-    // devolver o id, senão `gerarSlugUnico` nunca encerra o laço.
+    // Consulta pelo id para saber o nome atual do estabelecimento. O slug é
+    // imutável, então nenhuma busca por slug acontece mais neste fluxo.
     estabelecimentoFindUnique = jest
       .fn()
       .mockImplementation((args: { where?: { slug?: string } }) =>
@@ -178,6 +177,25 @@ describe('AuthService.atualizarPerfil', () => {
 
       expect(usuarioUpdate).toHaveBeenCalledTimes(1);
       expect(dadosDoUpdate().email).toBe(EMAIL_ATUAL);
+    });
+
+    it('renomeia o estabelecimento sem trocar o slug da URL pública', async () => {
+      await service.atualizarPerfil(
+        ID_USUARIO,
+        'Pizzaria do Zé Renovada',
+        EMAIL_ATUAL,
+      );
+
+      // O nome muda, mas o slug permanece: links de cardápio já compartilhados
+      // precisam continuar válidos.
+      expect(estabelecimentoUpdate).toHaveBeenCalledWith({
+        where: { id: ID_ESTABELECIMENTO },
+        data: { nome: 'Pizzaria do Zé Renovada' },
+      });
+      const algumaTrocaDeSlug = estabelecimentoUpdate.mock.calls.some(
+        ([args]) => 'slug' in (args as { data: Record<string, unknown> }).data,
+      );
+      expect(algumaTrocaDeSlug).toBe(false);
     });
   });
 

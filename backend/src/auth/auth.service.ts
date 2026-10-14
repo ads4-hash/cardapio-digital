@@ -473,8 +473,9 @@ export class AuthService {
       })
       .catch((erro) => this.tratarP2002(erro));
 
-    // O nome exibido no painel é o do estabelecimento (idêntico ao do usuário);
-    // ao renomear, atualiza o estabelecimento e regenera o slug da URL pública.
+    // O nome exibido no painel é o do estabelecimento (idêntico ao do usuário).
+    // Ao renomear, altera apenas o nome: o `slug` é imutável para não quebrar
+    // links de cardápio já compartilhados — a URL pública precisa ser estável.
     const estabelecimentoAtual = await this.prisma.estabelecimento.findUnique({
       where: { id: usuario.estabelecimentoId },
       select: { nome: true },
@@ -483,16 +484,10 @@ export class AuthService {
       estabelecimentoAtual &&
       estabelecimentoAtual.nome !== nomeEstabelecimento
     ) {
-      const novoSlug = await this.gerarSlugUnico(
-        nomeEstabelecimento,
-        usuario.estabelecimentoId,
-      );
-      await this.prisma.estabelecimento
-        .update({
-          where: { id: usuario.estabelecimentoId },
-          data: { nome: nomeEstabelecimento, slug: novoSlug },
-        })
-        .catch((erro) => this.tratarP2002(erro));
+      await this.prisma.estabelecimento.update({
+        where: { id: usuario.estabelecimentoId },
+        data: { nome: nomeEstabelecimento },
+      });
     }
 
     if (telefone !== undefined) {
