@@ -16,10 +16,13 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": true,
+    "strict": true,
+    // As classes DTO são preenchidas pelo ValidationPipe/class-transformer, não
+    // pelo construtor, então exigir inicialização em toda propriedade obrigaria
+    // a poluir ~20 arquivos de DTO com `!`. Mantemos o restante do `strict`
+    // (noImplicitAny, strictNullChecks, strictFunctionTypes, etc.) ligado.
+    "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true
