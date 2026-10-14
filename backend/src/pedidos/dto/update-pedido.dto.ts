@@ -11,8 +11,14 @@ export const PEDIDO_STATUS = [
 
 export class UpdatePedidoDto {
   /**
-   * Novo estágio do pedido. O fluxo normal é PENDENTE → EM_PREPARO → EM_ROTA
-   * (entrega) → PRONTO → CONCLUIDO; CANCELADO encerra a qualquer momento.
+   * Novo estágio do pedido. O fluxo tem DOIS RAMOS conforme o `tipoEntrega`
+   * (EM_ROTA e PRONTO são alternativas, não etapas consecutivas):
+   *
+   * - Retirada: PENDENTE → EM_PREPARO → PRONTO → CONCLUIDO
+   * - Entrega:  PENDENTE → EM_PREPARO → EM_ROTA → CONCLUIDO
+   *
+   * CANCELADO encerra a partir de qualquer ponto. CONCLUIDO e CANCELADO são
+   * terminais: não voltam ao fluxo (só aceitam repetir o próprio valor).
    * @example EM_PREPARO
    */
   @IsIn(PEDIDO_STATUS, {

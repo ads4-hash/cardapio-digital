@@ -245,7 +245,9 @@ export class PedidosService {
     return pedido;
   }
 
-  // Atualizar o status do pedido (PENDENTE, EM_PREPARO, EM_ROTA, CONCLUIDO, CANCELADO)
+  // Atualizar o status do pedido. O fluxo depende do tipo de entrega e tem
+  // dois ramos (ver validarTransicao): retirada passa por PRONTO e entrega por
+  // EM_ROTA — são alternativas, não etapas consecutivas.
   async updateStatus(estabelecimentoId: string, id: string, status: string) {
     const atual = await this.findOne(estabelecimentoId, id);
     this.validarTransicao(atual.status, atual.tipoEntrega, status);
@@ -276,6 +278,14 @@ export class PedidosService {
   // O painel já mostra apenas as opções válidas na interface, mas o endpoint é
   // a autoridade: sem estas regras um PATCH direto marcava CONCLUIDO →
   // PENDENTE, ressuscitava um cancelado ou encaixava "Em rota" em retirada.
+  //
+  // IMPORTANTE: o que é conferido aqui é só (1) o travamento dos estados
+  // terminais e (2) a coerência com o tipo de entrega. A ORDEM do fluxo
+  // (PENDENTE → EM_PREPARO → PRONTO/EM_ROTA → CONCLUIDO) é convenção da
+  // interface, NÃO validada no servidor: pular etapas ou voltar dentro do
+  // fluxo ativo é aceito de propósito (ajustes manuais do painel). Os ramos
+  // são alternativos, não consecutivos: retirada usa PRONTO, entrega usa
+  // EM_ROTA.
   private validarTransicao(
     statusAtual: string,
     tipoEntrega: string,
