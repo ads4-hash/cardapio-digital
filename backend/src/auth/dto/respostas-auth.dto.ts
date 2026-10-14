@@ -40,18 +40,11 @@ export class RespostaAuthDto implements RespostaAuth {
   })
   token: string;
 
-  @ApiProperty({
-    description:
-      'Refresh token opaco (30 dias), rotacionado a cada uso. Enviar em `POST /auth/refresh` para renovar o access token sem novo login.',
-    example: 'G7hN4u8y0p...',
-  })
-  refreshToken: string;
-
   @ApiProperty({ type: UsuarioPublicoDto })
   usuario: UsuarioPublicoDto;
 }
 
-/** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, tokens novos. */
+/** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, um token novo. */
 export class PerfilAtualizadoDto
   extends UsuarioPublicoDto
   implements PerfilAtualizado
@@ -59,16 +52,9 @@ export class PerfilAtualizadoDto
   @ApiProperty({
     required: false,
     description:
-      'Novo access token. Só vem quando o e-mail/senha mudam (as sessões antigas são encerradas).',
+      'Novo access token. Só vem quando o e-mail/senha mudam (as sessões antigas são encerradas e um novo refresh token é gravado no cookie HttpOnly).',
   })
   token?: string;
-
-  @ApiProperty({
-    required: false,
-    description:
-      'Novo refresh token. Só vem quando o e-mail/senha mudam (as sessões antigas são encerradas).',
-  })
-  refreshToken?: string;
 }
 
 /** Resposta de `GET /auth/cardapio` — nome e contato, para telas públicas. */

@@ -20,9 +20,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(requisicao).pipe(
     catchError((erro: HttpErrorResponse) => {
-      // Access token expirado: renova com o refresh token e repete a
-      // requisição uma única vez.
-      if (erro.status === 401 && !ehRotaDeAuth && auth.getRefreshToken()) {
+      // Access token expirado: renova com o refresh token (cookie HttpOnly) e
+      // repete a requisição uma única vez.
+      if (erro.status === 401 && !ehRotaDeAuth && auth.podeRenovar()) {
         return auth.renovarToken().pipe(
           switchMap((resposta) => {
             const repetida = req.clone({

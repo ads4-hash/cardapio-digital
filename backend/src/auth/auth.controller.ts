@@ -9,6 +9,8 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -26,14 +28,19 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService, obterIpCliente } from './auth.service';
+import type { RespostaTokens } from './auth.service';
 import { AuthGuard } from './auth.guard';
+import {
+  enviarCookieRefresh,
+  lerCookieRefresh,
+  limparCookieRefresh,
+} from './cookie-refresh';
 import { CurrentUser } from './current-user.decorator';
 import type { UsuarioAutenticado } from './current-user.decorator';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarUsuarioDto } from './dto/registrar-usuario.dto';
 import { SolicitarRecuperacaoDto } from './dto/solicitar-recuperacao.dto';
@@ -46,6 +53,19 @@ import {
   RespostaAuthDto,
   UsuarioPublicoDto,
 } from './dto/respostas-auth.dto';
+
+/**
+ * Move o refresh token para o cookie HttpOnly e devolve o corpo sem ele: o
+ * access token continua no JSON (curto, 15 min), mas o refresh (30 dias) nunca
+ * trafega no corpo nem é acessível ao JavaScript.
+ */
+function responderComSessao(
+  res: Response,
+  resposta: RespostaTokens,
+): Omit<RespostaTokens, 'refreshToken'> {
+  enviarCookieRefresh(res, resposta.refreshToken);
+  return { token: resposta.token, usuario: resposta.usuario };
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -72,8 +92,12 @@ export class AuthController {
     type: RespostaErroDto,
     description: 'Limite de 5/min por IP.',
   })
-  registrar(@Body() dto: RegistrarUsuarioDto, @Req() req: Request) {
-    return this.authService.registrar(
+  async registrar(
+    @Body() dto: RegistrarUsuarioDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<RespostaTokens, 'refreshToken'>> {
+    const resposta = await this.authService.registrar(
       dto.nomeEstabelecimento,
       dto.nome,
       dto.email,
@@ -82,6 +106,7 @@ export class AuthController {
       dto.telefone,
       obterIpCliente(req),
     );
+    return responderComSessao(res, resposta);
   }
 
   // Nome e contato do estabelecimento exibidos nas telas públicas. Não exige
@@ -118,7 +143,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Autentica o administrador e devolve o token JWT',
     description: [
-      'O token vai no header `Authorization: Bearer <token>` nos endpoints de painel.',
+      'O access token (15 min) vai no corpo e deve ser enviado como header `Authorization: Bearer <token>` nos endpoints de painel.',
+      'O refresh token (30 dias) vai em um cookie HttpOnly, inacessível ao JavaScript — usado por `POST /auth/refresh`.',
       '',
       'Além do limite de 10/min por IP, o login bloqueia por 15 minutos após 5 falhas',
       'do mesmo IP **ou** 10 do mesmo e-mail (proteção contra credential stuffing',
@@ -135,8 +161,17 @@ export class AuthController {
     type: RespostaErroDto,
     description: 'Muitas tentativas: aguarde a janela de 15 minutos.',
   })
-  login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.authService.login(dto.email, dto.senha, obterIpCliente(req));
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<RespostaTokens, 'refreshToken'>> {
+    const resposta = await this.authService.login(
+      dto.email,
+      dto.senha,
+      obterIpCliente(req),
+    );
+    return responderComSessao(res, resposta);
   }
 
   // Renova o access token a partir de um refresh token válido (rotação)
@@ -146,16 +181,23 @@ export class AuthController {
   @ApiOperation({
     summary: 'Renova o access token usando o refresh token',
     description:
-      'O refresh token é rotacionado a cada uso: o enviado é revogado e um novo par é devolvido. Reutilizar um refresh token já usado encerra todas as sessões do usuário (proteção contra roubo).',
+      'O refresh token vai em um cookie HttpOnly, enviado automaticamente pelo navegador. Não há corpo. O token é rotacionado a cada uso: o antigo é revogado e um novo cookie é gravado. Reutilizar um refresh token já usado encerra todas as sessões do usuário (proteção contra roubo).',
   })
-  @ApiBody({ type: RefreshTokenDto })
   @ApiOkResponse({ type: RespostaAuthDto })
   @ApiUnauthorizedResponse({
     type: RespostaErroDto,
     description: 'Refresh token ausente, inválido, expirado ou reutilizado.',
   })
-  renovar(@Body() dto: RefreshTokenDto) {
-    return this.authService.renovarTokens(dto.refreshToken);
+  async renovar(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<RespostaTokens, 'refreshToken'>> {
+    const refreshToken = lerCookieRefresh(req);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Sessão expirada. Faça login novamente.');
+    }
+    const resposta = await this.authService.renovarTokens(refreshToken);
+    return responderComSessao(res, resposta);
   }
 
   // Encerra a sessão deste dispositivo revogando o refresh token
@@ -167,9 +209,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Encerra a sessão atual',
     description:
-      'Revoga o refresh token enviado. O access token deixa de valer assim que expira (15 min); trocar a senha revoga todas as sessões.',
+      'Revoga o refresh token do cookie e o remove. O access token deixa de valer assim que expira (15 min); trocar a senha revoga todas as sessões.',
   })
-  @ApiBody({ type: RefreshTokenDto })
   @ApiOkResponse({ type: MensagemDto })
   @ApiUnauthorizedResponse({
     type: RespostaErroDto,
@@ -177,9 +218,15 @@ export class AuthController {
   })
   logout(
     @CurrentUser() usuario: UsuarioAutenticado,
-    @Body() dto: RefreshTokenDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.logout(dto.refreshToken, usuario.id);
+    const refreshToken = lerCookieRefresh(req);
+    limparCookieRefresh(res);
+    if (!refreshToken) {
+      return { mensagem: 'Sessão encerrada.' };
+    }
+    return this.authService.logout(refreshToken, usuario.id);
   }
 
   // Solicita a recuperação de senha (código por e-mail ou exibido em dev)
@@ -279,11 +326,12 @@ export class AuthController {
     type: RespostaErroDto,
     description: 'E-mail já usado por outro administrador.',
   })
-  atualizarPerfil(
+  async atualizarPerfil(
     @CurrentUser() usuario: UsuarioAutenticado,
     @Body() dto: AtualizarPerfilDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.atualizarPerfil(
+    const perfil = await this.authService.atualizarPerfil(
       usuario.id,
       dto.nome,
       dto.email,
@@ -292,5 +340,12 @@ export class AuthController {
       dto.telefone,
       dto.senhaAtual,
     );
+    // Troca de credencial: o serviço emitiu um par novo. O refresh vai para o
+    // cookie (como no login) e o corpo fica com o perfil + access token.
+    if (perfil.refreshToken) {
+      enviarCookieRefresh(res, perfil.refreshToken);
+      return { ...perfil, refreshToken: undefined };
+    }
+    return perfil;
   }
 }

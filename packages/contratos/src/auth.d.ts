@@ -11,14 +11,12 @@ export interface UsuarioPublico {
 /** Resposta de `POST /auth/registrar`, `/auth/login` e `/auth/refresh`. */
 export interface RespostaAuth {
   token: string;
-  refreshToken: string;
   usuario: UsuarioPublico;
 }
 
-/** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, tokens novos. */
+/** Resposta de `PATCH /auth/me`: perfil e, se a credencial mudou, um token novo. */
 export interface PerfilAtualizado extends UsuarioPublico {
   token?: string;
-  refreshToken?: string;
 }
 
 /** Resposta de `GET /auth/cardapio` — nome e contato, para telas públicas. */

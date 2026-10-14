@@ -35,11 +35,13 @@ export class RealtimeService {
     // internos do container (ver comentário em environment.ts)
     this.socket = io(environment.publicApiUrl, {
       transports: ['websocket'],
-      auth: { token: this.auth.getToken() },
+      // Passa o token no momento da conexão (e de cada reconexão): com o access
+      // token só em memória, um token capturado uma única vez ficaria velho
+      // depois dos 15 min e o handshake passaria a ser recusado.
+      auth: (cb) => cb({ token: this.auth.getToken() ?? '' }),
       // Sem reconexão automática, um corte de rede no meio do turno derrubava
       // o painel do tempo real até o próximo reload — e o admin só percebia
-      // quando faltava um pedido. O token do handshake é reutilizado nas
-      // tentativas (válido por dias, então não há risco de expirar no meio).
+      // quando faltava um pedido.
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1_000,

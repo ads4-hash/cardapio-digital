@@ -10,5 +10,4 @@ export type {
 
 export type UsuarioLogadoComTokens = UsuarioPublico & {
   token?: string;
-  refreshToken?: string;
 };

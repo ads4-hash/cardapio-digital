@@ -1,5 +1,6 @@
 // Carrega as variáveis de ambiente do .env antes de qualquer módulo do Nest
 import 'dotenv/config';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -117,6 +118,9 @@ async function bootstrap() {
       res.setHeader('X-Content-Type-Options', 'nosniff');
     },
   });
+
+  // Parseia cookies (usado para ler o cookie HttpOnly com o refresh token)
+  app.use(cookieParser());
 
   // Headers de segurança (Helmet). O crossOriginResourcePolicy é liberado para
   // que o frontend (outra origem) possa carregar as imagens de /uploads
