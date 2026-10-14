@@ -42,39 +42,71 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
         }
         @case ('cadastro') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-cadastro
-            [produtoParaEdicao]="produtoEmEdicao()"
-            (salvo)="aposSalvar()"
-            (cancelado)="aposCancelar()"
-          ></app-admin-cadastro>
+          @defer (on idle) {
+            <app-admin-cadastro
+              [produtoParaEdicao]="produtoEmEdicao()"
+              (salvo)="aposSalvar()"
+              (cancelado)="aposCancelar()"
+            ></app-admin-cadastro>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('produtos') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-produtos (editar)="editarProduto($event)"></app-admin-produtos>
+          @defer (on idle) {
+            <app-admin-produtos (editar)="editarProduto($event)"></app-admin-produtos>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('pedidos') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-pedidos></app-admin-pedidos>
+          @defer (on idle) {
+            <app-admin-pedidos></app-admin-pedidos>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('ingredientes') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-ingredientes></app-admin-ingredientes>
+          @defer (on idle) {
+            <app-admin-ingredientes></app-admin-ingredientes>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('categorias') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-categorias></app-admin-categorias>
+          @defer (on idle) {
+            <app-admin-categorias></app-admin-categorias>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('cardapio') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-cardapio></app-admin-cardapio>
+          @defer (on idle) {
+            <app-admin-cardapio></app-admin-cardapio>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('faturamento') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-faturamento></app-admin-faturamento>
+          @defer (on idle) {
+            <app-admin-faturamento></app-admin-faturamento>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
         @case ('perfil') {
           <button class="btn-voltar" (click)="voltar()">← Voltar</button>
-          <app-admin-perfil></app-admin-perfil>
+          @defer (on idle) {
+            <app-admin-perfil></app-admin-perfil>
+          } @placeholder {
+            <p class="carregando-secao">Carregando…</p>
+          }
         }
       }
 
@@ -141,6 +173,14 @@ import { AdminPerfilComponent } from '../../components/admin-perfil/admin-perfil
       box-shadow: var(--shadow-sm);
     }
     .btn-voltar:hover { box-shadow: var(--shadow-md); }
+    .carregando-secao {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
   `],
 })
 export class AdminScreenComponent implements OnInit {

@@ -1,15 +1,15 @@
 import { Routes } from '@angular/router';
-import { ClienteScreenComponent } from './screens/cliente-screen/cliente-screen.component';
-import { AdminScreenComponent } from './screens/admin-screen/admin-screen.component';
-import { LoginScreenComponent } from './screens/login-screen/login-screen.component';
-import { PedidoStatusComponent } from './screens/pedido-status/pedido-status.component';
-import { RecuperarSenhaScreenComponent } from './screens/recuperar-senha/recuperar-senha.component';
 import { authGuard, convidadoGuard } from './core/auth.guard';
 
+// Cada tela vira um chunk sob demanda (loadComponent): o cardápio público não
+// baixa o painel admin, o login não baixa o rastreio, e assim por diante.
 export const routes: Routes = [
   {
     path: 'cardapio/:slug',
-    component: ClienteScreenComponent,
+    loadComponent: () =>
+      import('./screens/cliente-screen/cliente-screen.component').then(
+        (m) => m.ClienteScreenComponent,
+      ),
   },
   {
     path: 'cardapio',
@@ -18,21 +18,33 @@ export const routes: Routes = [
   },
   {
     path: 'pedido/:id',
-    component: PedidoStatusComponent,
+    loadComponent: () =>
+      import('./screens/pedido-status/pedido-status.component').then(
+        (m) => m.PedidoStatusComponent,
+      ),
   },
   {
     path: '',
-    component: LoginScreenComponent,
+    loadComponent: () =>
+      import('./screens/login-screen/login-screen.component').then(
+        (m) => m.LoginScreenComponent,
+      ),
     canActivate: [convidadoGuard],
   },
   {
     path: 'recuperar-senha',
-    component: RecuperarSenhaScreenComponent,
+    loadComponent: () =>
+      import('./screens/recuperar-senha/recuperar-senha.component').then(
+        (m) => m.RecuperarSenhaScreenComponent,
+      ),
     canActivate: [convidadoGuard],
   },
   {
     path: 'admin',
-    component: AdminScreenComponent,
+    loadComponent: () =>
+      import('./screens/admin-screen/admin-screen.component').then(
+        (m) => m.AdminScreenComponent,
+      ),
     canActivate: [authGuard],
   },
   { path: '**', redirectTo: '/' },
