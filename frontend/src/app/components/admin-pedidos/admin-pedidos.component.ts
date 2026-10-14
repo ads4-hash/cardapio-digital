@@ -101,7 +101,7 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
                 @if (pedido.formaPagamento === 'DINHEIRO' && trocoDevolver(pedido) > 0) {
                   · Troco: {{ trocoDevolver(pedido) | currency:'BRL' }}
                   (pagando com {{ pedido.trocoPara | currency:'BRL' }})
-                } @else if (pedido.formaPagamento === 'DINHEIRO' && pedido.trocoPara != null) {
+                } @else if (pedido.formaPagamento === 'DINHEIRO' && pedido.trocoPara !== null) {
                   · Pagará exato {{ pedido.trocoPara | currency:'BRL' }}
                 }
               </p>
@@ -138,8 +138,8 @@ const STATUS_LABELS: Record<PedidoStatus, string> = {
     </section>
 
     @if (confirmacao(); as item) {
-      <div class="modal-overlay" (click)="cancelarConfirmacao()">
-        <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="modal-cancelar-titulo">
+      <div class="modal-overlay" role="presentation" (click)="fecharNoOverlay($event)">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-cancelar-titulo">
           <h3 id="modal-cancelar-titulo">Cancelar pedido</h3>
           <p>
             Tem certeza que deseja cancelar o pedido
@@ -388,6 +388,13 @@ export class AdminPedidosComponent implements OnInit, OnDestroy {
 
   cancelarConfirmacao(): void {
     this.confirmacao.set(null);
+  }
+
+  // Fecha só quando o clique é no próprio overlay (fundo), não em um filho.
+  fecharNoOverlay(evento: MouseEvent): void {
+    if (evento.target === evento.currentTarget) {
+      this.cancelarConfirmacao();
+    }
   }
 
   confirmarCancelamento(): void {

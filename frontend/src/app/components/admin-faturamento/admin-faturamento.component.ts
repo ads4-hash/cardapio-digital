@@ -96,13 +96,13 @@ function paraDataIso(d: Date): string {
       </div>
 
       <div class="filtro-datas">
-        <label>
+        <label for="filtro-de">
           De
-          <input class="input input--sm" type="date" [value]="de()" (change)="de.set($any($event.target).value)" />
+          <input id="filtro-de" class="input input--sm" type="date" [value]="de()" (change)="de.set($any($event.target).value)" />
         </label>
-        <label>
+        <label for="filtro-ate">
           Até
-          <input class="input input--sm" type="date" [value]="ate()" (change)="ate.set($any($event.target).value)" />
+          <input id="filtro-ate" class="input input--sm" type="date" [value]="ate()" (change)="ate.set($any($event.target).value)" />
         </label>
       </div>
 

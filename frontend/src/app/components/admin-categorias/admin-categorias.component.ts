@@ -29,9 +29,10 @@ import type { Categoria } from '../../models/produto.model';
             <div class="categoria-linha">
               <span class="categoria-nome">{{ cat.nome }}</span>
               <div class="categoria-acoes">
-                <label class="visivel-toggle">
+                <label class="visivel-toggle" [attr.for]="'cat-visivel-' + cat.id">
                   <input
                     type="checkbox"
+                    [id]="'cat-visivel-' + cat.id"
                     [checked]="cat.visivel !== false"
                     (change)="alternarVisibilidade(cat.id, $event)"
                   />

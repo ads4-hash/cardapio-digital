@@ -123,7 +123,7 @@
 
     @if (ehMarmita()) {
       <div class="grupos-form">
-        <label>Grupos de escolha</label>
+        <span class="form-legenda">Grupos de escolha</span>
         <p class="ingredientes-ajuda">
           Seções do cardápio com limite de porções. Repetição conta: com limite 2 o
           cliente pode pedir a mesma proteína duas vezes. O "Mín." obriga a escolher
@@ -145,10 +145,11 @@
                   placeholder="Ex: Proteínas"
                   maxlength="60"
                 />
-                <label class="grupo-max">
+                <label class="grupo-max" [attr.for]="'grupoMin' + i">
                   Mín.
                   <input
                     type="number"
+                    [id]="'grupoMin' + i"
                     class="grupo-max-input"
                     name="grupoMin{{ i }}"
                     min="0"
@@ -158,10 +159,11 @@
                     (ngModelChange)="definirMinimoGrupo(i, $event)"
                   />
                 </label>
-                <label class="grupo-max">
+                <label class="grupo-max" [attr.for]="'grupoMax' + i">
                   Máx.
                   <input
                     type="number"
+                    [id]="'grupoMax' + i"
                     class="grupo-max-input"
                     name="grupoMax{{ i }}"
                     min="1"
@@ -207,7 +209,7 @@
     }
 
     <div class="ingredientes-form">
-      <label>Ingredientes</label>
+      <span class="form-legenda">Ingredientes</span>
       <p class="ingredientes-ajuda">
         Clique nos ingredientes para incluir no produto. Deixe o Extra em 0 para o ingrediente ficar gratuito: o cliente escolhe quantas quiser. Informe um valor para cobrar a mais por porção.
       </p>
@@ -244,10 +246,11 @@
             @for (ing of ingredientesDoProduto(); track ing.id) {
               <div class="ing-adicional-linha">
                 <span class="ing-adicional-nome">{{ ing.nome }}</span>
-                <label class="ing-adicional-preco">
+                <label class="ing-adicional-preco" [attr.for]="'ing-preco-' + ing.id">
                   Extra (R$)
                   <input
                     type="number"
+                    [id]="'ing-preco-' + ing.id"
                     class="ing-preco"
                     step="0.01"
                     min="0"
@@ -257,9 +260,10 @@
                   />
                 </label>
                 @if (ehMarmita()) {
-                  <label class="ing-adicional-grupo">
+                  <label class="ing-adicional-grupo" [attr.for]="'ing-grupo-' + ing.id">
                     Grupo
                     <select
+                      [id]="'ing-grupo-' + ing.id"
                       class="ing-grupo"
                       name="grupoIng{{ ing.id }}"
                       [ngModel]="grupoDoIngrediente(ing.id)"

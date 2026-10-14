@@ -9,7 +9,7 @@ on:
 # instalam a partir da raiz e executam os scripts no workspace correspondente.
 jobs:
   backend:
-    name: Backend (lint + test + build)
+    name: Backend (lint + test + e2e + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,11 +27,13 @@ jobs:
         run: npm run lint --workspace backend
       - name: Testes
         run: npm test --workspace backend
+      - name: Testes e2e
+        run: npm run test:e2e --workspace backend
       - name: Build
         run: npm run build --workspace backend
 
   frontend:
-    name: Frontend (build)
+    name: Frontend (lint + test + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +45,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Instala dependências (workspace raiz)
         run: npm ci
+      - name: Lint
+        run: npm run lint --workspace frontend
       - name: Testes
         run: npm test --workspace frontend
       - name: Build

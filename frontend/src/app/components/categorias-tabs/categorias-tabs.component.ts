@@ -98,7 +98,7 @@ export class CategoriasTabsComponent {
   }
 
   // Notifica o componente pai quando os filtros mudam
-  onFiltroChange = output<{ categoria: string; busca: string }>();
+  filtroChange = output<{ categoria: string; busca: string }>();
 
   selecionarCategoria(id: string) {
     this.categoriaSelecionada.set(id);
@@ -111,7 +111,7 @@ export class CategoriasTabsComponent {
   }
 
   private emitirFiltro() {
-    this.onFiltroChange.emit({
+    this.filtroChange.emit({
       categoria: this.categoriaSelecionada(),
       busca: this.termoBusca()
     });

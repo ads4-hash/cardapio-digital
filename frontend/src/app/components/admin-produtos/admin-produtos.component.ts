@@ -15,7 +15,7 @@ import { ProdutoCardComponent } from '../produto-card/produto-card.component';
   template: `
     <section class="secao-produtos">
       <h2 class="titulo-secao">Produtos</h2>
-      <app-categorias-tabs (onFiltroChange)="onFiltroChange($event)"></app-categorias-tabs>
+      <app-categorias-tabs (filtroChange)="onFiltroChange($event)"></app-categorias-tabs>
 
       <div class="cardapio">
         @if (produtoService.carregandoProdutos()) {

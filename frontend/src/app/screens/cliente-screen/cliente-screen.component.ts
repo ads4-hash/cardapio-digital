@@ -18,7 +18,7 @@ import { CartService } from '../../services/cart.service';
   template: `
     <app-categorias-tabs
       [apenasVisiveis]="true"
-      (onFiltroChange)="onFiltroChange($event)"
+      (filtroChange)="onFiltroChange($event)"
     ></app-categorias-tabs>
 
     <section class="cardapio">

@@ -5,7 +5,7 @@
 
 <!-- Painel Lateral (Drawer) -->
 @if (isOpen()) {
-  <div class="overlay" (click)="fechar()"></div>
+  <div class="overlay" role="presentation" (click)="fechar()"></div>
   <div class="drawer">
     <div class="drawer-header">
       <h2>{{ etapa() === 'sucesso' ? 'Pedido Confirmado' : 'Seu Pedido' }}</h2>
@@ -57,9 +57,14 @@
         <p class="pag-titulo">Forma de pagamento <span class="req">*</span></p>
         <div class="opcoes-pag">
           @for (opcao of formasPagamento(); track opcao.valor) {
-            <label class="opcao" [class.selecionada]="formaPagamento() === opcao.valor">
+            <label
+              class="opcao"
+              [attr.for]="'forma-pag-' + opcao.valor"
+              [class.selecionada]="formaPagamento() === opcao.valor"
+            >
               <input
                 type="radio"
+                [id]="'forma-pag-' + opcao.valor"
                 name="formaPagamento"
                 [checked]="formaPagamento() === opcao.valor"
                 (change)="selecionarPagamento(opcao.valor)"
@@ -165,8 +170,9 @@
           <div class="entrega">
             <p class="entrega-titulo">Como deseja receber? <span class="req">*</span></p>
             <div class="opcoes-entrega">
-              <label class="opcao" [class.selecionada]="tipoEntrega() === 'RETIRADA'">
+              <label class="opcao" for="tipo-entrega-retirada" [class.selecionada]="tipoEntrega() === 'RETIRADA'">
                 <input
+                  id="tipo-entrega-retirada"
                   type="radio"
                   name="tipoEntrega"
                 [checked]="tipoEntrega() === 'RETIRADA'"
@@ -176,8 +182,9 @@
                   <strong>🏪 Retirada</strong>
                 </span>
               </label>
-              <label class="opcao" [class.selecionada]="tipoEntrega() === 'ENTREGA'">
+              <label class="opcao" for="tipo-entrega-entrega" [class.selecionada]="tipoEntrega() === 'ENTREGA'">
                 <input
+                  id="tipo-entrega-entrega"
                   type="radio"
                   name="tipoEntrega"
                 [checked]="tipoEntrega() === 'ENTREGA'"
