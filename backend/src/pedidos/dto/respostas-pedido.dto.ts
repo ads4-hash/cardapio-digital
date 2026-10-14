@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import type {
   FormaPagamento,
   ItemPedido,
@@ -176,6 +176,9 @@ export class ItemPedidoRastreioDto implements ItemPedidoRastreio {
  * Acompanhamento público (`GET /pedidos/:id/rastrear`): shape mais enxuto, sem
  * o produto inteiro e com `criadoEm`. Inclui o slug do estabelecimento para o
  * cliente carregar a identidade visual do cardápio certo.
+ *
+ * Endpoint sem autenticação: NÃO expõe PII do cliente (nome, telefone,
+ * endereço) nem forma de pagamento/troco.
  */
 export class PedidoRastreioDto implements PedidoRastreio {
   @ApiProperty({ example: 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e' })
@@ -201,37 +204,14 @@ export class PedidoRastreioDto implements PedidoRastreio {
   })
   status: PedidoStatus;
 
-  @ApiProperty({ example: 'João da Silva' })
-  cliente: string;
-
   @ApiProperty({ enum: ['RETIRADA', 'ENTREGA'], example: 'RETIRADA' })
   tipoEntrega: TipoEntrega;
-
-  @ApiPropertyOptional({
-    example: 'Rua das Flores, 120 - Centro',
-    nullable: true,
-    type: String,
-  })
-  endereco?: string | null;
-
-  @ApiPropertyOptional({
-    example: '+5511988888888',
-    nullable: true,
-    type: String,
-  })
-  telefone?: string | null;
 
   @ApiProperty({ example: 0 })
   taxaEntrega: number;
 
   @ApiProperty({ example: 104.8 })
   total: number;
-
-  @ApiProperty({ enum: ['DINHEIRO', 'PIX', 'CARTAO'], example: 'DINHEIRO' })
-  formaPagamento: FormaPagamento;
-
-  @ApiPropertyOptional({ example: 150, nullable: true, type: Number })
-  trocoPara?: number | null;
 
   @ApiProperty({ example: '2026-09-28T16:45:00.000Z' })
   criadoEm: string;

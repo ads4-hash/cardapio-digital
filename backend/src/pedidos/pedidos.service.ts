@@ -322,8 +322,9 @@ export class PedidosService {
   }
 
   // Consulta pública de acompanhamento: retorna apenas dados minimalistas do
-  // pedido (o ID em UUID já funciona como "senha" de acesso não adivinhável).
-  // Inclui o slug para o cliente poder voltar ao cardápio correto.
+  // pedido, sem PII do cliente (nome, telefone, endereço) nem forma de
+  // pagamento/troco — quem tiver o UUID consegue ver a resposta. Inclui o slug
+  // para o cliente poder voltar ao cardápio correto.
   async rastrear(id: string) {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
@@ -343,14 +344,9 @@ export class PedidosService {
       id: pedido.id,
       slug: pedido.estabelecimento.slug,
       status: pedido.status,
-      cliente: pedido.cliente,
       tipoEntrega: pedido.tipoEntrega,
-      endereco: pedido.endereco,
-      telefone: pedido.telefone,
       taxaEntrega: pedido.taxaEntrega,
       total: pedido.total,
-      formaPagamento: pedido.formaPagamento,
-      trocoPara: pedido.trocoPara,
       criadoEm: pedido.createdAt,
       itens: pedido.itens.map((item) => ({
         nome: item.produto.nome,

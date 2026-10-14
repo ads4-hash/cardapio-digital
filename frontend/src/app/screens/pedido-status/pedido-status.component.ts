@@ -9,15 +9,10 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, switchMap, timer } from 'rxjs';
-import {
-  PedidoService,
-  FORMA_PAGAMENTO_LABEL,
-  formatarTelefone as formatarTelefoneBr,
-} from '../../services/pedidos.service';
+import { PedidoService } from '../../services/pedidos.service';
 import type {
   PedidoRastreio,
   PedidoStatus,
-  FormaPagamento,
 } from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
@@ -75,31 +70,12 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
             </div>
           </div>
 
-          <p class="info">{{ pedido()!.cliente }} · {{ pedido()!.criadoEm | date:'HH:mm' }}</p>
+          <p class="info">Pedido realizado às {{ pedido()!.criadoEm | date:'HH:mm' }}</p>
 
           <div class="recebimento">
             <p class="tipo-entrega">
               {{ pedido()!.tipoEntrega === 'ENTREGA' ? '🚚 Entrega' : '🏪 Retirada' }}
             </p>
-            @if (pedido()!.tipoEntrega === 'ENTREGA') {
-              <p class="detalhe">
-                Endereço: <strong>{{ pedido()!.endereco }}</strong>
-              </p>
-            }
-            @if (pedido()!.telefone) {
-              <p class="detalhe">
-                Contato: <strong>{{ formatarTelefone(pedido()!.telefone) }}</strong>
-              </p>
-            }
-            <p class="detalhe">
-              Pagamento: <strong>{{ rotuloPagamento(pedido()!.formaPagamento) }}</strong>
-            </p>
-            @if (pedido()!.formaPagamento === 'DINHEIRO' && trocoDevolver() > 0) {
-              <p class="detalhe">
-                Troco: <strong>{{ trocoDevolver() | currency:'BRL' }}</strong>
-                (pagando com {{ pedido()!.trocoPara | currency:'BRL' }})
-              </p>
-            }
           </div>
 
           <ul class="itens">
@@ -271,22 +247,6 @@ export class PedidoStatusComponent implements OnInit, OnDestroy {
       .join(', ');
   }
 
-  formatarTelefone(valor: string | null | undefined): string {
-    return formatarTelefoneBr(valor);
-  }
-
-  rotuloPagamento(valor: FormaPagamento): string {
-    return FORMA_PAGAMENTO_LABEL[valor];
-  }
-
-  // Quanto de troco o estabelecimento deve devolver (trocoPara - total), ou 0
-  trocoDevolver(): number {
-    const p = this.pedido();
-    if (!p || p.formaPagamento !== 'DINHEIRO' || p.trocoPara == null) return 0;
-    const troco = p.trocoPara - p.total;
-    return troco > 0 ? troco : 0;
-  }
-
   // Link do WhatsApp para falar com o estabelecimento. Só aparece quando o
   // admin cadastrou um telefone no perfil. Se o número for brasileiro sem o
   // DDI (10 ou 11 dígitos), adiciona o prefixo 55 automaticamente.
@@ -301,7 +261,7 @@ export class PedidoStatusComponent implements OnInit, OnDestroy {
 
     const p = this.pedido();
     const mensagem = p
-      ? `Olá! Gostaria de saber como está o meu pedido #${p.id.slice(0, 8).toUpperCase()} (${p.cliente}).`
+      ? `Olá! Gostaria de saber como está o meu pedido #${p.id.slice(0, 8).toUpperCase()}.`
       : 'Olá! Gostaria de saber como está o meu pedido.';
     return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
   }

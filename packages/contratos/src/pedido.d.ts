@@ -54,19 +54,19 @@ export interface ItemPedidoRastreio {
   adicionados: string[];
 }
 
-/** Acompanhamento público (`GET /pedidos/:id/rastrear`). */
+/**
+ * Acompanhamento público (`GET /pedidos/:id/rastrear`). Endpoint sem autenticação
+ * acessível a quem tiver o id (UUID): por isso NÃO expõe dados pessoais do
+ * cliente (nome, telefone, endereço) nem forma de pagamento/troco — só o que é
+ * necessário para acompanhar o pedido.
+ */
 export interface PedidoRastreio {
   id: string;
   slug: string;
   status: PedidoStatus;
-  cliente: string;
   tipoEntrega: TipoEntrega;
-  endereco?: string | null;
-  telefone?: string | null;
   taxaEntrega: number;
   total: number;
-  formaPagamento: FormaPagamento;
-  trocoPara?: number | null;
   criadoEm: string;
   itens: ItemPedidoRastreio[];
 }

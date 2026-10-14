@@ -803,6 +803,12 @@ describe('PedidosService', () => {
           adicionados: ['Bacon'],
         },
       ]);
+      // O rastreio é público: não pode vazar PII do cliente nem pagamento
+      expect(rastreio).not.toHaveProperty('cliente');
+      expect(rastreio).not.toHaveProperty('endereco');
+      expect(rastreio).not.toHaveProperty('telefone');
+      expect(rastreio).not.toHaveProperty('formaPagamento');
+      expect(rastreio).not.toHaveProperty('trocoPara');
     });
 
     it('não quebra o acompanhamento com JSON corrompido', async () => {
