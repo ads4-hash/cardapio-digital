@@ -18,6 +18,7 @@ npm run start:dev   # desenvolvimento (watch)
 npm run build       # compila para dist/
 npm run start:prod  # executa dist/main
 npm run lint        # ESLint
+npm run email:teste -- voce@exemplo.com   # testa o SMTP (recuperação de senha)
 ```
 
 ## Testes

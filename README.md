@@ -85,6 +85,45 @@ e o administrador dele. O e-mail precisa ser único e o cadastro é limitado a 5
 | `CONFIAR_PROXY` | `false` | Defina `"true"` apenas atrás de proxy que preenche `X-Forwarded-For` |
 | `DOCS_HABILITADOS` | `true` (dev) / `false` (produção) | Force `"true"`/`"false"`; sem nada, o Swagger fica ligado só fora de produção |
 
+### Envio de e-mail (SMTP) — recuperação de senha
+
+Sem SMTP configurado, o backend roda em **modo local**: o código de recuperação
+não é enviado por e-mail e volta na resposta da API (exibido na tela). Isso só
+vale fora de produção — em produção, sem SMTP a recuperação responde `503`.
+
+Para enviar de verdade, preencha em `backend/.env`:
+
+| Variável | Exemplo | Descrição |
+|----------|---------|-----------|
+| `SMTP_HOST` | `smtp.gmail.com` | Servidor SMTP. Vazio = modo local |
+| `SMTP_PORT` | `587` | Porta (587 = STARTTLS, 465 = TLS direto) |
+| `SMTP_SECURE` | `false` | `"true"` para porta 465; `"false"` para 587 |
+| `SMTP_USER` | `seuemail@gmail.com` | Usuário autenticado |
+| `SMTP_PASS` | `senha-de-app` | Senha/token de app (nunca a senha normal) |
+| `SMTP_FROM` | `Cardápio <seuemail@gmail.com>` | Remetente (normalmente o mesmo do `SMTP_USER`) |
+| `FRONTEND_URL` | `https://seucardapio.com` | Base do link de recuperação enviado no e-mail |
+
+Exemplo com Gmail (exige verificação em 2 etapas e **senha de app**):
+
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_SECURE="false"
+SMTP_USER="seuemail@gmail.com"
+SMTP_PASS="abcd efgh ijkl mnop"   # senha de app (sem espaços)
+SMTP_FROM="Seu Cardápio <seuemail@gmail.com>"
+FRONTEND_URL="https://seucardapio.com"
+```
+
+Depois de configurar, valide o envio (dentro do workspace do backend):
+
+```bash
+npm run email:teste --workspace backend -- voce@exemplo.com
+```
+
+O script usa a mesma configuração da API e envia um e-mail de teste. Reinicie o
+backend para a nova configuração entrar em vigor.
+
 ## Rodando com Docker
 
 ```bash
