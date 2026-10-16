@@ -166,6 +166,11 @@ export class CarrinhoDrawerComponent {
   }
 
   async confirmarPedido(): Promise<void> {
+    // Reentrada: o `[disabled]` só reflete no DOM no ciclo seguinte de change
+    // detection, então um duplo clique chegava a rodar o método duas vezes e
+    // gravar dois pedidos.
+    if (this.enviando()) return;
+
     if (!this.configuracoes.aceitandoPedidos()) {
       this.erro.set('A casa está offline e não está recebendo pedidos.');
       return;
@@ -193,8 +198,18 @@ export class CarrinhoDrawerComponent {
 
     if (this.cartService.items().length === 0) return;
 
-    const indisponiveis = await this.limparItensIndisponiveis();
+    // Trava antes do primeiro `await` (validações acima são síncronas): é daqui
+    // em diante que a chamada assíncrona abre a janela para um segundo clique.
+    this.enviando.set(true);
+
+    const indisponiveis = await this.limparItensIndisponiveis().catch(() => {
+      this.enviando.set(false);
+      this.erro.set('Não foi possível enviar o pedido. Tente novamente.');
+      return null;
+    });
+    if (indisponiveis === null) return;
     if (indisponiveis.length > 0) {
+      this.enviando.set(false);
       this.erro.set(
         `${indisponiveis.join(', ')} saiu do cardápio e foi removido do carrinho. Revise antes de enviar.`,
       );
@@ -207,17 +222,18 @@ export class CarrinhoDrawerComponent {
     if (this.formaPagamento() === 'DINHEIRO' && this.desejaTroco()) {
       const numero = this.trocoPara();
       if (numero == null || !Number.isFinite(numero) || numero <= 0) {
+        this.enviando.set(false);
         this.erro.set('Informe o valor para calcular o troco.');
         return;
       }
       if (numero < this.totalComTaxa()) {
+        this.enviando.set(false);
         this.erro.set('O valor informado é menor que o total do pedido.');
         return;
       }
       trocoPara = numero;
     }
 
-    this.enviando.set(true);
     this.erro.set(null);
 
     const itens = this.cartService.items().map((item) => ({
