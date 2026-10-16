@@ -13,8 +13,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - uploads:/app/uploads       # imagens enviadas pelo admin
-      - banco:/app/prisma          # banco SQLite (arquivo dev.db)
+      # O runtime usa WORKDIR /app/backend, então process.cwd()/uploads e o
+      # SQLite (file:./dev.db, relativo a backend/prisma/schema.prisma) ficam
+      # em /app/backend/... — apontar para /app/... não persistiria nada.
+      - uploads:/app/backend/uploads  # imagens enviadas pelo admin
+      - banco:/app/backend/prisma     # banco SQLite (arquivo dev.db)
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then((r) => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
       interval: 30s
