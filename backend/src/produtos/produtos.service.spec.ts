@@ -193,6 +193,64 @@ describe('ProdutosService', () => {
       expect(data.grupos?.create).toHaveLength(1);
       expect(data.grupos?.create?.[0].nome).toBe('Proteínas');
     });
+
+    // Regressão: `deleteMany` dos grupos zera ProdutoIngrediente.grupoId
+    // (ON DELETE SET NULL). Sem o religamento, o item saía do grupo e os
+    // tetos/pisos da marmita deixavam de ser aplicados.
+    it('religa os vínculos existentes aos grupos recriados quando o patch manda só `grupos`', async () => {
+      produtoFindUnique.mockResolvedValue({
+        ...PRODUTO_ATUAL,
+        ingredientes: [
+          {
+            ingredienteId: 'ing-1',
+            precoAdicional: 3,
+            grupo: { id: 'g1', nome: 'Proteínas' },
+          },
+        ],
+      });
+      produtoUpdate.mockResolvedValue({
+        ...PRODUTO_ATUAL,
+        grupos: [
+          {
+            id: 'g-novo',
+            nome: 'Proteínas',
+            ordem: 0,
+            maximoEscolhas: 4,
+            minimoEscolhas: 2,
+          },
+        ],
+      });
+
+      await service.update('est-1', 'prod-1', {
+        grupos: [{ nome: 'Proteínas', maximoEscolhas: 4, minimoEscolhas: 2 }],
+      });
+
+      expect(produtoIngredienteUpdateMany).toHaveBeenCalledWith({
+        where: { produtoId: 'prod-1', ingredienteId: { in: ['ing-1'] } },
+        data: { grupoId: 'g-novo' },
+      });
+    });
+
+    it('não tenta religar nada quando não há vínculos e o patch manda só `grupos`', async () => {
+      produtoUpdate.mockResolvedValue({
+        ...PRODUTO_ATUAL,
+        grupos: [
+          {
+            id: 'g-novo',
+            nome: 'Proteínas',
+            ordem: 0,
+            maximoEscolhas: 2,
+            minimoEscolhas: 1,
+          },
+        ],
+      });
+
+      await service.update('est-1', 'prod-1', {
+        grupos: [{ nome: 'Proteínas', maximoEscolhas: 2, minimoEscolhas: 1 }],
+      });
+
+      expect(produtoIngredienteUpdateMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove', () => {

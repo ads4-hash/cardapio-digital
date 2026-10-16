@@ -267,6 +267,21 @@ export class ProdutosService {
         )
       : [];
 
+    // Com `grupos` e sem `ingredientes` no payload, o `deleteMany` acima deixa
+    // `ProdutoIngrediente.grupoId` como NULL (ON DELETE SET NULL) e nada o
+    // religaria: os tetos/pisos do produto deixavam de valer e o item virava
+    // "fora de grupo". Então os vínculos atuais são religados aos grupos
+    // recém-criados, usando o nome do grupo atual de cada ingrediente.
+    const vinculos =
+      ingredientes ??
+      (recriarGrupos
+        ? atual.ingredientes.map((vinculo) => ({
+            ingredienteId: vinculo.ingredienteId,
+            precoAdicional: vinculo.precoAdicional,
+            grupo: vinculo.grupo?.nome,
+          }))
+        : undefined);
+
     // `update` + reinterpretação dos vínculos de grupo na mesma transação.
     await this.prisma.$transaction(async (tx) => {
       const produto = await tx.produto.update({
@@ -305,9 +320,9 @@ export class ProdutosService {
       // Liga os ingredientes aos grupos pelo nome: usa os grupos recém-criados
       // quando veio `grupos` no payload, ou os já existentes quando só os
       // ingredientes mudaram (os nomes batem com o estado atual do produto).
-      if (ingredientes?.length) {
+      if (vinculos?.length) {
         const gruposParaVinculo = recriarGrupos ? produto.grupos : atual.grupos;
-        await this.vincularGrupos(id, gruposParaVinculo, ingredientes, tx);
+        await this.vincularGrupos(id, gruposParaVinculo, vinculos, tx);
       }
     });
 
