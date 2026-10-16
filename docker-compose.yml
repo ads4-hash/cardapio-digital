@@ -31,8 +31,12 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: projetinho-frontend
     restart: unless-stopped
+    # Só sobe depois de o backend responder ao healthcheck: sem a condição, o
+    # SSR podia iniciar e servir HTML apontando para uma API que ainda não
+    # aceita conexões.
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       # URL que o servidor Node usa durante o SSR: precisa do hostname de rede
       # do Docker, não "localhost" (que dentro do container seria o próprio
@@ -51,6 +55,12 @@ services:
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1}"
     ports:
       - "4000:4000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then((r) => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   uploads:

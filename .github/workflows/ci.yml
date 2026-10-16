@@ -51,3 +51,30 @@ jobs:
         run: npm test --workspace frontend
       - name: Build
         run: npm run build --workspace frontend
+
+  # Constrói as imagens Docker sem publicá-las: é a única forma de garantir que
+  # os Dockerfiles (etapas de build, COPY e o `prisma generate` no runtime) não
+  # quebrem — os jobs acima só exercitam o código, não o empacotamento.
+  docker:
+    name: Docker (build das imagens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configura o Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build da imagem do backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build da imagem do frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend

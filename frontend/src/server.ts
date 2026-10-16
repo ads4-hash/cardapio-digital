@@ -62,16 +62,13 @@ app.get('/config.js', (_req, res) => {
 });
 
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
+ * Healthcheck do servidor SSR, usado pelo Docker Compose para só liberar o
+ * tráfego quando o processo já está de pé. Responde rápido e não toca no
+ * Angular nem na API, para não confundir "SSR pronto" com "backend pronto".
  */
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
 
 /**
  * Serve static files from /browser
