@@ -81,9 +81,15 @@ e o administrador dele. O e-mail precisa ser único e o cadastro é limitado a 5
 | `DATABASE_URL`| `file:./dev.db` | Banco SQLite (relativo ao `prisma/`) |
 | `JWT_SECRET`  | — | Obrigatório em produção. Segredo dos tokens JWT e hash de IPs |
 | `PORT`        | `3000` | Porta da API |
-| `CORS_ORIGIN` | `http://localhost:4200` | Origens permitidas, separadas por vírgula |
+| `CORS_ORIGIN` | `http://localhost:4200`, `http://localhost:4000`, `http://127.0.0.1:4200`, `http://127.0.0.1:4000` | Origens permitidas, separadas por vírgula (URLs completas, com esquema) |
 | `CONFIAR_PROXY` | `false` | Defina `"true"` apenas atrás de proxy que preenche `X-Forwarded-For` |
 | `DOCS_HABILITADOS` | `true` (dev) / `false` (produção) | Force `"true"`/`"false"`; sem nada, o Swagger fica ligado só fora de produção |
+
+Na partida, a API **valida o ambiente** e encerra com uma mensagem apontando a
+variável culpada se algo estiver inconsistente (ex.: `CORS_ORIGIN` com URL sem
+esquema, `PORT` não numérica ou `COOKIE_SAMESITE=none` sem `Secure`). Em seguida
+imprime um resumo do que foi lido — porta, origens CORS, cookie de refresh e
+proxy — para não restar dúvida sobre o que o processo entendeu do deploy.
 
 ### Envio de e-mail (SMTP) — recuperação de senha
 

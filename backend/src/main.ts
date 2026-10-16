@@ -12,9 +12,25 @@ import { Response } from 'express';
 import { AppModule } from './app.module';
 import { DecimalInterceptor } from './common/decimal.interceptor';
 import { ErrosGlobaisFilter } from './common/erros-globais.filter';
-import { origensCors } from './cors';
+import { validarAmbiente } from './config/ambiente';
+import type { ResumoAmbiente } from './config/ambiente';
 
-const ORIGENS_CORS = origensCors();
+/**
+ * Imprime o que o processo entendeu do ambiente. Além de ajudar no diagnóstico,
+ * funciona como contrato: se o deploy não bate com o log, a variável não chegou.
+ */
+function registrarAmbiente(ambiente: ResumoAmbiente): void {
+  console.log(
+    `Ambiente: ${ambiente.emProducao ? 'produção' : 'desenvolvimento'} | porta ${ambiente.porta}`,
+  );
+  console.log(`CORS (origens permitidas): ${ambiente.origensCors.join(', ')}`);
+  console.log(
+    `Cookie de refresh: SameSite=${ambiente.cookieSameSite}, Secure=${ambiente.cookieSecure}`,
+  );
+  console.log(
+    `Trust proxy (X-Forwarded-For): ${ambiente.confiarProxy ? 'ligado' : 'desligado'}`,
+  );
+}
 
 /**
  * Publica a documentação interativa em /docs (UI) e /docs-json (OpenAPI).
@@ -102,6 +118,12 @@ function publicarDocumentacao(app: NestExpressApplication): void {
 }
 
 async function bootstrap() {
+  // Valida o ambiente antes de qualquer coisa (fail-fast) e já registra o
+  // resumo: melhor derrubar o boot com a variável culpada do que subir e só
+  // descobrir no navegador que o CORS/cookie não bate.
+  const ambiente = validarAmbiente();
+  registrarAmbiente(ambiente);
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Garante que a pasta de uploads existe antes de servir/gravar arquivos
@@ -145,7 +167,7 @@ async function bootstrap() {
 
   // Habilita o CORS para aceitar chamadas do Angular (origens configuráveis)
   app.enableCors({
-    origin: ORIGENS_CORS,
+    origin: ambiente.origensCors,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -155,7 +177,7 @@ async function bootstrap() {
   // contador de rate-limit e o lockout de login bloqueia o IP do proxy para
   // todos. Só ligue quando houver um proxy que preenche X-Forwarded-For de
   // forma confiável (o mesmo valor de CONFIAR_PROXY usado pelo login).
-  if (process.env.CONFIAR_PROXY === 'true') {
+  if (ambiente.confiarProxy) {
     app.set('trust proxy', 1);
   }
 
@@ -170,6 +192,6 @@ async function bootstrap() {
   // o Prisma, em vez de matar o processo abruptamente no meio de uma escrita.
   app.enableShutdownHooks();
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(ambiente.porta);
 }
 void bootstrap();
