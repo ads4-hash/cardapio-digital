@@ -84,12 +84,26 @@ e o administrador dele. O e-mail precisa ser único e o cadastro é limitado a 5
 | `CORS_ORIGIN` | `http://localhost:4200`, `http://localhost:4000`, `http://127.0.0.1:4200`, `http://127.0.0.1:4000` | Origens permitidas, separadas por vírgula (URLs completas, com esquema) |
 | `CONFIAR_PROXY` | `false` | Defina `"true"` apenas atrás de proxy que preenche `X-Forwarded-For` |
 | `DOCS_HABILITADOS` | `true` (dev) / `false` (produção) | Force `"true"`/`"false"`; sem nada, o Swagger fica ligado só fora de produção |
+| `LOG_FORMAT` | `pretty` (dev) / `json` (produção) | Formato dos logs: `json` (uma linha JSON por registro, para agregador) ou `pretty` (texto legível) |
 
 Na partida, a API **valida o ambiente** e encerra com uma mensagem apontando a
 variável culpada se algo estiver inconsistente (ex.: `CORS_ORIGIN` com URL sem
 esquema, `PORT` não numérica ou `COOKIE_SAMESITE=none` sem `Secure`). Em seguida
-imprime um resumo do que foi lido — porta, origens CORS, cookie de refresh e
-proxy — para não restar dúvida sobre o que o processo entendeu do deploy.
+imprime um resumo do que foi lido — porta, origens CORS, cookie de refresh,
+proxy e formato dos logs — para não restar dúvida sobre o que o processo
+entendeu do deploy.
+
+### Logs
+
+A API emite logs estruturados (`LoggerPersonalizado`), inclusive os internos do
+Nest. Em produção (`LOG_FORMAT=json` ou padrão em produção), cada registro é uma
+linha JSON com `timestamp`, `nivel` e `contexto`; erros vão para o stderr.
+
+Toda requisição gera um registro de acesso com método, caminho, status, duração
+e `requisicaoId` (5xx como `error`, 4xx como `warn`). O id também é devolvido
+no header `X-Request-Id` (repassado do cliente, se válido) e aparece nos logs
+de erro inesperado — é o que permite amarrar um stack trace à requisição que o
+provocou. A sonda `GET /health` fica de fora por volume.
 
 ### Envio de e-mail (SMTP) — recuperação de senha
 
@@ -171,6 +185,10 @@ npm install
 npm run build --workspace backend
 npm run lint --workspace backend
 npm test --workspace backend
+
+# Backend: testes end-to-end (API real com banco SQLite dedicado e resetado
+# a cada execução — e2e.db; não mexe no dev.db)
+npm run test:e2e --workspace backend
 
 # Frontend: build + testes
 npm run build --workspace frontend

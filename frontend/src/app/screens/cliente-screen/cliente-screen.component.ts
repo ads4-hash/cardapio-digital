@@ -8,6 +8,7 @@ import { ProdutoCardComponent } from '../../components/produto-card/produto-card
 import { CarrinhoDrawerComponent } from '../../components/carrinho-drawer/carrinho-drawer.component';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
+import { MetadataCardapioService } from '../../services/metadata-cardapio.service';
 import { CartService } from '../../services/cart.service';
 
 @Component({
@@ -83,6 +84,7 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
   protected readonly produtoService = inject(ProdutoService);
   private readonly configuracoes = inject(ConfiguracoesService);
   private readonly contexto = inject(EstabelecimentoContextoService);
+  private readonly metadata = inject(MetadataCardapioService);
   private readonly route = inject(ActivatedRoute);
   private readonly cart = inject(CartService);
 
@@ -103,6 +105,9 @@ export class ClienteScreenComponent implements OnInit, OnDestroy {
       if (!slug) return;
       this.contexto.definirSlugPublico(slug);
       this.produtoService.erroCardapio.set(null);
+      // Título e tags og:* com o nome da casa no HTML gerado pelo SSR (no
+      // browser o serviço ignora a chamada; ver MetadataCardapioService)
+      void this.metadata.aplicar(slug);
       // Isola o carrinho por casa: os itens de /cardapio/a não podem
       // aparecer em /cardapio/b nem ser enviados no pedido de lá.
       this.cart.definirEstabelecimento(slug);
