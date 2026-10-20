@@ -12,24 +12,38 @@ import { Response } from 'express';
 import { AppModule } from './app.module';
 import { DecimalInterceptor } from './common/decimal.interceptor';
 import { ErrosGlobaisFilter } from './common/erros-globais.filter';
+import { LoggerPersonalizado } from './common/logger-personalizado';
+import { RegistroHttpInterceptor } from './common/registro-http.interceptor';
 import { validarAmbiente } from './config/ambiente';
 import type { ResumoAmbiente } from './config/ambiente';
 
 /**
  * Imprime o que o processo entendeu do ambiente. Além de ajudar no diagnóstico,
  * funciona como contrato: se o deploy não bate com o log, a variável não chegou.
+ * Sai pelo mesmo logger estruturado da aplicação, para o resumo do boot estar
+ * na mesma linha de formato do resto.
  */
-function registrarAmbiente(ambiente: ResumoAmbiente): void {
-  console.log(
+function registrarAmbiente(
+  ambiente: ResumoAmbiente,
+  logger: LoggerPersonalizado,
+): void {
+  logger.log(
     `Ambiente: ${ambiente.emProducao ? 'produção' : 'desenvolvimento'} | porta ${ambiente.porta}`,
+    'Ambiente',
   );
-  console.log(`CORS (origens permitidas): ${ambiente.origensCors.join(', ')}`);
-  console.log(
+  logger.log(
+    `CORS (origens permitidas): ${ambiente.origensCors.join(', ')}`,
+    'Ambiente',
+  );
+  logger.log(
     `Cookie de refresh: SameSite=${ambiente.cookieSameSite}, Secure=${ambiente.cookieSecure}`,
+    'Ambiente',
   );
-  console.log(
+  logger.log(
     `Trust proxy (X-Forwarded-For): ${ambiente.confiarProxy ? 'ligado' : 'desligado'}`,
+    'Ambiente',
   );
+  logger.log(`Formato dos logs: ${ambiente.formatoLog}`, 'Ambiente');
 }
 
 /**
@@ -40,18 +54,22 @@ function registrarAmbiente(ambiente: ResumoAmbiente): void {
  * produção (não recomendado), defina DOCS_HABILITADOS=true; para desligar em
  * desenvolvimento, DOCS_HABILITADOS=false.
  */
-function publicarDocumentacao(app: NestExpressApplication): void {
+function publicarDocumentacao(
+  app: NestExpressApplication,
+  logger: LoggerPersonalizado,
+): void {
   const configurado = process.env.DOCS_HABILITADOS?.toLowerCase();
   const emProducao = process.env.NODE_ENV === 'production';
   const desligadoExplicitamente = configurado === 'false';
   const ligadoExplicitamente = configurado === 'true';
 
   if (desligadoExplicitamente || (emProducao && !ligadoExplicitamente)) {
-    console.log(
+    logger.log(
       'Documentação da API desabilitada' +
         (emProducao && !ligadoExplicitamente
           ? ' (padrão em produção; DOCS_HABILITADOS=true para forçar).'
           : ' (DOCS_HABILITADOS=false).'),
+      'Documentação',
     );
     return;
   }
@@ -114,7 +132,10 @@ function publicarDocumentacao(app: NestExpressApplication): void {
     },
   });
 
-  console.log('Documentação da API: /docs (UI) e /docs-json (OpenAPI)');
+  logger.log(
+    'Documentação da API: /docs (UI) e /docs-json (OpenAPI)',
+    'Documentação',
+  );
 }
 
 async function bootstrap() {
@@ -122,9 +143,16 @@ async function bootstrap() {
   // resumo: melhor derrubar o boot com a variável culpada do que subir e só
   // descobrir no navegador que o CORS/cookie não bate.
   const ambiente = validarAmbiente();
-  registrarAmbiente(ambiente);
+  const logger = new LoggerPersonalizado({ formato: ambiente.formatoLog });
+  registrarAmbiente(ambiente, logger);
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // O logger passa como opção de criação (e não via app.useLogger depois):
+  // assim já cobre os logs de inicialização dos módulos e instâncias do Nest,
+  // e `Logger.overrideLogger` redireciona todos os `new Logger(Contexto)` do
+  // código para o formato escolhido (json em produção, pretty no dev).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger,
+  });
 
   // Garante que a pasta de uploads existe antes de servir/gravar arquivos
   const uploadsDir = join(process.cwd(), 'uploads');
@@ -165,6 +193,9 @@ async function bootstrap() {
   // como string no JSON ("25.9") e quebrariam as somas do frontend.
   app.useGlobalInterceptors(new DecimalInterceptor());
 
+  // Acesso log estruturado + X-Request-Id (correlação com o filtro de erros)
+  app.useGlobalInterceptors(new RegistroHttpInterceptor());
+
   // Habilita o CORS para aceitar chamadas do Angular (origens configuráveis)
   app.enableCors({
     origin: ambiente.origensCors,
@@ -185,7 +216,7 @@ async function bootstrap() {
   app.useGlobalFilters(new ErrosGlobaisFilter());
 
   // Documentação da API (depois dos pipes/filtros, para refleti-los)
-  publicarDocumentacao(app);
+  publicarDocumentacao(app, logger);
 
   // Ao receber SIGTERM/SIGINT (restart do container, Ctrl+C), o Nest chama os
   // hooks de shutdown dos módulos: fecha o servidor HTTP/WebSocket e desconecta

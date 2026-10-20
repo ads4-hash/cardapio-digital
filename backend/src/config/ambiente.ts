@@ -13,8 +13,10 @@ import { origensCors } from '../cors';
 // entendeu do ambiente (fim da dúvida "será que a env foi lida?").
 
 const SAMESITE_VALIDOS = ['lax', 'strict', 'none'] as const;
+const FORMATOS_LOG_VALIDOS = ['json', 'pretty'] as const;
 
 export type SameSiteCookie = (typeof SAMESITE_VALIDOS)[number];
+export type FormatoLog = (typeof FORMATOS_LOG_VALIDOS)[number];
 
 /** O que o processo entendeu do ambiente, já validado e pronto para logar. */
 export interface ResumoAmbiente {
@@ -24,6 +26,7 @@ export interface ResumoAmbiente {
   cookieSameSite: SameSiteCookie;
   cookieSecure: boolean;
   confiarProxy: boolean;
+  formatoLog: FormatoLog;
 }
 
 // Aceita só "true"/"false" (vazio conta como ausente). Um valor como "1" ou
@@ -97,6 +100,22 @@ export function validarAmbiente(): ResumoAmbiente {
 
   const emProducao = process.env.NODE_ENV === 'production';
 
+  // Formato dos logs: JSON em produção (colheita por agregador), texto legível
+  // em desenvolvimento. Um valor fora de json/pretty é erro de configuração —
+  // mesmo racional do resto do fail-fast: derrubar o boot apontando a variável
+  // é melhor que logar em silêncio no formato errado.
+  const logBruto = process.env.LOG_FORMAT?.trim().toLowerCase() || '';
+  if (
+    logBruto !== '' &&
+    !(FORMATOS_LOG_VALIDOS as readonly string[]).includes(logBruto)
+  ) {
+    throw new Error(
+      `LOG_FORMAT inválido ("${process.env.LOG_FORMAT}"): use "json" ou "pretty".`,
+    );
+  }
+  const formatoLog = (logBruto ||
+    (emProducao ? 'json' : 'pretty')) as FormatoLog;
+
   const mesmaSiteBruto =
     process.env.COOKIE_SAMESITE?.trim().toLowerCase() || 'lax';
   if (!(SAMESITE_VALIDOS as readonly string[]).includes(mesmaSiteBruto)) {
@@ -132,5 +151,6 @@ export function validarAmbiente(): ResumoAmbiente {
     cookieSameSite,
     cookieSecure,
     confiarProxy: process.env.CONFIAR_PROXY?.trim().toLowerCase() === 'true',
+    formatoLog,
   };
 }

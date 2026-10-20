@@ -69,8 +69,17 @@ export class ErrosGlobaisFilter implements ExceptionFilter {
         corpo.mensagem = 'Não foi possível processar o arquivo enviado.';
       }
     } else if (exception instanceof Error) {
-      // Erros não-expectados: registra para diagnóstico, sem expor ao cliente
-      this.logger.error(exception.message, exception.stack);
+      // Erros não-expectados: registra para diagnóstico, sem expor ao cliente.
+      // O requisicaoId amarra esta entrada ao log de acesso da mesma requisição
+      // (mesmo X-Request-Id), o que resolve o "onde estava a requisição que
+      // gerou este stack?" num agregador de logs.
+      const identificador = request.requisicaoId
+        ? ` [requisicaoId=${request.requisicaoId}]`
+        : '';
+      this.logger.error(
+        `${exception.message}${identificador}`,
+        exception.stack,
+      );
     }
 
     response.status(corpo.statusCode).json(corpo);

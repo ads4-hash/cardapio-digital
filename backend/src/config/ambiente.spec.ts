@@ -10,6 +10,7 @@ const CHAVES = [
   'COOKIE_SECURE',
   'CONFIAR_PROXY',
   'DOCS_HABILITADOS',
+  'LOG_FORMAT',
 ] as const;
 
 describe('validarAmbiente', () => {
@@ -27,6 +28,7 @@ describe('validarAmbiente', () => {
     delete process.env.COOKIE_SECURE;
     delete process.env.CONFIAR_PROXY;
     delete process.env.DOCS_HABILITADOS;
+    delete process.env.LOG_FORMAT;
   });
 
   afterEach(() => {
@@ -105,5 +107,25 @@ describe('validarAmbiente', () => {
       'https://cardapio.exemplo.com',
       'https://admin.exemplo.com',
     ]);
+  });
+
+  it('usa pretty por padrão fora de produção e json em produção', () => {
+    expect(validarAmbiente().formatoLog).toBe('pretty');
+    process.env.NODE_ENV = 'production';
+    expect(validarAmbiente().formatoLog).toBe('json');
+  });
+
+  it('aceita LOG_FORMAT explícito (case-insensitive)', () => {
+    process.env.LOG_FORMAT = ' JSON ';
+    process.env.NODE_ENV = 'production';
+    expect(validarAmbiente().formatoLog).toBe('json');
+    process.env.LOG_FORMAT = 'Pretty';
+    delete process.env.NODE_ENV;
+    expect(validarAmbiente().formatoLog).toBe('pretty');
+  });
+
+  it('lança com LOG_FORMAT fora de json/pretty', () => {
+    process.env.LOG_FORMAT = 'text';
+    expect(() => validarAmbiente()).toThrow(/LOG_FORMAT/);
   });
 });

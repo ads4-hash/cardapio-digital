@@ -1,4 +1,4 @@
-import { BadRequestException, HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import { ErrosGlobaisFilter } from './erros-globais.filter';
 
@@ -12,7 +12,7 @@ interface CorpoErro {
 describe('ErrosGlobaisFilter', () => {
   let filter: ErrosGlobaisFilter;
 
-  function criarHost() {
+  function criarHost(requisicao: Record<string, unknown> = {}) {
     const corpos: CorpoErro[] = [];
     const response = {
       status: jest.fn().mockReturnThis(),
@@ -23,7 +23,7 @@ describe('ErrosGlobaisFilter', () => {
     const host = {
       switchToHttp: () => ({
         getResponse: () => response,
-        getRequest: () => ({ url: '/produtos' }),
+        getRequest: () => ({ url: '/produtos', ...requisicao }),
       }),
     };
     return { corpos, host } as {
@@ -62,5 +62,35 @@ describe('ErrosGlobaisFilter', () => {
     expect(corpos[0].statusCode).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(corpos[0].mensagem).toContain('inesperado');
     expect(corpos[0].mensagem).not.toContain('segredo interno');
+  });
+
+  it('cita o requisicaoId no log de erro inesperado (correlação)', () => {
+    const logErro = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const { host } = criarHost({ requisicaoId: 'req-abc123' });
+
+    filter.catch(new Error('estouro interno'), host);
+
+    expect(logErro).toHaveBeenCalledWith(
+      expect.stringContaining('requisicaoId=req-abc123'),
+      expect.stringContaining('Error: estouro interno'),
+    );
+    logErro.mockRestore();
+  });
+
+  it('loga o erro inesperado sem requisicaoId quando não há interceptor', () => {
+    const logErro = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const { host } = criarHost();
+
+    filter.catch(new Error('estouro interno'), host);
+
+    expect(logErro).toHaveBeenCalledWith(
+      'estouro interno',
+      expect.stringContaining('Error: estouro interno'),
+    );
+    logErro.mockRestore();
   });
 });
