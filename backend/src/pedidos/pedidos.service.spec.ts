@@ -73,6 +73,7 @@ describe('PedidosService', () => {
   let pedidoCreate: jest.Mock<Promise<{ id: string }>, [PedidoCreateArgs]>;
   let pedidoFindMany: jest.Mock<Promise<unknown[]>, [ArgsPedidoFindMany]>;
   let pedidoFindUnique: jest.Mock;
+  let pedidoFindFirst: jest.Mock;
   let pedidoUpdate: jest.Mock;
   let pedidoDelete: jest.Mock;
   let obterTaxaEntrega: jest.Mock;
@@ -141,6 +142,7 @@ describe('PedidosService', () => {
       ({ data }) => Promise.resolve({ id: 'ped-1', ...data }),
     );
     pedidoFindUnique = jest.fn().mockResolvedValue(null);
+    pedidoFindFirst = jest.fn().mockResolvedValue(null);
     pedidoFindMany = jest
       .fn<Promise<unknown[]>, [ArgsPedidoFindMany]>()
       .mockResolvedValue([]);
@@ -165,6 +167,7 @@ describe('PedidosService', () => {
         create: pedidoCreate,
         findMany: pedidoFindMany,
         findUnique: pedidoFindUnique,
+        findFirst: pedidoFindFirst,
         update: pedidoUpdate,
         delete: pedidoDelete,
       },
@@ -766,32 +769,35 @@ describe('PedidosService', () => {
   });
 
   describe('rastrear — acompanhamento público', () => {
-    it('devolve o slug do estabelecimento para o cliente voltar ao cardápio', async () => {
-      pedidoFindUnique.mockResolvedValue({
-        id: 'ped-1',
-        cliente: 'Ana',
-        tipoEntrega: TipoEntrega.RETIRADA,
-        endereco: null,
-        telefone: '11988887777',
-        taxaEntrega: 0,
-        total: 25,
-        formaPagamento: FormaPagamento.PIX,
-        trocoPara: null,
-        status: 'PENDENTE',
-        criadoEm: new Date('2026-09-25T12:00:00Z'),
-        estabelecimento: { slug: 'pizzaria' },
-        itens: [
-          {
-            quantidade: 2,
-            preco: 12.5,
-            removidos: JSON.stringify(['Cebola']),
-            adicionados: JSON.stringify(['Bacon']),
-            produto: { nome: 'Pizza' },
-          },
-        ],
-      });
+    const UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const pedidoBanco = {
+      id: UUID,
+      cliente: 'Ana',
+      tipoEntrega: TipoEntrega.RETIRADA,
+      endereco: null,
+      telefone: '11988887777',
+      taxaEntrega: 0,
+      total: 25,
+      formaPagamento: FormaPagamento.PIX,
+      trocoPara: null,
+      status: 'PENDENTE',
+      criadoEm: new Date('2026-09-25T12:00:00Z'),
+      estabelecimento: { slug: 'pizzaria' },
+      itens: [
+        {
+          quantidade: 2,
+          preco: 12.5,
+          removidos: JSON.stringify(['Cebola']),
+          adicionados: JSON.stringify(['Bacon']),
+          produto: { nome: 'Pizza' },
+        },
+      ],
+    };
 
-      const rastreio = await service.rastrear('ped-1');
+    it('devolve o slug do estabelecimento para o cliente voltar ao cardápio', async () => {
+      pedidoFindUnique.mockResolvedValue(pedidoBanco);
+
+      const rastreio = await service.rastrear(UUID);
 
       expect(rastreio.slug).toBe('pizzaria');
       expect(rastreio.itens).toEqual([
@@ -811,20 +817,34 @@ describe('PedidosService', () => {
       expect(rastreio).not.toHaveProperty('trocoPara');
     });
 
+    it('aceita o código curto (8 primeiros caracteres do UUID), sem diferenciar maiúsculas', async () => {
+      pedidoFindFirst.mockResolvedValue(pedidoBanco);
+
+      const rastreio = await service.rastrear('F47AC10B');
+
+      expect(rastreio.slug).toBe('pizzaria');
+      expect(rastreio.id).toBe(UUID);
+      // Busca por prefixo em minúsculo: os UUIDs gravados são hex minúsculo
+      expect(pedidoFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { startsWith: 'f47ac10b' } },
+        }),
+      );
+      expect(pedidoFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('UUID completo continua caindo no findUnique (chave primária)', async () => {
+      pedidoFindUnique.mockResolvedValue(pedidoBanco);
+
+      await service.rastrear(UUID);
+
+      expect(pedidoFindUnique).toHaveBeenCalled();
+      expect(pedidoFindFirst).not.toHaveBeenCalled();
+    });
+
     it('não quebra o acompanhamento com JSON corrompido', async () => {
       pedidoFindUnique.mockResolvedValue({
-        id: 'ped-1',
-        cliente: 'Ana',
-        tipoEntrega: TipoEntrega.RETIRADA,
-        endereco: null,
-        telefone: '11988887777',
-        taxaEntrega: 0,
-        total: 25,
-        formaPagamento: FormaPagamento.DINHEIRO,
-        trocoPara: null,
-        status: 'PENDENTE',
-        criadoEm: new Date('2026-09-25T12:00:00Z'),
-        estabelecimento: { slug: 'pizzaria' },
+        ...pedidoBanco,
         itens: [
           {
             quantidade: 1,
@@ -836,7 +856,7 @@ describe('PedidosService', () => {
         ],
       });
 
-      const rastreio = await service.rastrear('ped-1');
+      const rastreio = await service.rastrear(UUID);
 
       expect(rastreio.itens[0].removidos).toEqual([]);
       expect(rastreio.itens[0].adicionados).toEqual([]);
@@ -845,7 +865,13 @@ describe('PedidosService', () => {
     it('recusa pedido inexistente com 404', async () => {
       pedidoFindUnique.mockResolvedValue(null);
 
-      await expect(service.rastrear('nao-existe')).rejects.toThrow(
+      await expect(service.rastrear(UUID)).rejects.toThrow(NotFoundException);
+    });
+
+    it('recusa código curto desconhecido com 404', async () => {
+      pedidoFindFirst.mockResolvedValue(null);
+
+      await expect(service.rastrear('NAOEXIST')).rejects.toThrow(
         NotFoundException,
       );
     });

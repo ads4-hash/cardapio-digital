@@ -17,7 +17,37 @@
         <p class="success-icon">✅</p>
         <p><strong>Pedido recebido com sucesso!</strong></p>
         <p>Muito obrigado! O número do seu pedido é <strong>#{{ pedidoSucesso() }}</strong>.</p>
+
+        @if (pixVisivel()) {
+          <div class="pix-bloco">
+            <p><strong>Pague por Pix</strong></p>
+            @if (qrPixUrl(); as qr) {
+              <img class="pix-qr" [src]="qr" alt="QR Code Pix" />
+            }
+            @if (tipoChavePixLabel()) {
+              <p class="pix-linha">Tipo da chave: {{ tipoChavePixLabel() }}</p>
+            }
+            <p class="pix-linha">Chave: {{ configuracoes.pix().chave }}</p>
+            @if (configuracoes.pix().titular) {
+              <p class="pix-linha">Titular: {{ configuracoes.pix().titular }}</p>
+            }
+            @if (configuracoes.pix().instituicao) {
+              <p class="pix-linha">Instituição: {{ configuracoes.pix().instituicao }}</p>
+            }
+          </div>
+        }
+
         <a class="btn-acompanhar" [routerLink]="['/pedido', pedidoId()]">Acompanhar pedido</a>
+        @if (linkWhatsapp(); as whatsapp) {
+          <a
+            class="btn-whatsapp-pedido"
+            [href]="whatsapp"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            💬 Enviar pedido no WhatsApp
+          </a>
+        }
       </div>
       <div class="drawer-footer">
         <button class="btn-checkout" (click)="fechar()">Fechar</button>

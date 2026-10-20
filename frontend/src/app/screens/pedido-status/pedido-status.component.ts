@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Title } from '@angular/platform-browser';
 import { Subscription, switchMap, timer } from 'rxjs';
 import { PedidoService } from '../../services/pedidos.service';
 import type {
@@ -16,6 +17,7 @@ import type {
 } from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
+import { linkWhatsApp } from '../../utils/whatsapp';
 
 const STATUS_LABELS: Record<PedidoStatus, string> = {
   PENDENTE: 'Pendente',
@@ -180,6 +182,7 @@ export class PedidoStatusComponent implements OnInit, OnDestroy {
   private readonly pedidoService = inject(PedidoService);
   private readonly configuracoes = inject(ConfiguracoesService);
   private readonly contexto = inject(EstabelecimentoContextoService);
+  private readonly title = inject(Title);
 
   readonly STATUS_LABELS = STATUS_LABELS;
   readonly STATUS_CORES = STATUS_CORES;
@@ -204,6 +207,11 @@ export class PedidoStatusComponent implements OnInit, OnDestroy {
   private readonly assinaturas = new Subscription();
 
   ngOnInit(): void {
+    // Título do documento (o HTML do SSR sai com isto no <title>). Sem o nome
+    // da casa aqui: o pedido é privado e não é página de SEO — o essencial é
+    // não entregar "<title>Frontend</title>" em /pedido/:id.
+    this.title.setTitle('Acompanhar pedido — Cardápio Digital');
+
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.erro.set('Pedido não informado.');
@@ -248,22 +256,14 @@ export class PedidoStatusComponent implements OnInit, OnDestroy {
   }
 
   // Link do WhatsApp para falar com o estabelecimento. Só aparece quando o
-  // admin cadastrou um telefone no perfil. Se o número for brasileiro sem o
-  // DDI (10 ou 11 dígitos), adiciona o prefixo 55 automaticamente.
+  // admin cadastrou um telefone no perfil (a normalização 55 + dígitos mora
+  // no util compartilhado utils/whatsapp.ts).
   whatsappLink(): string | null {
-    const telefone = this.configuracoes.telefone();
-    if (!telefone) return null;
-
-    const digitos = telefone.replace(/\D/g, '');
-    const numero =
-      digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
-    if (numero.length < 10 || numero.length > 13) return null;
-
     const p = this.pedido();
     const mensagem = p
       ? `Olá! Gostaria de saber como está o meu pedido #${p.id.slice(0, 8).toUpperCase()}.`
       : 'Olá! Gostaria de saber como está o meu pedido.';
-    return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    return linkWhatsApp(this.configuracoes.telefone(), mensagem);
   }
 
   posicaoStatus(): number {

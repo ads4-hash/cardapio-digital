@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../environment';
 import { EstabelecimentoContextoService } from './estabelecimento-contexto.service';
-import type { VisualCardapio } from '../models/configuracao.model';
+import type { PixConfiguracao, VisualCardapio } from '../models/configuracao.model';
 
 interface AceitandoPedidos {
   aceitandoPedidos: boolean;
@@ -25,6 +25,14 @@ const PADRAO_VISUAL: VisualCardapio = {
   logoUrl: null,
   capaUrl: null,
   tema: 'auto',
+};
+// Sem Pix cadastrado até o admin preencher a seção do perfil
+const PADRAO_PIX: PixConfiguracao = {
+  tipoChave: null,
+  chave: null,
+  titular: null,
+  instituicao: null,
+  qrUrl: null,
 };
 
 // Chave do localStorage por estabelecimento (slug)
@@ -47,6 +55,7 @@ export class ConfiguracoesService {
   private readonly URL_TAXA = `${environment.apiUrl}/configuracoes/taxa-entrega`;
   private readonly URL_NOME = `${environment.apiUrl}/auth/cardapio`;
   private readonly URL_VISUAL = `${environment.apiUrl}/configuracoes/cardapio`;
+  private readonly URL_PIX = `${environment.apiUrl}/configuracoes/pix`;
 
   // Mantém aceitando por padrão até carregar a configuração do servidor
   aceitandoPedidos = signal(true);
@@ -59,6 +68,9 @@ export class ConfiguracoesService {
   telefone = signal<string | null>(null);
   // Identidade visual do cardápio público
   visualCardapio = signal<VisualCardapio>({ ...PADRAO_VISUAL });
+  // Dados Pix do estabelecimento — públicos, exibidos ao cliente que paga
+  // com Pix na confirmação do pedido e na mensagem de WhatsApp
+  pix = signal<PixConfiguracao>({ ...PADRAO_PIX });
 
   // Caches em memória por slug (evita repetir HTTP ao alternar entre telas)
   private aceitandoCache = new Map<string, boolean>();
@@ -66,6 +78,7 @@ export class ConfiguracoesService {
   private nomeCache = new Map<string, string>();
   private telefoneCache = new Map<string, string>();
   private visualCache = new Map<string, VisualCardapio>();
+  private pixCache = new Map<string, PixConfiguracao>();
   private emVoo = new Set<string>();
 
   private defaultSlug(): string | null {
@@ -164,6 +177,39 @@ export class ConfiguracoesService {
     } catch {
       return { ...PADRAO_VISUAL };
     }
+  }
+
+  // Consulta os dados Pix do estabelecimento (GET público, usada no checkout
+  // e na exibição do QR Code após confirmar o pedido com Pix)
+  carregarPix(slug = this.defaultSlug() ?? ''): void {
+    if (isPlatformServer(this.platformId) || !slug) return;
+
+    const naCache = this.pixCache.get(slug);
+    if (naCache) this.pix.set(naCache);
+
+    if (this.emVoo.has(`px:${slug}`)) return;
+    this.emVoo.add(`px:${slug}`);
+    this.http.get<PixConfiguracao>(`${this.URL_PIX}?slug=${encodeURIComponent(slug)}`).subscribe({
+      next: (res) => {
+        this.pixCache.set(slug, res);
+        this.pix.set(res);
+      },
+      error: (err) => console.error('Erro ao consultar dados Pix:', err),
+      complete: () => this.emVoo.delete(`px:${slug}`),
+    });
+  }
+
+  // Salva os dados Pix (PATCH autenticado — tela de Perfil do admin)
+  salvarPix(
+    dados: Partial<PixConfiguracao>,
+    slug = this.defaultSlug() ?? '',
+  ): Observable<PixConfiguracao> {
+    return this.http.patch<PixConfiguracao>(this.URL_PIX, dados).pipe(
+      tap((res) => {
+        this.pixCache.set(slug, res);
+        this.pix.set(res);
+      }),
+    );
   }
 
   // Carrega nome e telefone do estabelecimento (GET público), usando antes o

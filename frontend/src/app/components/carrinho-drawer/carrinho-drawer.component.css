@@ -226,6 +226,42 @@
   text-decoration: none;
   font-size: 0.9rem;
 }
+.btn-whatsapp-pedido {
+  display: block;
+  margin: 10px auto 0;
+  padding: 12px 18px;
+  background: #25d366;
+  color: #fff;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: filter var(--transition);
+}
+.btn-whatsapp-pedido:hover { filter: brightness(1.06); }
+.pix-bloco {
+  margin: 16px auto 0;
+  padding: 14px;
+  max-width: 320px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: left;
+  font-size: 0.88rem;
+}
+.pix-bloco p { margin: 0 0 6px; }
+.pix-linha { word-break: break-all; }
+.pix-qr {
+  display: block;
+  margin: 10px auto;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px;
+  border: 1px solid var(--border);
+}
 .erro { background: var(--danger-light); color: var(--danger); padding: 12px; border-radius: 10px; font-size: 0.88rem; font-weight: 500; }
 .req { color: var(--danger); }
 .success { text-align: center; padding: 16px 0; }

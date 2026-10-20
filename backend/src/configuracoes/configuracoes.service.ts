@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarCardapioDto } from './dto/atualizar-cardapio.dto';
+import type { PixConfiguracao, TipoChavePix } from '@projetinho/contratos';
 
 // Chave da configuração que indica se o estabelecimento aceita pedidos
 export const CHAVE_ACEITANDO_PEDIDOS = 'aceitando_pedidos';
@@ -11,6 +12,22 @@ export const CHAVE_CARDAPIO_COR = 'cardapio_cor';
 export const CHAVE_CARDAPIO_LOGO = 'cardapio_logo';
 export const CHAVE_CARDAPIO_TEMA = 'cardapio_tema';
 export const CHAVE_CARDAPIO_CAPA = 'cardapio_capa';
+// Dados Pix que o cliente usa para pagar quando escolhe Pix no checkout
+export const CHAVE_PIX_TIPO_CHAVE = 'pix_tipo_chave';
+export const CHAVE_PIX_CHAVE = 'pix_chave';
+export const CHAVE_PIX_TITULAR = 'pix_titular';
+export const CHAVE_PIX_INSTITUICAO = 'pix_instituicao';
+export const CHAVE_PIX_QR = 'pix_qr';
+
+// Tipos de chave Pix válidos (Banco Central). Usado para validar o valor lido
+// do banco antes de devolver ao cliente, já que a tabela é chave-valor livre.
+const TIPOS_CHAVE_PIX: TipoChavePix[] = [
+  'CPF',
+  'CNPJ',
+  'TELEFONE',
+  'EMAIL',
+  'ALEATORIA',
+];
 
 export interface VisualCardapioPublico {
   cor: string | null;
@@ -130,6 +147,68 @@ export class ConfiguracoesService {
       dto.capaUrl,
     );
     return this.obterVisualCardapio(estabelecimentoId);
+  }
+
+  // Dados Pix do estabelecimento (GET público). O cliente usa estas
+  // informações para pagar quando escolhe Pix no checkout — por isso o
+  // QR Code e o titular ficam aqui e não em uma tabela nova: a chave-valor
+  // já cobre os campos e evita migration.
+  async obterPix(estabelecimentoId: string): Promise<PixConfiguracao> {
+    const [tipoChave, chave, titular, instituicao, qr] = await Promise.all([
+      this.prisma.configuracao.findUnique({
+        where: this.chaveDe(estabelecimentoId, CHAVE_PIX_TIPO_CHAVE),
+      }),
+      this.prisma.configuracao.findUnique({
+        where: this.chaveDe(estabelecimentoId, CHAVE_PIX_CHAVE),
+      }),
+      this.prisma.configuracao.findUnique({
+        where: this.chaveDe(estabelecimentoId, CHAVE_PIX_TITULAR),
+      }),
+      this.prisma.configuracao.findUnique({
+        where: this.chaveDe(estabelecimentoId, CHAVE_PIX_INSTITUICAO),
+      }),
+      this.prisma.configuracao.findUnique({
+        where: this.chaveDe(estabelecimentoId, CHAVE_PIX_QR),
+      }),
+    ]);
+    return {
+      tipoChave:
+        tipoChave && TIPOS_CHAVE_PIX.includes(tipoChave.valor as TipoChavePix)
+          ? (tipoChave.valor as TipoChavePix)
+          : null,
+      chave: chave?.valor || null,
+      titular: titular?.valor || null,
+      instituicao: instituicao?.valor || null,
+      qrUrl: qr?.valor || null,
+    };
+  }
+
+  // Salva os dados Pix (somente admin) — PATCH: só os campos enviados mudam
+  // (undefined preserva; null/vazio limpa, graças ao definirConfig)
+  async definirPix(
+    estabelecimentoId: string,
+    dto: {
+      tipoChave?: TipoChavePix | null;
+      chave?: string | null;
+      titular?: string | null;
+      instituicao?: string | null;
+      qrUrl?: string | null;
+    },
+  ): Promise<PixConfiguracao> {
+    await this.definirConfig(
+      estabelecimentoId,
+      CHAVE_PIX_TIPO_CHAVE,
+      dto.tipoChave,
+    );
+    await this.definirConfig(estabelecimentoId, CHAVE_PIX_CHAVE, dto.chave);
+    await this.definirConfig(estabelecimentoId, CHAVE_PIX_TITULAR, dto.titular);
+    await this.definirConfig(
+      estabelecimentoId,
+      CHAVE_PIX_INSTITUICAO,
+      dto.instituicao,
+    );
+    await this.definirConfig(estabelecimentoId, CHAVE_PIX_QR, dto.qrUrl);
+    return this.obterPix(estabelecimentoId);
   }
 
   private chaveDe(estabelecimentoId: string, chave: string) {

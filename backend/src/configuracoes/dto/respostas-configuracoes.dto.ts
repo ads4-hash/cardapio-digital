@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import type {
   AceitandoPedidos,
+  PixConfiguracao,
   TaxaEntrega,
   VisualCardapio,
 } from '@projetinho/contratos';
@@ -58,4 +59,49 @@ export class VisualCardapioDto implements VisualCardapio {
     example: 'auto',
   })
   tema: 'claro' | 'escuro' | 'auto';
+}
+
+/** `GET`/`PATCH /configuracoes/pix` — dados para pagar com Pix */
+export class PixDto implements PixConfiguracao {
+  @ApiProperty({
+    description: 'Tipo da chave Pix cadastrada pelo estabelecimento.',
+    enum: ['CPF', 'CNPJ', 'TELEFONE', 'EMAIL', 'ALEATORIA'],
+    example: 'CPF',
+    nullable: true,
+    type: String,
+  })
+  tipoChave: PixConfiguracao['tipoChave'];
+
+  @ApiProperty({
+    description: 'A própria chave Pix (valor que o cliente copia e cola).',
+    example: '123.456.789-00',
+    nullable: true,
+    type: String,
+  })
+  chave: string | null;
+
+  @ApiProperty({
+    description: 'Nome do titular da conta que recebe o Pix.',
+    example: 'Maria da Silva',
+    nullable: true,
+    type: String,
+  })
+  titular: string | null;
+
+  @ApiProperty({
+    description: 'Instituição/banco que emitiu a chave Pix.',
+    example: 'Nubank',
+    nullable: true,
+    type: String,
+  })
+  instituicao: string | null;
+
+  @ApiProperty({
+    description:
+      'URL da imagem do QR Code Pix (caminho relativo em /uploads/).',
+    example: '/uploads/est-abc/1756460000000-123.png',
+    nullable: true,
+    type: String,
+  })
+  qrUrl: string | null;
 }

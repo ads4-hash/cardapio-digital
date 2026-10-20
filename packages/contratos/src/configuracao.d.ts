@@ -15,3 +15,15 @@ export interface AceitandoPedidos {
 export interface TaxaEntrega {
   taxaEntrega: number;
 }
+
+/** Tipos de chave Pix aceitos pelo Brasil (Banco Central). */
+export type TipoChavePix = 'CPF' | 'CNPJ' | 'TELEFONE' | 'EMAIL' | 'ALEATORIA';
+
+/** `GET`/`PATCH /configuracoes/pix` — dados para o cliente pagar com Pix. */
+export interface PixConfiguracao {
+  tipoChave: TipoChavePix | null;
+  chave: string | null;
+  titular: string | null;
+  instituicao: string | null;
+  qrUrl: string | null;
+}

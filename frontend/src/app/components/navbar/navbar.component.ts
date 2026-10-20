@@ -4,6 +4,7 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
 import { resolverImagemUrl } from '../../services/produto.service';
+import { linkWhatsApp } from '../../utils/whatsapp';
 
 @Component({
   selector: 'app-navbar',
@@ -411,16 +412,8 @@ export class NavbarComponent implements OnInit {
   // quando o estabelecimento cadastrou um telefone). A mensagem leva a
   // saudação do horário: bom dia / boa tarde / boa noite.
   whatsappCliente(): string | null {
-    const telefone = this.configuracoes.telefone();
-    if (!telefone) return null;
-
-    const digitos = telefone.replace(/\D/g, '');
-    const numero =
-      digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
-    if (numero.length < 10 || numero.length > 13) return null;
-
     const mensagem = `${this.saudacaoPorHorario()}! Gostaria de tirar uma dúvida sobre o cardápio.`;
-    return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    return linkWhatsApp(this.configuracoes.telefone(), mensagem);
   }
 
   private saudacaoPorHorario(): string {

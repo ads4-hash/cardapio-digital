@@ -323,18 +323,34 @@ export class PedidosService {
 
   // Consulta pública de acompanhamento: retorna apenas dados minimalistas do
   // pedido, sem PII do cliente (nome, telefone, endereço) nem forma de
-  // pagamento/troco — quem tiver o UUID consegue ver a resposta. Inclui o slug
-  // para o cliente poder voltar ao cardápio correto.
+  // pagamento/troco. Aceita o UUID completo ou o código curto exibido ao
+  // cliente (#ABC12345, os 8 primeiros caracteres do UUID), que deixa o link
+  // de acompanhamento bem menor. Inclui o slug para o cliente voltar ao
+  // cardápio correto.
   async rastrear(id: string) {
-    const pedido = await this.prisma.pedido.findUnique({
-      where: { id },
-      include: {
-        itens: {
-          include: { produto: { select: { nome: true } } },
-        },
-        estabelecimento: { select: { slug: true } },
+    const bruto = id.trim();
+    const ehUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        bruto,
+      );
+    const inclusao = {
+      itens: {
+        include: { produto: { select: { nome: true } } },
       },
-    });
+      estabelecimento: { select: { slug: true } },
+    } as const;
+
+    // Código curto vira busca por prefixo (UUIDs são hex minúsculo); o
+    // findUnique só serve para chave primária completa.
+    const pedido = ehUuid
+      ? await this.prisma.pedido.findUnique({
+          where: { id: bruto },
+          include: inclusao,
+        })
+      : await this.prisma.pedido.findFirst({
+          where: { id: { startsWith: bruto.toLowerCase() } },
+          include: inclusao,
+        });
 
     if (!pedido) {
       throw new NotFoundException(`Pedido com ID ${id} não encontrado.`);

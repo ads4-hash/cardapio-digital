@@ -12,6 +12,7 @@ import {
 import { ConfiguracoesService } from './configuracoes.service';
 import { AtualizarCardapioDto } from './dto/atualizar-cardapio.dto';
 import { AtualizarConfiguracaoDto } from './dto/atualizar-configuracao.dto';
+import { AtualizarPixDto } from './dto/atualizar-pix.dto';
 import { AtualizarTaxaEntregaDto } from './dto/atualizar-taxa-entrega.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -20,6 +21,7 @@ import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.se
 import { RespostaErroDto } from '../common/dto/resposta-erro.dto';
 import {
   AceitandoPedidosDto,
+  PixDto,
   TaxaEntregaDto,
   VisualCardapioDto,
 } from './dto/respostas-configuracoes.dto';
@@ -170,6 +172,51 @@ export class ConfiguracoesController {
     return this.configuracoesService.definirTaxaEntrega(
       this.estabelecimentoDoUsuario(usuario),
       dto.taxaEntrega,
+    );
+  }
+
+  // Dados Pix usados pelo cliente para pagar (quando escolhe Pix no checkout)
+  @Get('pix')
+  @ApiOperation({
+    summary: 'Dados de pagamento Pix (público)',
+    description:
+      'Chave, titular, instituição e QR Code exibidos ao cliente que paga com Pix. Campos sem valor cadastrado voltam `null`.',
+  })
+  @ApiQuery({
+    name: 'slug',
+    required: true,
+    description: 'Slug do estabelecimento.',
+    example: 'pizzaria-do-ze',
+  })
+  @ApiOkResponse({ type: PixDto })
+  @ApiBadRequestResponse({
+    type: RespostaErroDto,
+    description: 'Slug não informado ou desconhecido.',
+  })
+  async obterPix(@Query('slug') slug?: string) {
+    const estabelecimentoId = await this.resolverEstabelecimentoId(slug);
+    return this.configuracoesService.obterPix(estabelecimentoId);
+  }
+
+  // Salva os dados Pix do estabelecimento — somente autenticado
+  @UseGuards(AuthGuard)
+  @Patch('pix')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Salva os dados de pagamento Pix',
+    description:
+      'PATCH de verdade: só os campos enviados mudam. Enviar `null` em um campo limpa o valor gravado.',
+  })
+  @ApiBody({ type: AtualizarPixDto })
+  @ApiOkResponse({ type: PixDto })
+  @ApiUnauthorizedResponse({ type: RespostaErroDto })
+  definirPix(
+    @CurrentUser() usuario: UsuarioAutenticado,
+    @Body() dto: AtualizarPixDto,
+  ) {
+    return this.configuracoesService.definirPix(
+      this.estabelecimentoDoUsuario(usuario),
+      dto,
     );
   }
 }

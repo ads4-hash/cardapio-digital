@@ -5,20 +5,56 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CartService } from '../../services/cart.service';
 import type { CartItem, ItemIngrediente } from '../../models/cart.model';
-import { PedidoService } from '../../services/pedidos.service';
+import { PedidoService, FORMA_PAGAMENTO_LABEL } from '../../services/pedidos.service';
 import type { TipoEntrega, FormaPagamento } from '../../models/pedido.model';
 import { ConfiguracoesService } from '../../services/configuracoes.service';
-import { ProdutoService } from '../../services/produto.service';
+import { ProdutoService, resolverImagemUrl } from '../../services/produto.service';
 import type { Produto } from '../../models/produto.model';
 import { EstabelecimentoContextoService } from '../../services/estabelecimento-contexto.service';
 import { PersonalizacaoProdutoComponent } from '../personalizacao-produto/personalizacao-produto.component';
 import {
   agruparAdicionados,
+  agruparNomesRepetidos,
   nomesIngredientes,
 } from '../../utils/ingredientes';
+import { linkWhatsApp } from '../../utils/whatsapp';
 import { mensagemDoErro } from '../../core/mensagens-erro';
 
 type Etapa = 'carrinho' | 'checkout' | 'sucesso';
+
+// Resumo congelado no momento do envio: o carrinho é limpo ao confirmar, mas
+// a etapa de sucesso ainda precisa dos itens para montar a mensagem de
+// WhatsApp com o pedido e, se for o caso, os dados de pagamento Pix.
+interface ResumoEnvio {
+  codigo: string;
+  cliente: string;
+  itens: {
+    nome: string;
+    quantidade: number;
+    precoUnitario: number;
+    // Nomes dos ingredientes extras e removidos; o preço unitário já embute
+    // os extras, mas a mensagem de WhatsApp precisa descrever o pedido.
+    adicionais: string[];
+    removidos: string[];
+  }[];
+  tipoEntrega: TipoEntrega;
+  endereco: string | null;
+  // Taxa cobrada na entrega (0 na retirada) — mostrada ao cliente para ele
+  // entender como o total foi fechado.
+  taxaEntrega: number;
+  formaPagamento: FormaPagamento;
+  trocoPara: number | null;
+  total: number;
+}
+
+// Rótulos amigáveis dos tipos de chave Pix (espelha o contrato TipoChavePix)
+const TIPOS_CHAVE_LABEL: Record<string, string> = {
+  CPF: 'CPF',
+  CNPJ: 'CNPJ',
+  TELEFONE: 'Telefone',
+  EMAIL: 'E-mail',
+  ALEATORIA: 'Chave aleatória',
+};
 
 @Component({
   selector: 'app-carrinho-drawer',
@@ -49,6 +85,8 @@ export class CarrinhoDrawerComponent {
   enviando = signal(false);
   pedidoSucesso = signal<string>('');
   pedidoId = signal<string>('');
+  // Snapshot do pedido recém-criado (o carrinho é limpo no sucesso)
+  resumoEnvio = signal<ResumoEnvio | null>(null);
 
   readonly todasFormasPagamento: {
     valor: FormaPagamento;
@@ -143,6 +181,8 @@ export class CarrinhoDrawerComponent {
         `${removidos.join(', ')} saiu do cardápio e foi removido do carrinho.`,
       );
     }
+    // Garante os dados Pix frescos para a etapa de sucesso (cache no serviço)
+    this.configuracoes.carregarPix();
     this.isOpen.set(true);
   }
 
@@ -258,11 +298,34 @@ export class CarrinhoDrawerComponent {
       })
       .subscribe({
         next: (pedido) => {
+          // Congela o resumo antes de limpar o carrinho: a etapa de sucesso
+          // usa esses dados para montar a mensagem de WhatsApp do pedido.
+          this.resumoEnvio.set({
+            codigo: pedido.id.slice(0, 8).toUpperCase(),
+            cliente: this.cliente().trim(),
+            itens: this.cartService.items().map((item) => ({
+              nome: item.produto.nome,
+              quantidade: item.quantidade,
+              precoUnitario: item.precoUnitario,
+              adicionais: item.personalizacao.adicionados.map((a) => a.nome),
+              removidos: item.personalizacao.removidos.map((r) => r.nome),
+            })),
+            tipoEntrega,
+            endereco: tipoEntrega === 'ENTREGA' ? this.endereco().trim() : null,
+            taxaEntrega: this.taxa(),
+            formaPagamento: this.formaPagamento(),
+            trocoPara: trocoPara ?? null,
+            total: this.totalComTaxa(),
+          });
           this.pedidoId.set(pedido.id);
           this.pedidoSucesso.set(pedido.id.slice(0, 8).toUpperCase());
           this.cartService.clear();
           this.enviando.set(false);
           this.etapa.set('sucesso');
+          // Abre o WhatsApp já com a mensagem do pedido pronta; se o
+          // navegador bloquear o popup, o botão da tela de sucesso serve
+          // de fallback para o cliente enviar manualmente.
+          this.abrirWhatsappAutomatico();
         },
         error: (err: HttpErrorResponse) => {
           console.error('Erro ao gravar pedido:', err);
@@ -291,5 +354,114 @@ export class CarrinhoDrawerComponent {
     this.erro.set(null);
     this.pedidoSucesso.set('');
     this.pedidoId.set('');
+    this.resumoEnvio.set(null);
+  }
+
+  // Dados Pix do estabelecimento (cacheados no serviço de configurações)
+  private get pix() {
+    return this.configuracoes.pix();
+  }
+
+  // Mostra o bloco de pagamento Pix na etapa de sucesso apenas quando o
+  // pedido foi pago com Pix e a casa cadastrou ao menos a chave
+  pixVisivel(): boolean {
+    return this.resumoEnvio()?.formaPagamento === 'PIX' && !!this.pix.chave;
+  }
+
+  // Rótulo amigável do tipo da chave Pix para o template
+  tipoChavePixLabel(): string {
+    const opcao = TIPOS_CHAVE_LABEL[this.pix.tipoChave ?? ''];
+    return opcao ?? '';
+  }
+
+  // URL completa da imagem do QR Code Pix (resolvida para o browser)
+  qrPixUrl(): string | null {
+    return resolverImagemUrl(this.pix.qrUrl) ?? null;
+  }
+
+  // Link wa.me com o resumo do pedido para o telefone do estabelecimento.
+  // Se o cliente pagou com Pix, a mensagem ganha um bloco com os dados de
+  // pagamento (chave, titular, instituição) e termina com o link para
+  // acompanhar o pedido.
+  linkWhatsapp(): string | null {
+    const r = this.resumoEnvio();
+    if (!r) return null;
+
+    const brl = (valor: number) =>
+      new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(valor);
+
+    // Mensagem formatada para o WhatsApp: negrito com *texto* e o nome do
+    // cliente logo após o número do pedido. Sem emoji — alguns clientes do
+    // WhatsApp (notadamente o desktop no Windows) renderizam quebrados.
+    const linhas: string[] = [
+      `*Pedido #${r.codigo} — ${r.cliente}*`,
+      '',
+      '*Itens:*',
+      ...r.itens.flatMap((item) => {
+        const linhasItem = [
+          `• ${item.quantidade}x ${item.nome} — ${brl(item.precoUnitario * item.quantidade)}`,
+        ];
+        if (item.adicionais.length > 0) {
+          // Repetição vira "4x Queijo" — o cliente pode pedir a mesma
+          // porção várias vezes e a lista bruta ficaria ilegível.
+          linhasItem.push(
+            `   Adicionais: ${agruparNomesRepetidos(item.adicionais)}`,
+          );
+        }
+        if (item.removidos.length > 0) {
+          linhasItem.push(
+            `   Removidos: ${agruparNomesRepetidos(item.removidos)}`,
+          );
+        }
+        return linhasItem;
+      }),
+      '',
+      // Taxa junto do endereço numa linha só: o cliente vê o custo da
+      // entrega no mesmo lugar em que lê o destino. A taxa já está embutida
+      // no total.
+      r.tipoEntrega === 'ENTREGA'
+        ? `Entrega: ${r.endereco} (Taxa ${r.taxaEntrega > 0 ? brl(r.taxaEntrega) : 'grátis'})`
+        : 'Retirada no balcão',
+    ];
+    linhas.push(`Pagamento: ${FORMA_PAGAMENTO_LABEL[r.formaPagamento]}`);
+    if (r.formaPagamento === 'DINHEIRO' && r.trocoPara != null) {
+      linhas.push(`Troco para: ${brl(r.trocoPara)}`);
+    }
+    linhas.push(`Total: ${brl(r.total)}`);
+
+    if (r.formaPagamento === 'PIX' && this.pix.chave) {
+      linhas.push('', '*Pague por Pix*');
+      linhas.push(`Chave: ${this.pix.chave}`);
+      if (this.pix.titular) linhas.push(`Titular: ${this.pix.titular}`);
+      if (this.pix.instituicao) {
+        linhas.push(`Instituição: ${this.pix.instituicao}`);
+      }
+    }
+
+    linhas.push('', `Acompanhar pedido: ${this.urlAcompanhamento()}`);
+
+    return linkWhatsApp(this.configuracoes.telefone(), linhas.join('\n'));
+  }
+
+  // URL da tela de acompanhamento do pedido. O origin do browser basta,
+  // já que a mensagem só é montada após a confirmação (lado do cliente).
+  // Usa o código curto (#ABC12345) em vez do UUID para encurtar o link
+  // exibido no WhatsApp; o backend aceita os dois formatos.
+  private urlAcompanhamento(): string {
+    const origem = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origem}/pedido/${this.pedidoSucesso()}`;
+  }
+
+  // Abre o WhatsApp automática e imediatamente após a confirmação do pedido,
+  // com a mensagem já preenchida. Navegadores podem bloquear `window.open`
+  // fora de um gesto direto do usuário; nesse caso o botão da tela de
+  // sucesso continua disponível como fallback.
+  abrirWhatsappAutomatico(): void {
+    const link = this.linkWhatsapp();
+    if (!link) return;
+    window.open(link, '_blank', 'noopener');
   }
 }
