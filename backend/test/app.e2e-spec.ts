@@ -1,30 +1,3 @@
-// @nestjs/jwt é ESM e não é transformado pelo Jest (CJS), então o módulo real
-// quebraria o import do AppModule. Trocamos por um JwtModule compatível que
-// provê um JwtService de teste — o mesmo recurso usado nos testes unitários.
-jest.mock('@nestjs/jwt', () => {
-  const { Module } = jest.requireActual<typeof import('@nestjs/common')>(
-    '@nestjs/common',
-  );
-
-  class JwtService {
-    sign = (): string => 'token-de-teste';
-    verify = (): Record<string, unknown> => ({});
-    decode = (): Record<string, unknown> => ({});
-  }
-
-  class JwtModule {}
-  Module({})(JwtModule);
-
-  (JwtModule as unknown as { register: () => unknown }).register = () => ({
-    module: JwtModule,
-    global: true,
-    providers: [{ provide: JwtService, useValue: new JwtService() }],
-    exports: [JwtService],
-  });
-
-  return { JwtService, JwtModule };
-});
-
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';

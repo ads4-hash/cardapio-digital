@@ -4,6 +4,11 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "setupFiles": ["<rootDir>/setup-e2e.ts"],
+  "globalSetup": "<rootDir>/global-setup-e2e.ts",
+  "testTimeout": 30000,
+  "moduleNameMapper": {
+    "^@nestjs/jwt$": "<rootDir>/shims/nestjs-jwt.cjs"
+  },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }
