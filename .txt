@@ -1,2 +1,3 @@
 Iniciar Backend -> npm run start:dev
 Iniciar Frontend -> npm start 
+Iniciar Back+Front -> npm run dev

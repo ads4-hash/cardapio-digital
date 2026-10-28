@@ -4,7 +4,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { of } from 'rxjs';
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 import { RegistroHttpInterceptor } from './registro-http.interceptor';
 
 interface RespostaDeTeste {

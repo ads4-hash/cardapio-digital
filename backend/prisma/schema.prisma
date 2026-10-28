@@ -22,6 +22,8 @@ model Estabelecimento {
   configuracoes Configuracao[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  @@index([slug])
 }
 
 model Categoria {
@@ -64,6 +66,7 @@ model Produto {
   // Cardápio público: WHERE estabelecimentoId (+ categoriaId opcional)
   @@index([estabelecimentoId])
   @@index([categoriaId])
+  @@index([estabelecimentoId, categoriaId])
 }
 
 // Seção de escolha dentro de um produto ("Proteínas", "Acompanhamentos").
@@ -94,6 +97,7 @@ model Ingrediente {
   updatedAt         DateTime        @updatedAt
 
   @@index([estabelecimentoId])
+  @@index([estabelecimentoId, nome])
 }
 
 model ProdutoIngrediente {
@@ -132,6 +136,7 @@ model Pedido {
   // Painel: lista os pedidos do tenant em ordem; acompanha o filtro por status
   @@index([estabelecimentoId])
   @@index([estabelecimentoId, status])
+  @@index([estabelecimentoId, createdAt])
 }
 
 model ItemPedido {

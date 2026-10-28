@@ -24,8 +24,8 @@ const STATUS_CORES: Record<PedidoStatus, string> = {
 const STATUS_LABELS: Record<PedidoStatus, string> = {
   PENDENTE: 'Pendente',
   EM_PREPARO: 'Em preparo',
-  EM_ROTA: 'Em rota',
-  PRONTO: 'Pronto',
+  EM_ROTA: 'Saiu para entrega',
+  PRONTO: 'Pronto para retirada',
   CONCLUIDO: 'Concluído',
   CANCELADO: 'Cancelado',
 };

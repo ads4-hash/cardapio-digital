@@ -10,22 +10,21 @@ import {
   aplicarCorPrimaria,
 } from './services/configuracoes.service';
 import { EstabelecimentoContextoService } from './services/estabelecimento-contexto.service';
+import { LoadingService } from './core/services/loading.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    RouterOutlet,
-    NavbarComponent,
-  ],
+  imports: [RouterOutlet, NavbarComponent],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrl: './app.component.css',
 })
 export class AppComponent {
   private readonly configuracoes = inject(ConfiguracoesService);
   private readonly contexto = inject(EstabelecimentoContextoService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
+  readonly loading = inject(LoadingService);
   // A identidade visual do cardápio só vale na tela pública /cardapio
   private readonly rotaCardapio = signal(false);
   // Navbar fica oculta no acompanhamento do pedido (/pedido)

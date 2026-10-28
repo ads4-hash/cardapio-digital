@@ -9,8 +9,39 @@
     "frontend"
   ],
   "scripts": {
+    "preinstall": "node scripts/check-node.js",
+    "dev": "concurrently \"npm run start:dev -w backend\" \"npm start -w frontend\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "prepare": "husky",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml,html,scss,css}\"",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test --if-present",
+    "analyze:frontend": "npm run build --workspace frontend && npx esbuild-visualizer --metadata frontend/dist/Projetinho/browser/stats.json --filename frontend/dist/Projetinho/browser/stats.html || echo 'Execute ng build com --stats-json ou use source-map-explorer no build gerado'"
+  },
+  "lint-staged": {
+    "backend/src/**/*.ts": [
+      "npm run lint --workspace backend --"
+    ],
+    "frontend/src/**/*.ts": [
+      "npm run lint --workspace frontend --"
+    ],
+    "frontend/src/**/*.html": [
+      "npm run lint --workspace frontend --"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "concurrently": "^9.1.2",
+    "esbuild-visualizer": "^0.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "source-map-explorer": "^2.5.3"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   }
 }

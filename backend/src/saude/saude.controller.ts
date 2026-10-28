@@ -11,11 +11,11 @@ import { PrismaService } from '../prisma/prisma.service';
 // e confere o banco de dados de verdade, para "up" não significar só "o Node
 // abriu a porta". Sem auth e sem escopo de tenant, de propósito.
 @ApiTags('saúde')
-@Controller('health')
+@Controller()
 export class SaudeController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Get()
+  @Get('health')
   @ApiOperation({
     summary: 'Healthcheck da aplicação',
     description: '200 quando a API e o banco respondem; 503 caso contrário.',
@@ -33,5 +33,26 @@ export class SaudeController {
       throw new ServiceUnavailableException('Banco de dados indisponível.');
     }
     return { status: 'ok' };
+  }
+
+  @Get('readyz')
+  @ApiOperation({
+    summary: 'Readiness check da aplicação',
+    description:
+      '200 quando a API está pronta para receber tráfego (banco acessível). Usado por orquestradores.',
+  })
+  @ApiOkResponse({
+    schema: { example: { status: 'ready', database: 'ok' } },
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'Aplicação não pronta (banco de dados indisponível).',
+  })
+  async readyz(): Promise<{ status: 'ready'; database: 'ok' }> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      throw new ServiceUnavailableException('Banco de dados indisponível.');
+    }
+    return { status: 'ready', database: 'ok' };
   }
 }

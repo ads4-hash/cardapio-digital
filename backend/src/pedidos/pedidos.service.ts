@@ -216,29 +216,31 @@ export class PedidosService {
     }
 
     // Cria o pedido junto com seus itens na mesma transação
-    const pedido = await this.prisma.pedido.create({
-      data: {
-        cliente: data.cliente,
-        tipoEntrega,
-        endereco: data.endereco,
-        telefone: data.telefone,
-        taxaEntrega: deCentavos(taxaEntregaCentavos),
-        total: deCentavos(totalCentavos),
-        formaPagamento,
-        trocoPara:
-          trocoParaCentavos === null ? null : deCentavos(trocoParaCentavos),
-        estabelecimentoId: estabelecimento.id,
-        itens: {
-          create: itensParaCriar,
-        },
-      },
-      include: {
-        itens: {
-          include: {
-            produto: true,
+    const pedido = await this.prisma.$transaction(async (tx) => {
+      return tx.pedido.create({
+        data: {
+          cliente: data.cliente,
+          tipoEntrega,
+          endereco: data.endereco,
+          telefone: data.telefone,
+          taxaEntrega: deCentavos(taxaEntregaCentavos),
+          total: deCentavos(totalCentavos),
+          formaPagamento,
+          trocoPara:
+            trocoParaCentavos === null ? null : deCentavos(trocoParaCentavos),
+          estabelecimentoId: estabelecimento.id,
+          itens: {
+            create: itensParaCriar,
           },
         },
-      },
+        include: {
+          itens: {
+            include: {
+              produto: true,
+            },
+          },
+        },
+      });
     });
 
     this.gateway.emitirPedidoCriado(estabelecimento.id, pedido);

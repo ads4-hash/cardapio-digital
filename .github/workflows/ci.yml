@@ -9,7 +9,7 @@ on:
 # instalam a partir da raiz e executam os scripts no workspace correspondente.
 jobs:
   backend:
-    name: Backend (lint + test + e2e + build)
+    name: Backend (lint + typecheck + test + e2e + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,12 +19,16 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: Instala dependências (workspace raiz)
+      - name: Instala dependǦncias (workspace raiz)
         run: npm ci
       - name: Gera o Prisma Client
         run: npx prisma generate --schema backend/prisma/schema.prisma
+      - name: Formatação
+        run: npx prettier --check "backend/src/**/*.ts" "backend/prisma/**/*.ts" "packages/**/*.ts" "*.md" "*.yml" "*.yaml" "*.json"
       - name: Lint
         run: npm run lint --workspace backend
+      - name: Typecheck
+        run: npm run typecheck --workspace backend
       - name: Testes
         run: npm test --workspace backend
       - name: Testes e2e
@@ -33,7 +37,7 @@ jobs:
         run: npm run build --workspace backend
 
   frontend:
-    name: Frontend (lint + test + build)
+    name: Frontend (lint + typecheck + test + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,10 +47,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: Instala dependências (workspace raiz)
+      - name: Instala dependǦncias (workspace raiz)
         run: npm ci
+      - name: Formatação
+        run: npx prettier --check "frontend/src/**/*.ts" "frontend/src/**/*.html" "frontend/src/**/*.scss" "frontend/src/**/*.css" "*.md" "*.yml" "*.yaml" "*.json"
       - name: Lint
         run: npm run lint --workspace frontend
+      - name: Typecheck
+        run: npm run typecheck --workspace frontend
       - name: Testes
         run: npm test --workspace frontend
       - name: Build

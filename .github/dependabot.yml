@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+      angular:
+        patterns:
+          - "@angular/*"
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+      dev-tools:
+        patterns:
+          - "eslint*"
+          - "prettier"
+          - "typescript"
+          - "jest"
+          - "vitest"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
