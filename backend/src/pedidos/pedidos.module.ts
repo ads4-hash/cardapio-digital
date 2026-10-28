@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { PedidosService } from './pedidos.service';
 import { PedidosController } from './pedidos.controller';
 import { PedidosGateway } from './pedidos.gateway';
-import { ConfiguracoesModule } from '../configuracoes/configuracoes.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ComandasModule } from '../comandas/comandas.module';
+import { MesasModule } from '../mesas/mesas.module';
 
 @Module({
-  imports: [ConfiguracoesModule],
+  imports: [PrismaModule, ComandasModule, MesasModule],
   controllers: [PedidosController],
   providers: [PedidosService, PedidosGateway],
 })

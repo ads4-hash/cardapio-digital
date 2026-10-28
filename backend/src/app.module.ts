@@ -12,6 +12,8 @@ import { IngredientesModule } from './ingredientes/ingredientes.module';
 import { ConfiguracoesModule } from './configuracoes/configuracoes.module';
 import { EnvioEmailModule } from './envio-email/envio-email.module';
 import { SaudeModule } from './saude/saude.module';
+import { MesasModule } from './mesas/mesas.module';
+import { ComandasModule } from './comandas/comandas.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { SaudeModule } from './saude/saude.module';
         limit: 100,
       },
     ]),
+    MesasModule,
+    ComandasModule,
   ],
   providers: [
     {

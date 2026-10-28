@@ -193,6 +193,12 @@ describe('PedidosService', () => {
       gateway,
       configuracoes,
       estabelecimentos,
+      {
+        garantirComandaAberta: jest.fn(),
+        listar: jest.fn(),
+        fechar: jest.fn(),
+        obterPorId: jest.fn(),
+      } as any,
     );
   });
 

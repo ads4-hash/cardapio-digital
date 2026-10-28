@@ -14,6 +14,7 @@ import { PedidosGateway } from './pedidos.gateway';
 import { ConfiguracoesService } from '../configuracoes/configuracoes.service';
 import { EstabelecimentosService } from '../estabelecimentos/estabelecimentos.service';
 import { deCentavos, paraCentavos } from '../common/dinheiro';
+import { ComandasService } from '../comandas/comandas.service';
 
 @Injectable()
 export class PedidosService {
@@ -22,6 +23,7 @@ export class PedidosService {
     private readonly gateway: PedidosGateway,
     private readonly configuracoes: ConfiguracoesService,
     private readonly estabelecimentos: EstabelecimentosService,
+    private readonly comandasService: ComandasService,
   ) {}
 
   // Listar pedidos do estabelecimento (console admin escopado).
@@ -102,6 +104,16 @@ export class PedidosService {
       throw new BadRequestException(
         'Informe o endereço de entrega para pedidos com entrega.',
       );
+    }
+    if (tipoEntrega === TipoEntrega.MESA) {
+      if (!data.mesaId) {
+        throw new BadRequestException('Informe a mesa para o pedido.');
+      }
+      if (!data.telefone?.trim()) {
+        data.telefone = '';
+      }
+    } else if (!data.telefone?.trim()) {
+      throw new BadRequestException('Informe um telefone para contato.');
     }
 
     // Busca os preços atuais de cada produto e seus ingredientes, sempre
@@ -215,19 +227,66 @@ export class PedidosService {
       );
     }
 
+    let comandaId: string | null = null;
+    let mesaId: string | null = null;
+    let numeroMesa: number | null = null;
+    if (tipoEntrega === TipoEntrega.MESA) {
+      const plano = (estabelecimento as any).plano || 'DELIVERY';
+      if (plano !== 'MESA' && plano !== 'COMPLETO') {
+        throw new BadRequestException(
+          'Este estabelecimento não aceita pedidos por mesa.',
+        );
+      }
+
+      const mesa = await this.prisma.mesa.findFirst({
+        where: { id: data.mesaId, estabelecimentoId: estabelecimento.id },
+      });
+
+      if (!mesa) {
+        throw new NotFoundException('Mesa não encontrada.');
+      }
+
+      const comandaAberta = await this.prisma.comanda.findFirst({
+        where: {
+          mesaId: mesa.id,
+          estabelecimentoId: estabelecimento.id,
+          status: 'ABERTA',
+        },
+      });
+
+      if (comandaAberta) {
+        mesaId = mesa.id;
+        numeroMesa = mesa.numero;
+        comandaId = comandaAberta.id;
+      } else {
+        const comanda = await this.comandasService.garantirComandaAberta({
+          estabelecimentoId: estabelecimento.id,
+          mesaId: mesa.id,
+          numeroMesa: mesa.numero,
+        });
+        mesaId = mesa.id;
+        numeroMesa = mesa.numero;
+        comandaId = comanda.id;
+      }
+    }
+
     // Cria o pedido junto com seus itens na mesma transação
     const pedido = await this.prisma.$transaction(async (tx) => {
       return tx.pedido.create({
         data: {
           cliente: data.cliente,
           tipoEntrega,
-          endereco: data.endereco,
-          telefone: data.telefone,
+          endereco: tipoEntrega === TipoEntrega.MESA ? null : data.endereco,
+          telefone: data.telefone ?? '',
           taxaEntrega: deCentavos(taxaEntregaCentavos),
           total: deCentavos(totalCentavos),
           formaPagamento,
           trocoPara:
             trocoParaCentavos === null ? null : deCentavos(trocoParaCentavos),
+          origem: tipoEntrega === TipoEntrega.MESA ? 'MESA' : tipoEntrega,
+          numeroMesa,
+          mesaId,
+          comandaId,
           estabelecimentoId: estabelecimento.id,
           itens: {
             create: itensParaCriar,

@@ -8,7 +8,7 @@ export type PedidoStatus =
   | 'CONCLUIDO'
   | 'CANCELADO';
 
-export type TipoEntrega = 'RETIRADA' | 'ENTREGA';
+export type TipoEntrega = 'RETIRADA' | 'ENTREGA' | 'MESA';
 
 export type FormaPagamento = 'DINHEIRO' | 'PIX' | 'CARTAO';
 
@@ -39,6 +39,10 @@ export interface Pedido {
   total: number;
   formaPagamento: FormaPagamento;
   trocoPara: number | null;
+  origem?: string;
+  numeroMesa?: number | null;
+  mesaId?: string | null;
+  comandaId?: string | null;
   estabelecimentoId: string;
   itens: ItemPedido[];
   createdAt: string;
@@ -84,9 +88,11 @@ export interface CreatePedido {
   slug: string;
   cliente: string;
   tipoEntrega: TipoEntrega;
-  telefone: string;
+  telefone?: string;
   endereco?: string;
   formaPagamento?: FormaPagamento;
   trocoPara?: number;
+  mesaId?: string;
+  numeroMesa?: number;
   itens: ItemPedidoParaCriar[];
 }

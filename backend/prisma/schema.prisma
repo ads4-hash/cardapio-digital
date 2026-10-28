@@ -14,11 +14,14 @@ model Estabelecimento {
   nome          String
   slug          String         @unique
   telefone      String? // contato do estabelecimento (exibido no pedido/WhatsApp)
+  plano         String         @default("DELIVERY") // DELIVERY | MESA | COMPLETO
   usuarios      Usuario[]
   categorias    Categoria[]
   produtos      Produto[]
   ingredientes  Ingrediente[]
   pedidos       Pedido[]
+  mesas         Mesa[]
+  comandas      Comanda[]
   configuracoes Configuracao[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -119,14 +122,20 @@ model ProdutoIngrediente {
 model Pedido {
   id                String          @id @default(uuid())
   cliente           String
-  tipoEntrega       String          @default("RETIRADA") // RETIRADA ou ENTREGA
+  tipoEntrega       String          @default("RETIRADA") // RETIRADA, ENTREGA ou MESA
   endereco          String?
   telefone          String?
-  taxaEntrega       Decimal       @default(0)
+  taxaEntrega       Decimal         @default(0)
   status            String          @default("PENDENTE") // PENDENTE, EM_PREPARO, EM_ROTA, PRONTO, CONCLUIDO, CANCELADO — validado por UpdatePedidoDto
   total             Decimal
   formaPagamento    String          @default("DINHEIRO") // DINHEIRO, PIX, CARTAO
   trocoPara         Decimal? // valor recebido em dinheiro: troco a ser devolvido = trocoPara - total
+  origem            String          @default("DELIVERY") // MESA | BALCAO | DELIVERY | RETIRADA
+  numeroMesa        Int?
+  mesaId            String?
+  mesa              Mesa?           @relation(fields: [mesaId], references: [id])
+  comandaId         String?
+  comanda           Comanda?        @relation(fields: [comandaId], references: [id])
   estabelecimentoId String
   estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
   itens             ItemPedido[]
@@ -137,6 +146,8 @@ model Pedido {
   @@index([estabelecimentoId])
   @@index([estabelecimentoId, status])
   @@index([estabelecimentoId, createdAt])
+  @@index([comandaId])
+  @@index([mesaId])
 }
 
 model ItemPedido {
@@ -214,6 +225,41 @@ model Configuracao {
   estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
 
   @@id([estabelecimentoId, chave])
+}
+
+model Mesa {
+  id                String          @id @default(uuid())
+  numero            Int
+  status            String          @default("LIVRE") // LIVRE | OCUPADA
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id], onDelete: Cascade)
+  comandas          Comanda[]
+  pedidos           Pedido[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([estabelecimentoId, numero])
+  @@index([estabelecimentoId])
+  @@index([estabelecimentoId, status])
+}
+
+model Comanda {
+  id                String          @id @default(uuid())
+  codigo            String          @unique
+  mesaId            String
+  mesa              Mesa            @relation(fields: [mesaId], references: [id])
+  estabelecimentoId String
+  estabelecimento   Estabelecimento @relation(fields: [estabelecimentoId], references: [id])
+  status            String          @default("ABERTA") // ABERTA | FECHADA | CANCELADA
+  pedidos           Pedido[]
+  fechadoPorId      String?
+  fechadoEm         DateTime?
+  observacao        String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([estabelecimentoId, status])
+  @@index([mesaId, status])
 }
 
 model TentativaLogin {

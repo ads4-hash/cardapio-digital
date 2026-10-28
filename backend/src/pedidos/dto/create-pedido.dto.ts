@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -72,6 +73,7 @@ export class ItemPedidoDto {
 export enum TipoEntrega {
   RETIRADA = 'RETIRADA',
   ENTREGA = 'ENTREGA',
+  MESA = 'MESA',
 }
 
 // Métodos de pagamento aceitos pelo estabelecimento
@@ -105,28 +107,29 @@ export class CreatePedidoDto {
   cliente: string;
 
   /**
-   * `RETIRADA` o cliente busca no balcão; `ENTREGA` o estabelecimento leva.
+   * `RETIRADA` o cliente busca no balcão; `ENTREGA` o estabelecimento leva; `MESA` pedido via QR na mesa.
    * @example ENTREGA
    */
   @IsString()
-  @IsIn([TipoEntrega.RETIRADA, TipoEntrega.ENTREGA], {
-    message: 'Informe se o pedido é retirada ou entrega.',
+  @IsIn([TipoEntrega.RETIRADA, TipoEntrega.ENTREGA, TipoEntrega.MESA], {
+    message: 'Informe se o pedido é retirada, entrega ou mesa.',
   })
   tipoEntrega: TipoEntrega;
 
   /**
-   * Contato solicitado no checkout (retirada ou entrega).
+   * Contato solicitado no checkout (retirada ou entrega). Opcional para pedidos na mesa.
    * @example (11) 98888-7777
    */
+  @ValidateIf((o) => o.tipoEntrega !== TipoEntrega.MESA)
   @IsString()
   @IsNotEmpty({ message: 'Informe um telefone para contato.' })
   @MaxLength(20, {
     message: 'O telefone deve ter no máximo 20 caracteres.',
   })
-  telefone: string;
+  telefone?: string;
 
   /**
-   * Endereço exigido quando o pedido é entrega. Omitir em pedidos de retirada.
+   * Endereço exigido quando o pedido é entrega. Omitir em pedidos de retirada ou mesa.
    * @example Rua das Flores, 120 - Centro
    */
   @IsOptional()
@@ -159,6 +162,23 @@ export class CreatePedidoDto {
   )
   @Min(0.01, { message: 'O valor do troco deve ser maior que zero.' })
   trocoPara?: number;
+
+  /**
+   * Mesa para pedido via QR.
+   */
+  @ValidateIf((o) => o.tipoEntrega === TipoEntrega.MESA)
+  @IsString()
+  @IsNotEmpty({ message: 'Informe a mesa.' })
+  mesaId?: string;
+
+  /**
+   * Número da mesa.
+   */
+  @ValidateIf((o) => o.tipoEntrega === TipoEntrega.MESA)
+  @Type(() => Number)
+  @IsInt({ message: 'O número da mesa deve ser inteiro.' })
+  @Min(1, { message: 'O número da mesa é inválido.' })
+  numeroMesa?: number;
 
   /**
    * Itens do pedido, de 1 a 50.
